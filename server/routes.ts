@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { getKeboolaData, generateVisualization } from "./services/keboola";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 const messageSchema = z.object({
   conversationId: z.string(),
@@ -15,34 +16,57 @@ const conversationSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // API routes
-  app.get("/api/conversations", async (req, res) => {
+  // Set up authentication
+  await setupAuth(app);
+
+  // User auth route
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const conversations = await storage.getConversations();
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+  
+  // API routes - protected by authentication
+  app.get("/api/conversations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversations = await storage.getConversations(userId);
       res.json(conversations);
     } catch (error) {
+      console.error("Error fetching conversations:", error);
       res.status(500).json({ message: "Failed to fetch conversations" });
     }
   });
 
-  app.get("/api/conversations/:id", async (req, res) => {
+  app.get("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const conversation = await storage.getConversation(req.params.id);
+      const userId = req.user.claims.sub;
+      const conversation = await storage.getConversation(req.params.id, userId);
+      
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
+      
       res.json(conversation);
     } catch (error) {
+      console.error("Error fetching conversation:", error);
       res.status(500).json({ message: "Failed to fetch conversation" });
     }
   });
 
-  app.post("/api/conversations", async (req, res) => {
+  app.post("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const data = conversationSchema.parse(req.body);
       
       const conversation = await storage.createConversation({
         id: uuidv4(),
+        userId: userId,
         title: data.title,
         messages: [],
         createdAt: new Date(),
@@ -54,25 +78,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid request data", errors: error.errors });
       }
+      console.error("Error creating conversation:", error);
       res.status(500).json({ message: "Failed to create conversation" });
     }
   });
 
-  app.delete("/api/conversations", async (req, res) => {
+  app.delete("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
-      await storage.clearConversations();
+      const userId = req.user.claims.sub;
+      await storage.clearConversations(userId);
       res.status(200).json({ message: "All conversations cleared" });
     } catch (error) {
+      console.error("Error clearing conversations:", error);
       res.status(500).json({ message: "Failed to clear conversations" });
     }
   });
 
-  app.post("/api/messages", async (req, res) => {
+  app.post("/api/messages", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
       const data = messageSchema.parse(req.body);
       
-      // Verify the conversation exists
-      const conversation = await storage.getConversation(data.conversationId);
+      // Verify the conversation exists and belongs to the current user
+      const conversation = await storage.getConversation(data.conversationId, userId);
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
