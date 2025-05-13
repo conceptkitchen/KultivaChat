@@ -73,12 +73,17 @@ export type Conversation = typeof conversations.$inferSelect & {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
-// Storage interface types for in-memory storage
+// Storage interface types for database and memory storage
 export interface IStorage {
-  getConversations(): Promise<Conversation[]>;
-  getConversation(id: string): Promise<Conversation | undefined>;
+  // User operations
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(userData: UpsertUser): Promise<User>;
+  
+  // Conversation operations
+  getConversations(userId?: string): Promise<Conversation[]>;
+  getConversation(id: string, userId?: string): Promise<Conversation | undefined>;
   createConversation(conversation: Conversation): Promise<Conversation>;
   updateConversation(conversation: Conversation): Promise<Conversation>;
-  deleteConversation(id: string): Promise<void>;
-  clearConversations(): Promise<void>;
+  deleteConversation(id: string, userId?: string): Promise<void>;
+  clearConversations(userId?: string): Promise<void>;
 }
