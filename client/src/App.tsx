@@ -13,8 +13,9 @@ import { apiRequest } from "@/lib/queryClient";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/settings" component={Home} />
       <Route path="/chat/:id" component={ChatPage} />
+      <Route path="/" component={ChatPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -75,7 +76,10 @@ function App() {
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <button className="text-neutral-500 hover:text-neutral-700">
+            <button 
+              onClick={() => navigate('/settings')}
+              className="text-neutral-500 hover:text-neutral-700"
+            >
               <svg 
                 xmlns="http://www.w3.org/2000/svg" 
                 width="18" 

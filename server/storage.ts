@@ -1,4 +1,5 @@
 import { type Conversation, type IStorage } from "@shared/schema";
+import { DatabaseStorage } from "./database-storage";
 
 export class MemStorage implements IStorage {
   private conversations: Map<string, Conversation>;
@@ -36,4 +37,8 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// For development, you can choose between MemStorage and DatabaseStorage
+import { DatabaseStorage } from "./database-storage";
+
+// Use DatabaseStorage for persistent chat history
+export const storage = new DatabaseStorage();

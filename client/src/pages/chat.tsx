@@ -1,20 +1,45 @@
-import React from "react";
-import { useRoute } from "wouter";
+import React, { useEffect } from "react";
+import { useRoute, useLocation } from "wouter";
 import { Chat } from "@/components/chat";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Conversation } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { v4 as uuidv4 } from "uuid";
 
 export default function ChatPage() {
   const [match, params] = useRoute<{ id: string }>("/chat/:id");
+  const [, navigate] = useLocation();
   const conversationId = params?.id;
+  
+  // Create a new conversation if we're on the root path
+  const createConversationMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/conversations", {
+        title: "New Conversation",
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      navigate(`/chat/${data.id}`);
+    },
+  });
+  
+  // If we're at the root path with no conversation ID, create one
+  useEffect(() => {
+    if (!conversationId && !match) {
+      createConversationMutation.mutate();
+    }
+  }, [conversationId, match]);
 
   const { data: conversation, isLoading, error } = useQuery<Conversation>({
     queryKey: ["/api/conversations", conversationId],
     enabled: !!conversationId,
   });
 
-  if (isLoading) {
+  if (createConversationMutation.isPending || isLoading) {
     return (
       <div className="h-full flex flex-col">
         <div className="flex-1 p-8 space-y-6">
@@ -29,7 +54,7 @@ export default function ChatPage() {
     );
   }
 
-  if (error || !conversation) {
+  if ((error || !conversation) && conversationId) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center p-8">
@@ -38,6 +63,10 @@ export default function ChatPage() {
         </div>
       </div>
     );
+  }
+
+  if (!conversation) {
+    return null; // This should not happen as we redirect to a new conversation
   }
 
   return <Chat conversation={conversation} />;
