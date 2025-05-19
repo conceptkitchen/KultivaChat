@@ -18,6 +18,26 @@ const conversationSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
   await setupAuth(app);
+  
+  // Add Keboola test endpoint
+  app.get('/api/keboola/test', async (req, res) => {
+    try {
+      const data = await getKeboolaData();
+      res.json({
+        success: true,
+        message: 'Successfully connected to Keboola',
+        data: data.slice(0, 5), // Only return the first 5 records
+        total_records: data.length
+      });
+    } catch (error) {
+      console.error('Keboola test error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to connect to Keboola',
+        error: error.message
+      });
+    }
+  });
 
   // User auth route
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
