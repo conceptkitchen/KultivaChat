@@ -177,19 +177,18 @@ export function Chat({ conversation }: ChatProps) {
         className="flex-1 p-4 md:px-8 space-y-6 custom-scrollbar overflow-y-auto max-h-[calc(100vh-160px)]"
         style={{ overscrollBehavior: "contain" }}
       >
-        {/* Welcome message at the top of the conversation */}
-        <ChatBubble
-          key="welcome-permanent-message"
-          message={{
-            id: "welcome-permanent-message",
-            role: "assistant",
-            content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
-            timestamp: new Date(conversation?.createdAt || Date.now()),
-          }}
-        />
-        
-        {/* Separator line between welcome and conversation */}
-        <div className="border-t border-neutral-200 my-4"></div>
+        {/* Only show welcome message if there are no messages yet */}
+        {messages.length === 0 && (
+          <ChatBubble
+            key="welcome-message"
+            message={{
+              id: "welcome-message",
+              role: "assistant",
+              content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
+              timestamp: new Date(conversation?.createdAt || Date.now()),
+            }}
+          />
+        )}
         
         {/* Actual conversation messages */}
         {messages.map((message) => (
