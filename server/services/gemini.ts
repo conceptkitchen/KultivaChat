@@ -13,6 +13,7 @@ const getApiKey = (): string => {
 const initializeGeminiClient = () => {
   try {
     const apiKey = getApiKey();
+    console.log("Initializing Gemini client with API key (first few chars):", apiKey.substring(0, 5) + "...");
     return new GoogleGenerativeAI(apiKey);
   } catch (error) {
     console.error("Failed to initialize Gemini client:", error);
