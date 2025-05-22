@@ -137,16 +137,15 @@ export function Chat({ conversation }: ChatProps) {
     }
   }, [messages]);
 
-  // TURN OFF automatic message updates from server
-  // This will prevent duplicate messages - we will control this manually
+  // Each conversation is completely independent
   useEffect(() => {
-    if (conversation && conversation.messages && messages.length === 0) {
-      // Only update messages when they're empty (first load)
-      console.log("Initial load of messages:", conversation.messages.length);
-      setMessages(conversation.messages);
+    if (conversation && conversation.id) {
+      // When conversation ID changes, reset the message state
+      console.log("Loading messages for conversation:", conversation.id);
+      setMessages(conversation.messages || []);
       setIsProcessing(false);
     }
-  }, [conversation]);
+  }, [conversation?.id]);
 
   // Initial welcome message if this is a new conversation
   useEffect(() => {

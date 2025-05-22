@@ -33,10 +33,8 @@ export function Sidebar({ isOpen, onClose, onNewChat }: SidebarProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
-      // If on a specific conversation, redirect to home
-      if (location.startsWith('/chat/')) {
-        navigate('/');
-      }
+      // Always create a fresh conversation
+      navigate('/');
     }
   });
 
@@ -152,8 +150,7 @@ export function Sidebar({ isOpen, onClose, onNewChat }: SidebarProps) {
               variant="ghost" 
               className="w-full justify-start px-3 py-2 text-neutral-600"
               onClick={() => {
-                // Logout logic would go here
-                console.log("Logout clicked");
+                window.location.href = "/api/logout";
               }}
             >
               <LogOut className="text-neutral-400 mr-2 h-4 w-4" />
