@@ -131,13 +131,15 @@ export function Chat({ conversation }: ChatProps) {
     }
   };
 
-  // Scroll to bottom when messages change
+  // Make sure all messages are visible, especially the welcome message
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollArea = scrollAreaRef.current;
+      
+      // Always scroll to bottom to show latest messages
       scrollArea.scrollTop = scrollArea.scrollHeight;
     }
-  }, [messages]);
+  }, [messages.length]);
 
   // Each conversation is completely independent
   useEffect(() => {
@@ -145,15 +147,15 @@ export function Chat({ conversation }: ChatProps) {
       // When conversation ID changes, reset the message state
       console.log("Loading messages for conversation:", conversation.id);
       
-      // Create a welcome message that stays at the beginning
+      // Create a welcome message with a permanent ID that stays at the beginning
       const welcomeMessage = {
-        id: "welcome-message",
+        id: "welcome-message-" + conversation.id,
         role: "assistant" as const,
         content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
         timestamp: new Date(conversation.createdAt),
       };
       
-      // Always include welcome message before other messages
+      // Always include welcome message before other messages (at the top)
       const allMessages = [welcomeMessage, ...(conversation.messages || [])];
       
       // Set messages with welcome message
