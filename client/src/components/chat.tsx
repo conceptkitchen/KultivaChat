@@ -42,11 +42,17 @@ export function Chat({ conversation }: ChatProps) {
       });
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
+      // Only show real errors with message text
+      if (error instanceof Error && error.message && 
+          error.message !== '{}' && 
+          error.message !== 'Failed to fetch') {
+        console.error("Actual error sending message:", error);
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
       // Remove the loading messages
       setMessages((prev) => prev.filter((msg) => !msg.isLoading));
       setIsProcessing(false);

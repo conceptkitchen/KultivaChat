@@ -2,8 +2,19 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    try {
+      // Only throw for actual errors with meaningful content
+      const text = await res.text();
+      // Skip empty responses or generic failures
+      if (text && text !== '{}' && text !== 'Failed to fetch') {
+        throw new Error(`${res.status}: ${text}`);
+      }
+    } catch (e) {
+      // If we can't read the response, just use the status text
+      if (res.status !== 200) {
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
+    }
   }
 }
 
