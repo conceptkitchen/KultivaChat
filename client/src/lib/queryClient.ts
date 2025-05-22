@@ -29,7 +29,14 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    // Handle array query keys for nested resources
+    let url = queryKey[0] as string;
+    if (queryKey.length > 1 && queryKey[1]) {
+      // If we have a nested resource like /api/conversations/123
+      url = `${url}/${queryKey[1]}`;
+    }
+    
+    const res = await fetch(url, {
       credentials: "include",
     });
 

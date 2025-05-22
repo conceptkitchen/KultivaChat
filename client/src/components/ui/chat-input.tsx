@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  conversationId?: string; // Add conversationId prop
   disabled?: boolean;
   placeholder?: string;
 }

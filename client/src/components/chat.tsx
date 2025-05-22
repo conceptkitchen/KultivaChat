@@ -18,6 +18,9 @@ export function Chat({ conversation }: ChatProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // For debugging
+  console.log("Chat rendering with conversation:", conversation.id);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (message: { conversationId: string; content: string }) => {

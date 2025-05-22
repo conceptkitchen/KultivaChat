@@ -69,5 +69,6 @@ export default function ChatPage() {
     return null; // This should not happen as we redirect to a new conversation
   }
 
+  console.log("Chat page rendering conversation:", conversation);
   return <Chat conversation={conversation} />;
 }
