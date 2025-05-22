@@ -116,15 +116,20 @@ export function Chat({ conversation }: ChatProps) {
       
       setIsProcessing(false);
     } catch (error) {
-      console.error("Failed to send message:", error);
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
+      // Only show errors if the message actually failed to send
+      if (error instanceof Error && error.message) {
+        console.error("Failed to send message:", error);
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
       
-      // Remove loading message
-      setMessages(prev => prev.filter(msg => !msg.isLoading));
+      // Remove loading message if there's an actual error
+      if (error instanceof Error && error.message) {
+        setMessages(prev => prev.filter(msg => !msg.isLoading));
+      }
       setIsProcessing(false);
     }
   };
