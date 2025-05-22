@@ -58,7 +58,7 @@ export function Chat({ conversation }: ChatProps) {
     
     setIsProcessing(true);
     
-    // Add user message immediately
+    // Create new message objects
     const userMessage: Message = {
       id: uuidv4(),
       role: "user",
@@ -75,7 +75,10 @@ export function Chat({ conversation }: ChatProps) {
       isLoading: true,
     };
     
+    // Update messages state with user's message and loading indicator
     setMessages((prev) => [...prev, userMessage, loadingMessage]);
+    
+    console.log("Added user message to chat:", content);
     
     // Send to API
     sendMessageMutation.mutate({
