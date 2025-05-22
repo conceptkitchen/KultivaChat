@@ -58,6 +58,10 @@ export function Chat({ conversation }: ChatProps) {
     
     setIsProcessing(true);
     
+    // Only show the message locally until the server responds
+    // This prevents duplicate messages in the UI
+    const tempMessages = [...messages];
+    
     // Create new message objects
     const userMessage: Message = {
       id: uuidv4(),
@@ -75,10 +79,11 @@ export function Chat({ conversation }: ChatProps) {
       isLoading: true,
     };
     
-    // Update messages state with user's message and loading indicator
-    setMessages((prev) => [...prev, userMessage, loadingMessage]);
+    // Add temporary messages for UI display only
+    tempMessages.push(userMessage, loadingMessage);
+    setMessages(tempMessages);
     
-    console.log("Added user message to chat:", content);
+    console.log("Sending message to API:", content);
     
     // Send to API
     sendMessageMutation.mutate({
@@ -98,8 +103,13 @@ export function Chat({ conversation }: ChatProps) {
   // Update local messages when conversation updates
   useEffect(() => {
     if (conversation && conversation.messages) {
-      setMessages(conversation.messages);
-      setIsProcessing(false); // Clear processing state when we get a response
+      // Only update messages from the server if they're different
+      // This prevents duplicate messages from appearing
+      if (JSON.stringify(messages) !== JSON.stringify(conversation.messages)) {
+        console.log("Updating messages from server - count:", conversation.messages.length);
+        setMessages(conversation.messages);
+        setIsProcessing(false); // Clear processing state when we get a response
+      }
     }
   }, [conversation]);
 
