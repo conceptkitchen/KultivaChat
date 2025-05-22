@@ -14,13 +14,21 @@ interface ChatProps {
 
 export function Chat({ conversation }: ChatProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const [messages, setMessages] = useState<Message[]>(conversation.messages || []);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   // For debugging
   console.log("Chat rendering with conversation:", conversation.id);
+  
+  // Update messages when conversation changes
+  useEffect(() => {
+    if (conversation && conversation.messages) {
+      setMessages(conversation.messages);
+      console.log("Updated messages from conversation:", conversation.messages.length);
+    }
+  }, [conversation]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (message: { conversationId: string; content: string }) => {
