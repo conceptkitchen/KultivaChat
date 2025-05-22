@@ -147,19 +147,9 @@ export function Chat({ conversation }: ChatProps) {
       // When conversation ID changes, reset the message state
       console.log("Loading messages for conversation:", conversation.id);
       
-      // Create a welcome message with a permanent ID that stays at the beginning
-      const welcomeMessage = {
-        id: "welcome-message-" + conversation.id,
-        role: "assistant" as const,
-        content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
-        timestamp: new Date(conversation.createdAt),
-      };
-      
-      // Always include welcome message before other messages (at the top)
-      const allMessages = [welcomeMessage, ...(conversation.messages || [])];
-      
-      // Set messages with welcome message
-      setMessages(allMessages);
+      // Set messages directly from the conversation, as welcome 
+      // message is now handled in the render function
+      setMessages(conversation.messages || []);
       setIsProcessing(false);
     }
   }, [conversation?.id]);
@@ -185,7 +175,23 @@ export function Chat({ conversation }: ChatProps) {
       <ScrollArea 
         ref={scrollAreaRef}
         className="flex-1 p-4 md:px-8 space-y-6 custom-scrollbar overflow-y-auto max-h-[calc(100vh-160px)]"
+        style={{ overscrollBehavior: "contain" }}
       >
+        {/* Welcome message at the top of the conversation */}
+        <ChatBubble
+          key="welcome-permanent-message"
+          message={{
+            id: "welcome-permanent-message",
+            role: "assistant",
+            content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
+            timestamp: new Date(conversation?.createdAt || Date.now()),
+          }}
+        />
+        
+        {/* Separator line between welcome and conversation */}
+        <div className="border-t border-neutral-200 my-4"></div>
+        
+        {/* Actual conversation messages */}
         {messages.map((message) => (
           <ChatBubble 
             key={message.id} 
