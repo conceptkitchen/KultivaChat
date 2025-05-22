@@ -117,8 +117,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/messages", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
-      const data = messageSchema.parse(req.body);
+      // Ensure user is authenticated and has valid claims
+      if (!req.user || !req.user.claims || !req.user.claims.sub) {
+        return res.status(401).json({ message: "User not properly authenticated" });
+      }
+      
+      const userId = req.user.claims.sub;
+      
+      // Validate the message data
+      let data;
+      try {
+        data = messageSchema.parse(req.body);
+      } catch (err) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({ message: "Invalid request data", errors: err.errors });
+        }
+        throw err;
+      }
       
       // Verify the conversation exists and belongs to the current user
       const conversation = await storage.getConversation(data.conversationId, userId);
