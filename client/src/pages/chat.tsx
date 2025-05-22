@@ -16,6 +16,18 @@ export default function ChatPage() {
   // Create a new conversation if we're on the root path
   const createConversationMutation = useMutation({
     mutationFn: async () => {
+      // Clear any previous conversations first
+      try {
+        await fetch('/api/conversations', {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+        console.log("Cleared old conversations");
+      } catch (err) {
+        console.error("Failed to clear conversations:", err);
+      }
+      
+      // Create a new conversation
       const response = await apiRequest("POST", "/api/conversations", {
         title: "New Conversation",
       });
