@@ -103,12 +103,14 @@ export function Chat({ conversation }: ChatProps) {
   // Update local messages when conversation updates
   useEffect(() => {
     if (conversation && conversation.messages) {
-      // Only update messages from the server if they're different
-      // This prevents duplicate messages from appearing
-      if (JSON.stringify(messages) !== JSON.stringify(conversation.messages)) {
-        console.log("Updating messages from server - count:", conversation.messages.length);
+      // Only replace messages if the server has different data
+      const serverMessageIds = conversation.messages.map(msg => msg.id).sort().join(',');
+      const clientMessageIds = messages.map(msg => msg.id).sort().join(',');
+      
+      if (serverMessageIds !== clientMessageIds) {
+        console.log("Replacing messages with server data:", conversation.messages.length);
         setMessages(conversation.messages);
-        setIsProcessing(false); // Clear processing state when we get a response
+        setIsProcessing(false);
       }
     }
   }, [conversation]);
@@ -131,7 +133,7 @@ export function Chat({ conversation }: ChatProps) {
     <div className="flex flex-col h-full overflow-hidden bg-neutral-50">
       <ScrollArea 
         ref={scrollAreaRef}
-        className="flex-1 p-4 md:px-8 space-y-6 custom-scrollbar"
+        className="flex-1 p-4 md:px-8 space-y-6 custom-scrollbar overflow-y-auto max-h-[calc(100vh-160px)]"
       >
         {messages.map((message) => (
           <ChatBubble 
