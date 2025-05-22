@@ -124,12 +124,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const userId = req.user.claims.sub;
       
+      // Debug request body
+      console.log("Message request body:", JSON.stringify(req.body));
+      
       // Validate the message data
       let data;
       try {
         data = messageSchema.parse(req.body);
       } catch (err) {
         if (err instanceof z.ZodError) {
+          console.log("Validation error:", JSON.stringify(err.errors));
           return res.status(400).json({ message: "Invalid request data", errors: err.errors });
         }
         throw err;
