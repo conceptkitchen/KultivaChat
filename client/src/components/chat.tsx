@@ -56,15 +56,21 @@ export function Chat({ conversation }: ChatProps) {
   const handleSendMessage = async (content: string) => {
     if (isProcessing) return;
     
+    // Don't allow sending the same message twice in a row
+    const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
+    if (lastUserMsg && lastUserMsg.content === content) {
+      console.log("Prevented sending duplicate message");
+      return;
+    }
+    
     setIsProcessing(true);
     
     // Only show the message locally until the server responds
-    // This prevents duplicate messages in the UI
-    const tempMessages = [...messages];
+    const tempId = uuidv4(); // Generate a temporary ID for tracking
     
     // Create new message objects
     const userMessage: Message = {
-      id: uuidv4(),
+      id: tempId,
       role: "user",
       content,
       timestamp: new Date(),
@@ -79,9 +85,8 @@ export function Chat({ conversation }: ChatProps) {
       isLoading: true,
     };
     
-    // Add temporary messages for UI display only
-    tempMessages.push(userMessage, loadingMessage);
-    setMessages(tempMessages);
+    // Replace all messages with the updated list
+    setMessages([...messages, userMessage, loadingMessage]);
     
     console.log("Sending message to API:", content);
     

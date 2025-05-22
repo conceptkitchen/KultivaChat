@@ -127,16 +127,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Debug request body
       console.log("Message request body:", JSON.stringify(req.body));
       
-      // Check for duplicate messages
-      // This prevents multiple of the same message from being added
+      // Strict duplicate detection - check for exact same message
       const existingConversation = await storage.getConversation(req.body.conversationId, userId);
       if (existingConversation && existingConversation.messages) {
-        const lastUserMessages = existingConversation.messages
+        // Get the last user message
+        const lastUserMessage = existingConversation.messages
           .filter(msg => msg.role === "user")
-          .slice(-3);
+          .pop();
         
-        if (lastUserMessages.some(msg => msg.content === req.body.content)) {
-          console.log("Duplicate message detected. Ignoring.");
+        // If the last user message is identical, it's a definite duplicate
+        if (lastUserMessage && lastUserMessage.content === req.body.content) {
+          console.log("Exact duplicate message detected, returning existing conversation");
           return res.status(200).json({ 
             message: "Duplicate message ignored",
             conversation: existingConversation
