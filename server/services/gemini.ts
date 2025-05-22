@@ -30,13 +30,17 @@ export async function generateGeminiResponse(
     const genAI = initializeGeminiClient();
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    // Format conversation history for the model
-    const formattedHistory = conversationHistory.map(message => ({
+    // For single message responses, don't use conversation history
+    // This prevents message chains and keeps each exchange independent
+    const useHistory = false; // Set to false to ignore conversation history
+
+    // Format conversation history for the model (if enabled)
+    const formattedHistory = useHistory ? conversationHistory.map(message => ({
       role: message.role === "user" ? "user" : "model",
       parts: [{ text: message.content }]
-    }));
+    })) : [];
 
-    // Start a chat session
+    // Start a chat session (with empty history if useHistory is false)
     const chat = model.startChat({
       history: formattedHistory,
       generationConfig: {
