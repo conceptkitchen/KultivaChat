@@ -31,7 +31,7 @@ export function Chat({ conversation }: ChatProps) {
   }, [conversation]);
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (message: { conversationId: string; content: string }) => {
+    mutationFn: async (message: { conversationId: string; content: string; systemMessage?: string }) => {
       return await apiRequest("POST", "/api/messages", message);
     },
     onSuccess: (response) => {
@@ -144,26 +144,39 @@ export function Chat({ conversation }: ChatProps) {
     if (conversation && conversation.id) {
       // When conversation ID changes, reset the message state
       console.log("Loading messages for conversation:", conversation.id);
-      setMessages(conversation.messages || []);
+      
+      // Create a welcome message that stays at the beginning
+      const welcomeMessage = {
+        id: "welcome-message",
+        role: "assistant" as const,
+        content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
+        timestamp: new Date(conversation.createdAt),
+      };
+      
+      // Always include welcome message before other messages
+      const allMessages = [welcomeMessage, ...(conversation.messages || [])];
+      
+      // Set messages with welcome message
+      setMessages(allMessages);
       setIsProcessing(false);
     }
   }, [conversation?.id]);
 
-  // Initial welcome message gets added directly to the conversation
+  // Add welcome message to the conversation
   useEffect(() => {
-    // Only add welcome message to empty conversations
-    if (conversation?.messages?.length === 0 && messages.length === 0) {
+    // Only show welcome message for conversations that have no messages or have user messages
+    if (conversation && messages.length === 0) {
       const welcomeMessage = {
-        id: uuidv4(),
-        role: "assistant",
+        id: "welcome-" + uuidv4(),
+        role: "assistant" as const,
         content: "Hello! I'm Kultivate AI, your data assistant. I can help you with:\n\n• Analyzing and visualizing your data\n• Creating code snippets for your Keboola integrations\n• Generating documentation and reports\n• Answering questions about your data pipeline\n\nWhat would you like to work on today?",
         timestamp: new Date(),
       };
       
-      // Add welcome message to the current conversation
+      // Add welcome message at beginning
       setMessages([welcomeMessage]);
     }
-  }, [conversation?.id]);
+  }, [conversation, messages.length]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-neutral-50">
