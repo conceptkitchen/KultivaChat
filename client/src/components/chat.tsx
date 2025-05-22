@@ -56,21 +56,20 @@ export function Chat({ conversation }: ChatProps) {
   const handleSendMessage = async (content: string) => {
     if (isProcessing) return;
     
-    // Don't allow sending the same message twice in a row
-    const lastUserMsg = [...messages].reverse().find(m => m.role === "user");
-    if (lastUserMsg && lastUserMsg.content === content) {
-      console.log("Prevented sending duplicate message");
+    // STRICT duplicate check
+    if (messages.some(msg => msg.role === "user" && msg.content === content)) {
+      toast({
+        title: "Duplicate message",
+        description: "You've already sent this message",
+      });
       return;
     }
     
     setIsProcessing(true);
     
-    // Only show the message locally until the server responds
-    const tempId = uuidv4(); // Generate a temporary ID for tracking
-    
-    // Create new message objects
+    // Create new message objects with fixed IDs
     const userMessage: Message = {
-      id: tempId,
+      id: uuidv4(),
       role: "user",
       content,
       timestamp: new Date(),
@@ -85,16 +84,49 @@ export function Chat({ conversation }: ChatProps) {
       isLoading: true,
     };
     
-    // Replace all messages with the updated list
-    setMessages([...messages, userMessage, loadingMessage]);
+    // Add to local messages only - don't use server data
+    const updatedMessages = [...messages, userMessage, loadingMessage];
+    setMessages(updatedMessages);
     
     console.log("Sending message to API:", content);
     
-    // Send to API
-    sendMessageMutation.mutate({
-      conversationId: conversation.id,
-      content,
-    });
+    try {
+      // Send to API
+      const response = await sendMessageMutation.mutateAsync({
+        conversationId: conversation.id,
+        content,
+      });
+      
+      // Get response data
+      const data = await response.json();
+      
+      // Manually update messages with the response
+      const aiMessage: Message = {
+        id: data.aiMessage.id,
+        role: "assistant",
+        content: data.aiMessage.content,
+        displays: data.aiMessage.displays || [],
+        timestamp: new Date(data.aiMessage.timestamp),
+      };
+      
+      // Replace loading message with actual response
+      setMessages(prev => 
+        prev.map(msg => msg.isLoading ? aiMessage : msg)
+      );
+      
+      setIsProcessing(false);
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Remove loading message
+      setMessages(prev => prev.filter(msg => !msg.isLoading));
+      setIsProcessing(false);
+    }
   };
 
   // Scroll to bottom when messages change
@@ -105,18 +137,14 @@ export function Chat({ conversation }: ChatProps) {
     }
   }, [messages]);
 
-  // Update local messages when conversation updates
+  // TURN OFF automatic message updates from server
+  // This will prevent duplicate messages - we will control this manually
   useEffect(() => {
-    if (conversation && conversation.messages) {
-      // Only replace messages if the server has different data
-      const serverMessageIds = conversation.messages.map(msg => msg.id).sort().join(',');
-      const clientMessageIds = messages.map(msg => msg.id).sort().join(',');
-      
-      if (serverMessageIds !== clientMessageIds) {
-        console.log("Replacing messages with server data:", conversation.messages.length);
-        setMessages(conversation.messages);
-        setIsProcessing(false);
-      }
+    if (conversation && conversation.messages && messages.length === 0) {
+      // Only update messages when they're empty (first load)
+      console.log("Initial load of messages:", conversation.messages.length);
+      setMessages(conversation.messages);
+      setIsProcessing(false);
     }
   }, [conversation]);
 
