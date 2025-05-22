@@ -27,7 +27,7 @@ export async function generateGeminiResponse(
 ): Promise<{ content: string; displays?: any[] }> {
   try {
     const genAI = initializeGeminiClient();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     // Format conversation history for the model
     const formattedHistory = conversationHistory.map(message => ({
