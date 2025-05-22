@@ -1,10 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AssistantAI } from "@/components/ui/assistant-ai";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
+import { GeminiTester } from "@/components/gemini-tester";
 
 export default function Home() {
   const [, navigate] = useLocation();
@@ -26,6 +27,8 @@ export default function Home() {
     createConversationMutation.mutate();
   };
 
+  const [showTester, setShowTester] = useState(false);
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-4 md:p-8 bg-neutral-50">
       <div className="max-w-2xl w-full text-center space-y-8">
@@ -38,7 +41,15 @@ export default function Home() {
             Your AI assistant for data visualization, code generation, 
             and Keboola API integration
           </p>
+          <Button 
+            variant="outline"
+            onClick={() => setShowTester(!showTester)}
+          >
+            {showTester ? "Hide Gemini Tester" : "Test Gemini 2.0 Flash"}
+          </Button>
         </div>
+        
+        {showTester && <GeminiTester />}
 
         <div className="grid gap-4 md:grid-cols-2 p-4">
           <div className="bg-white rounded-lg p-4 shadow-sm border border-neutral-200">

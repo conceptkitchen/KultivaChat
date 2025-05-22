@@ -38,7 +38,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Register both authenticated and unauthenticated routes
   const server = await registerRoutes(app);
+  await registerUnauthedRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
