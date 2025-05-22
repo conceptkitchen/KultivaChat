@@ -131,15 +131,26 @@ export function Chat({ conversation }: ChatProps) {
     }
   };
 
-  // Make sure all messages are visible, especially the welcome message
+  // Auto-scroll to the bottom whenever messages change or a message is sent
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollArea = scrollAreaRef.current;
+    // Only auto-scroll when we have messages or when processing a message
+    if (messages.length > 0 || isProcessing) {
+      const scrollToBottom = () => {
+        if (scrollAreaRef.current) {
+          scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+      };
       
-      // Always scroll to bottom to show latest messages
-      scrollArea.scrollTop = scrollArea.scrollHeight;
+      // Scroll immediately
+      scrollToBottom();
+      
+      // And again after a tiny delay to ensure DOM has updated
+      setTimeout(scrollToBottom, 100);
+      
+      // One more time for good measure to handle slow DOM updates
+      setTimeout(scrollToBottom, 300);
     }
-  }, [messages.length]);
+  }, [messages, isProcessing]);
 
   // Each conversation is completely independent
   useEffect(() => {
