@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/messages", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
       const data = messageSchema.parse(req.body);
       
       // Verify the conversation exists and belongs to the current user
