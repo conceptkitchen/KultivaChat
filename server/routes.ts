@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 import { getKeboolaData, generateVisualization } from "./services/keboola";
+import { generateGeminiResponse } from "./services/gemini";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
 const messageSchema = z.object({
@@ -94,11 +95,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       res.status(201).json(conversation);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid request data", errors: error.errors });
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid request data", errors: err.errors });
       }
-      console.error("Error creating conversation:", error);
+      console.error("Error creating conversation:", err);
       res.status(500).json({ message: "Failed to create conversation" });
     }
   });
@@ -137,34 +138,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let assistantMessage;
       let displays = [];
 
-      // Keywords to look for in the user's message
-      const isAskingForVisualization = data.content.toLowerCase().includes("visualization") || 
-                                       data.content.toLowerCase().includes("chart") ||
-                                       data.content.toLowerCase().includes("graph");
-      
-      const isAskingForTable = data.content.toLowerCase().includes("table") || 
-                                data.content.toLowerCase().includes("data table") ||
-                                data.content.toLowerCase().includes("show data");
-      
-      const isAskingForCode = data.content.toLowerCase().includes("code") || 
-                               data.content.toLowerCase().includes("script") ||
-                               data.content.toLowerCase().includes("implementation");
-      
-      const isAskingAboutKeboola = data.content.toLowerCase().includes("keboola") ||
-                                    data.content.toLowerCase().includes("api");
-
       try {
+        // Extract previous messages for context
+        const previousMessages = conversation.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })).slice(-10); // Get last 10 messages for context
+        
+        // Keywords to look for in the user's message
+        const isAskingForVisualization = data.content.toLowerCase().includes("visualization") || 
+                                         data.content.toLowerCase().includes("chart") ||
+                                         data.content.toLowerCase().includes("graph");
+        
+        const isAskingForTable = data.content.toLowerCase().includes("table") || 
+                                  data.content.toLowerCase().includes("data table") ||
+                                  data.content.toLowerCase().includes("show data");
+                                  
+        const isAskingAboutKeboola = data.content.toLowerCase().includes("keboola") ||
+                                      data.content.toLowerCase().includes("api");
+
         // Fetch data from Keboola if requested
         let keboolaData = null;
         if (isAskingAboutKeboola || isAskingForVisualization || isAskingForTable) {
           try {
             keboolaData = await getKeboolaData();
-          } catch (error) {
-            console.error("Error fetching Keboola data:", error);
+          } catch (err) {
+            console.error("Error fetching Keboola data:", err);
           }
         }
 
-        // Build appropriate response
+        // Special handling for visualization or table requests with Keboola data
         if (isAskingForVisualization && keboolaData) {
           const visualizationResponse = await generateVisualization(keboolaData, data.content);
           
@@ -190,59 +193,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             ]
           };
-        } else if (isAskingForCode) {
-          // Generate code sample based on request
-          const codeSnippet = `// Example code for ${data.content.includes("Keboola") ? "Keboola API integration" : "data processing"}
-const fetchData = async () => {
-  const API_URL = 'https://connection.keboola.com/v2/storage';
-  const API_KEY = process.env.KEBOOLA_API_KEY;
-  
-  try {
-    const response = await fetch(\`\${API_URL}/tables/your-table-id/export\`, {
-      method: 'GET',
-      headers: {
-        'X-StorageApi-Token': API_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error(\`API error: \${response.status}\`);
-    }
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    throw error;
-  }
-};`;
-
-          assistantMessage = {
-            id: uuidv4(),
-            role: "assistant" as const,
-            content: "Here's a code example that might help you:",
-            timestamp: new Date(),
-            displays: [
-              {
-                type: "code",
-                title: "Code Example",
-                language: "javascript",
-                content: codeSnippet
-              }
-            ]
-          };
         } else {
-          // General response
-          assistantMessage = {
-            id: uuidv4(),
-            role: "assistant" as const,
-            content: `I'd be happy to help with that. Could you provide more details about what you're looking for? I can help with data visualization, Keboola API integration, code generation, or creating documentation.`,
-            timestamp: new Date()
-          };
+          // For all other requests, use Gemini model
+          try {
+            // Add Keboola context if relevant
+            let prompt = data.content;
+            if (keboolaData && isAskingAboutKeboola) {
+              prompt += `\n\nAvailable Keboola data (sample): ${JSON.stringify(keboolaData.slice(0, 3))}`;
+            }
+            
+            // Get response from Gemini
+            const geminiResponse = await generateGeminiResponse(prompt, previousMessages);
+            
+            assistantMessage = {
+              id: uuidv4(),
+              role: "assistant" as const,
+              content: geminiResponse.content,
+              timestamp: new Date(),
+              displays: geminiResponse.displays
+            };
+          } catch (error) {
+            console.error("Error generating Gemini response:", error);
+            // Fallback if Gemini fails
+            assistantMessage = {
+              id: uuidv4(),
+              role: "assistant" as const,
+              content: "I'm sorry, but I'm having trouble connecting to my AI service right now. Please try again in a few moments.",
+              timestamp: new Date()
+            };
+          }
         }
       } catch (error) {
-        // Fallback response if something goes wrong
+        console.error("Error processing message:", error);
+        // General fallback response
         assistantMessage = {
           id: uuidv4(),
           role: "assistant" as const,
