@@ -94,8 +94,8 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
                   {tableData.map((row, i) => (
                     <TableRow key={i} className={i % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
                       {columns.map((column) => (
-                        <TableCell key={column} className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap border-b border-gray-200">
-                          <div className="max-w-48 truncate" title={String(row[column] || '')}>
+                        <TableCell key={column} className="px-4 py-3 text-sm text-gray-900 border-b border-gray-200">
+                          <div className="min-w-0 break-words" title={String(row[column] || '')}>
                             {String(row[column] || '')}
                           </div>
                         </TableCell>
