@@ -327,12 +327,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   } else {
                     // Show all tables in the bucket
                     const tablesList = tables.map(table => ({
-                      'Table Name': table.name,
-                      'Table ID': table.id,
-                      'Rows': table.rowsCount,
-                      'Columns': table.columns.length,
-                      'Size (MB)': Math.round(table.dataSizeBytes / 1024 / 1024 * 100) / 100,
-                      'Last Updated': new Date(table.lastChangeDate).toLocaleDateString()
+                      'Table Name': table.name || 'Unknown',
+                      'Table ID': table.id || 'Unknown',
+                      'Rows': table.rowsCount || 0,
+                      'Columns': (table.columns && table.columns.length) || 0,
+                      'Size (MB)': table.dataSizeBytes ? Math.round(table.dataSizeBytes / 1024 / 1024 * 100) / 100 : 0,
+                      'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
                     }));
                     
                     assistantMessage = {
