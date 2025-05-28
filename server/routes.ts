@@ -213,8 +213,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                data.content.toLowerCase().includes("pipeline") ||
                                data.content.toLowerCase().includes("transformation");
                                   
+        // MCP server should handle ALL data questions as the primary data source
         const isAskingAboutKeboola = data.content.toLowerCase().includes("keboola") ||
                                       data.content.toLowerCase().includes("api") ||
+                                      data.content.toLowerCase().includes("data") ||
+                                      data.content.toLowerCase().includes("table") ||
+                                      data.content.toLowerCase().includes("bucket") ||
+                                      data.content.toLowerCase().includes("job") ||
+                                      data.content.toLowerCase().includes("how many") ||
+                                      data.content.toLowerCase().includes("show me") ||
+                                      data.content.toLowerCase().includes("what") ||
+                                      data.content.toLowerCase().includes("query") ||
+                                      data.content.toLowerCase().includes("count") ||
+                                      data.content.toLowerCase().includes("find") ||
+                                      data.content.toLowerCase().includes("search") ||
+                                      data.content.toLowerCase().includes("squarespace") ||
+                                      data.content.toLowerCase().includes("closeout") ||
                                       isAskingForTable || isAskingForBuckets || isAskingForJobs;
 
         // Handle Keboola MCP requests
@@ -353,16 +367,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 displays: []
               };
             } else {
-              // General Keboola query - show project overview
+              // Intelligent data analysis - understand the question and provide context
               const buckets = await keboolaMCP.retrieveBuckets();
-              const response = keboolaMCP.generateDataResponse(buckets, data.content, 'buckets');
+              const queryLower = data.content.toLowerCase();
+              
+              // Try to find relevant buckets and provide intelligent responses
+              let relevantData = [];
+              let responseMessage = "";
+              
+              if (queryLower.includes("squarespace")) {
+                // Look for Squarespace-related buckets
+                const squarespaceBucket = buckets.find(b => 
+                  b.name.toLowerCase().includes("squarespace") || 
+                  b.id.toLowerCase().includes("squarespace")
+                );
+                
+                if (squarespaceBucket) {
+                  const tables = await keboolaMCP.retrieveBucketTables(squarespaceBucket.id);
+                  responseMessage = `Found Squarespace data in bucket "${squarespaceBucket.name}" with ${tables.length} tables:`;
+                  relevantData = tables.map(table => ({
+                    'Table Name': table.name,
+                    'Records': table.rowsCount,
+                    'Columns': table.columns.length,
+                    'Last Updated': new Date(table.lastChangeDate).toLocaleDateString()
+                  }));
+                } else {
+                  responseMessage = `Looking through all ${buckets.length} buckets for Squarespace data...`;
+                  relevantData = buckets.map(bucket => ({
+                    'Bucket Name': bucket.name,
+                    'Bucket ID': bucket.id,
+                    'Stage': bucket.stage,
+                    'Description': bucket.description || 'No description'
+                  }));
+                }
+              } else if (queryLower.includes("closeout") || queryLower.includes("how many")) {
+                // Try to find data that might contain "closeout" information
+                responseMessage = `Searching through your ${buckets.length} data buckets for relevant information:`;
+                
+                // Get a sample from each bucket to provide context
+                for (const bucket of buckets.slice(0, 3)) { // Limit to first 3 buckets
+                  try {
+                    const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
+                    if (tables.length > 0) {
+                      relevantData.push({
+                        'Bucket': bucket.name,
+                        'Tables': tables.length,
+                        'Total Records': tables.reduce((sum, table) => sum + table.rowsCount, 0),
+                        'Example Table': tables[0].name
+                      });
+                    }
+                  } catch (err) {
+                    console.log(`Could not access bucket ${bucket.name}`);
+                  }
+                }
+              } else {
+                // General data overview
+                responseMessage = `Here's your complete Keboola data overview with ${buckets.length} buckets:`;
+                relevantData = buckets.map(bucket => ({
+                  'Bucket Name': bucket.name,
+                  'Bucket ID': bucket.id,
+                  'Stage': bucket.stage,
+                  'Created': new Date(bucket.created).toLocaleDateString(),
+                  'Description': bucket.description || 'No description'
+                }));
+              }
               
               assistantMessage = {
                 id: uuidv4(),
                 role: "assistant" as const,
-                content: `Here's an overview of your Keboola project:\n\n${response.message}`,
+                content: responseMessage,
                 timestamp: new Date(),
-                displays: response.displays
+                displays: [{
+                  type: "table",
+                  title: "Your Data",
+                  content: relevantData
+                }]
               };
             }
           } catch (mcpError) {
