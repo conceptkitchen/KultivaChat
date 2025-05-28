@@ -36,7 +36,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({
         success: false,
         message: 'Failed to connect to Keboola',
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
@@ -321,21 +321,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           // For all other requests, use Gemini model
           try {
-            // Add Keboola context if relevant
-            let prompt = data.content;
-            if (keboolaData && isAskingAboutKeboola) {
-              prompt += `\n\nAvailable Keboola data (sample): ${JSON.stringify(keboolaData.slice(0, 3))}`;
-            }
-            
             // Get response from Gemini
-            const geminiResponse = await generateGeminiResponse(prompt, previousMessages);
+            const geminiResponse = await generateGeminiResponse(data.content, previousMessages);
             
             assistantMessage = {
               id: uuidv4(),
               role: "assistant" as const,
-              content: geminiResponse.content,
+              content: geminiResponse,
               timestamp: new Date(),
-              displays: geminiResponse.displays
+              displays: []
             };
           } catch (error) {
             console.error("Error generating Gemini response:", error);
