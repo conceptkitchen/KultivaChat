@@ -548,46 +548,60 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
   const message = userMessage.toLowerCase();
   
   try {
-    // Smart query for specific business data
-    if (message.includes('kapwa') && (message.includes('order') || message.includes('data'))) {
-      // First get the actual tables in the Kapwa Gardens bucket
+    // Show workspace tables first if asking about data
+    if (message.includes('workspace') || (message.includes('table') && message.includes('show'))) {
       try {
-        const kapwaTables = await keboolaMCP.retrieveBucketTables('out.c-squarespace-kapwa-gardens');
+        const workspaceTables = await keboolaMCP.showWorkspaceTables();
+        return {
+          content: `Here are all the tables available in your workspace:`,
+          displays: [{
+            type: "table",
+            title: "Workspace Tables",
+            content: workspaceTables
+          }]
+        };
+      } catch (error) {
+        return {
+          content: `Unable to access workspace tables. Error: ${error.message}`,
+          displays: []
+        };
+      }
+    }
+
+    // Smart query for specific business data - query workspace directly
+    if (message.includes('kapwa') && (message.includes('order') || message.includes('data'))) {
+      try {
+        // Query Kapwa Gardens orders directly from workspace using the exact table name from your screenshot
+        const kapwaQuery = `SELECT * FROM OUT_FACT_ORDERS_KAPWA_GARDENS LIMIT 20`;
+        const kapwaData = await keboolaMCP.queryTable(kapwaQuery);
         
-        if (kapwaTables && kapwaTables.length > 0) {
-          // Find orders table
-          const ordersTable = kapwaTables.find(table => 
-            table.name.toLowerCase().includes('order') || 
-            table.id.toLowerCase().includes('order')
-          ) || kapwaTables[0];
-          
-          // Query the actual table with proper ID
-          const kapwaQuery = `SELECT * FROM \`${ordersTable.id}\` LIMIT 20`;
-          const kapwaData = await keboolaMCP.queryTable(kapwaQuery);
-          
+        return {
+          content: `Here are the recent Kapwa Gardens orders from your workspace:`,
+          displays: [{
+            type: "table",
+            title: "Kapwa Gardens Orders",
+            content: kapwaData
+          }]
+        };
+      } catch (queryError) {
+        // Try alternative table name
+        try {
+          const altQuery = `SELECT * FROM OUT_FACT_ORDERS_5_KAPWA_GARDENS LIMIT 20`;
+          const altData = await keboolaMCP.queryTable(altQuery);
           return {
-            content: `Here are the recent Kapwa Gardens orders from table "${ordersTable.name}":`,
+            content: `Here are the recent Kapwa Gardens orders:`,
             displays: [{
               type: "table",
-              title: `Kapwa Gardens - ${ordersTable.name}`,
-              content: kapwaData
+              title: "Kapwa Gardens Orders",
+              content: altData
             }]
           };
-        } else {
+        } catch (altError) {
           return {
-            content: `No tables found in Kapwa Gardens bucket. Available buckets: c-squarespace-kapwa-gardens`,
+            content: `Unable to access Kapwa Gardens order data. Try asking "show me workspace tables" to see what's available.`,
             displays: []
           };
         }
-      } catch (queryError) {
-        console.error('Kapwa query error:', queryError);
-        // Show what buckets are available
-        const buckets = await keboolaMCP.retrieveBuckets();
-        const kapwaBucket = buckets.find(b => b.name.includes('kapwa'));
-        return {
-          content: `Unable to access Kapwa Gardens data. Found bucket: ${kapwaBucket ? kapwaBucket.name : 'Not found'}`,
-          displays: []
-        };
       }
     }
 

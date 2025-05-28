@@ -135,7 +135,7 @@ export class KeboolaMCP {
 
   async queryTable(sqlQuery: string): Promise<any[]> {
     try {
-      // Create a temporary workspace job to execute the query
+      // Query the workspace directly using the workspace API
       const jobData = {
         configData: {
           parameters: {
@@ -144,6 +144,7 @@ export class KeboolaMCP {
         },
       };
 
+      console.log(`Querying workspace ${this.workspaceSchema} with query: ${sqlQuery}`);
       const response = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/query`, jobData, {
         headers: {
           'X-StorageApi-Token': this.storageToken,
@@ -151,10 +152,24 @@ export class KeboolaMCP {
         },
       });
 
-      return response.data.results || [];
+      console.log('Workspace query response:', response.data);
+      return response.data.results || response.data.rows || [];
     } catch (error) {
-      console.error('Error querying table:', error);
+      console.error('Error querying workspace:', error);
       throw error;
+    }
+  }
+
+  async showWorkspaceTables(): Promise<any[]> {
+    try {
+      // Get the available tables in the workspace
+      const query = `SELECT table_name FROM information_schema.tables WHERE table_schema != 'information_schema'`;
+      return await this.queryTable(query);
+    } catch (error) {
+      console.error('Error showing workspace tables:', error);
+      // If BigQuery, try different approach
+      const query = `SELECT table_name FROM \`${this.workspaceSchema}\`.INFORMATION_SCHEMA.TABLES`;
+      return await this.queryTable(query);
     }
   }
 
