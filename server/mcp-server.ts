@@ -545,88 +545,121 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // Function to get MCP server response for chat integration
 export async function getMCPResponse(userMessage: string): Promise<{ content: string; displays?: any[] }> {
-  // Analyze user intent and call appropriate tools
   const message = userMessage.toLowerCase();
   
   try {
-    if (message.includes('bucket') && !message.includes('table')) {
-      // List all buckets
+    // Smart query for specific business data
+    if (message.includes('kapwa') && (message.includes('order') || message.includes('data'))) {
+      // Query Kapwa Gardens orders directly from workspace
+      const kapwaQuery = `SELECT * FROM \`OUT_FACT_ORDERS_KAPWA_GARDENS\` LIMIT 20`;
+      try {
+        const kapwaData = await keboolaMCP.queryTable(kapwaQuery);
+        return {
+          content: `Here are the recent Kapwa Gardens orders from your workspace:`,
+          displays: [{
+            type: "table",
+            title: "Kapwa Gardens Orders",
+            content: kapwaData
+          }]
+        };
+      } catch (queryError) {
+        // Try alternative table name
+        const altQuery = `SELECT * FROM \`OUT_FACT_ORDERS_5_KAPWA_GARDENS\` LIMIT 20`;
+        const altData = await keboolaMCP.queryTable(altQuery);
+        return {
+          content: `Here are the recent Kapwa Gardens orders:`,
+          displays: [{
+            type: "table", 
+            title: "Kapwa Gardens Orders",
+            content: altData
+          }]
+        };
+      }
+    }
+
+    if (message.includes('undiscovered') && (message.includes('order') || message.includes('data'))) {
+      const undiscoveredQuery = `SELECT * FROM \`OUT_FACT_ORDERS_3_UNDISCOVERED\` LIMIT 20`;
+      const undiscoveredData = await keboolaMCP.queryTable(undiscoveredQuery);
+      return {
+        content: `Here are the recent Undiscovered orders:`,
+        displays: [{
+          type: "table",
+          title: "Undiscovered Orders",
+          content: undiscoveredData
+        }]
+      };
+    }
+
+    if (message.includes('balay') && (message.includes('order') || message.includes('data'))) {
+      const balayQuery = `SELECT * FROM \`OUT_FACT_ORDERS_4_BALAY_KREATIVE\` LIMIT 20`;
+      const balayData = await keboolaMCP.queryTable(balayQuery);
+      return {
+        content: `Here are the recent Balay Kreative orders:`,
+        displays: [{
+          type: "table",
+          title: "Balay Kreative Orders", 
+          content: balayData
+        }]
+      };
+    }
+
+    if (message.includes('form') && message.includes('data')) {
+      const formQuery = `SELECT * FROM \`OUT_FORMS_TYPEFORM\` LIMIT 20`;
+      const formData = await keboolaMCP.queryTable(formQuery);
+      return {
+        content: `Here's your Typeform data:`,
+        displays: [{
+          type: "table",
+          title: "Form Data",
+          content: formData
+        }]
+      };
+    }
+
+    if (message.includes('customer')) {
+      // Try Kapwa customers first
+      const customerQuery = `SELECT * FROM \`OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS\` LIMIT 20`;
+      const customerData = await keboolaMCP.queryTable(customerQuery);
+      return {
+        content: `Here are your Kapwa Gardens customers:`,
+        displays: [{
+          type: "table",
+          title: "Kapwa Gardens Customers",
+          content: customerData
+        }]
+      };
+    }
+
+    if (message.includes('bucket')) {
       const buckets = await keboolaMCP.retrieveBuckets();
       const response = keboolaMCP.generateDataResponse(buckets, userMessage, 'buckets');
       return {
         content: response.message,
         displays: response.displays
       };
-    } 
-    
-    if (message.includes('table') || message.includes('data')) {
-      // Get tables from relevant buckets
-      const buckets = await keboolaMCP.retrieveBuckets();
-      
-      // Find specific bucket if mentioned
-      let targetBucket = buckets[0];
-      for (const bucket of buckets) {
-        if (message.includes(bucket.name.toLowerCase()) || 
-            message.includes(bucket.id.toLowerCase())) {
-          targetBucket = bucket;
-          break;
-        }
-      }
-      
-      const tables = await keboolaMCP.retrieveBucketTables(targetBucket.id);
-      
-      if (tables.length > 0) {
-        // Try to get actual data
-        try {
-          const firstTable = tables[0];
-          const sampleQuery = `SELECT * FROM "${firstTable.id}" LIMIT 10`;
-          const actualData = await keboolaMCP.queryTable(sampleQuery);
-          
-          return {
-            content: `Here's data from "${firstTable.name}" in bucket "${targetBucket.name}":`,
-            displays: [{
-              type: "table",
-              title: `${firstTable.name} - Sample Data`,
-              content: actualData
-            }]
-          };
-        } catch (queryError) {
-          // Fallback to table structure
-          const tablesList = tables.map(table => ({
-            'Table Name': table.name || 'Unknown',
-            'Records': table.rowsCount || 0,
-            'Columns': (table.columns && table.columns.length) || 0,
-            'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
-          }));
-          
-          return {
-            content: `Found ${tables.length} tables in "${targetBucket.name}":`,
-            displays: [{
-              type: "table",
-              title: `Tables in ${targetBucket.name}`,
-              content: tablesList
-            }]
-          };
-        }
-      }
     }
     
-    if (message.includes('job')) {
-      const jobs = await keboolaMCP.retrieveJobs();
-      const response = keboolaMCP.generateDataResponse(jobs, userMessage, 'jobs');
+    // Default: show recent orders across all brands
+    const recentOrdersQuery = `SELECT * FROM \`OUT_FACT_ORDERS_KAPWA_GARDENS\` LIMIT 10`;
+    try {
+      const recentData = await keboolaMCP.queryTable(recentOrdersQuery);
       return {
-        content: response.message,
+        content: `Here's a sample of your recent business data:`,
+        displays: [{
+          type: "table",
+          title: "Recent Orders",
+          content: recentData
+        }]
+      };
+    } catch (error) {
+      // Fallback to buckets if no data access
+      const buckets = await keboolaMCP.retrieveBuckets();
+      const response = keboolaMCP.generateDataResponse(buckets, userMessage, 'buckets');
+      return {
+        content: `Here's your Keboola project overview with ${buckets.length} buckets:`,
         displays: response.displays
       };
     }
-    
-    // Default: show project overview
-    const buckets = await keboolaMCP.retrieveBuckets();
-    const response = keboolaMCP.generateDataResponse(buckets, userMessage, 'buckets');
-    return {
-      content: `Here's your Keboola project overview with ${buckets.length} buckets:`,
-      displays: response.displays
-    };
     
   } catch (error) {
     throw new Error(`MCP Server error: ${error.message}`);
