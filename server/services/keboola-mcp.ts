@@ -143,10 +143,10 @@ export class KeboolaMCP {
       console.log('Google Credentials Path:', this.googleCredentials);
       
       // Check if credentials file exists
-      const fs = require('fs');
-      if (this.googleCredentials && fs.existsSync(this.googleCredentials)) {
+      const { readFileSync, existsSync } = await import('fs');
+      if (this.googleCredentials && existsSync(this.googleCredentials)) {
         console.log('✓ Google credentials file exists');
-        const credContent = JSON.parse(fs.readFileSync(this.googleCredentials, 'utf8'));
+        const credContent = JSON.parse(readFileSync(this.googleCredentials, 'utf8'));
         console.log('✓ Credentials project:', credContent.project_id);
         console.log('✓ Service account email:', credContent.client_email);
       } else {
