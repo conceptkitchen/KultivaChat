@@ -386,10 +386,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   const tables = await keboolaMCP.retrieveBucketTables(squarespaceBucket.id);
                   responseMessage = `Found Squarespace data in bucket "${squarespaceBucket.name}" with ${tables.length} tables:`;
                   relevantData = tables.map(table => ({
-                    'Table Name': table.name,
-                    'Records': table.rowsCount,
-                    'Columns': table.columns.length,
-                    'Last Updated': new Date(table.lastChangeDate).toLocaleDateString()
+                    'Table Name': table.name || 'Unknown',
+                    'Records': table.rowsCount || 0,
+                    'Columns': (table.columns && table.columns.length) || 0,
+                    'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
                   }));
                 } else {
                   responseMessage = `Looking through all ${buckets.length} buckets for Squarespace data...`;
