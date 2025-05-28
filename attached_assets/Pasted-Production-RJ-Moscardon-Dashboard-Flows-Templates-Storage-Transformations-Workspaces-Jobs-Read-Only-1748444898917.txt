@@ -1,0 +1,294 @@
+Production
+
+RJ Moscardon
+Dashboard
+Flows
+Templates
+Storage
+Transformations
+Workspaces
+Jobs
+Read-Only Access to all project data is granted for this workspace. Be cautious when sharing it. Learn More
+Google BigQuery
+Workspaces
+KL_Query
+ACTIVE
+Information & Settings
+Versions
+Workspace Description
+Add description
+or
+Generate description
+Workspace Parameters
+Workspace ID
+21894818
+Type
+BigQuery
+Created
+a day ago
+Last Change
+a day ago
+Owner, Sharing
+You, Shared
+Table Input Mapping
+New Table Input
+
+
+Source Table
+Input Table
+
+
+out
+squarespace_forms_data_undiscovered / OUT_DIM_CHECKOUT_ATTRIBUTES
+﻿OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED	
+
+
+
+out
+squarespace-kapwa-gardens / OUT_FACT_ORDERS
+﻿OUT_FACT_ORDERS_KAPWA_GARDENS	
+
+
+
+out
+squarespace_forms_data_undiscovered / OUT_DIM_CUSTOMERS
+﻿OUT_DIM_CUSTOMERS_UNDISCOVERED	
+
+
+
+out
+squarespace-kapwa-gardens / OUT_DIM_CUSTOMERS
+﻿OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS	
+
+
+
+out
+squarespace-kultivate-labs / OUT_FACT_ORDERS
+﻿OUT_FACT_ORDERS_2_KULTIVATE_LABS	
+
+
+
+out
+squarespace-kapwa-gardens / OUT_FACT_PAYMENTS
+﻿OUT_FACT_PAYMENTS_KAPWA_GARDENS	
+
+
+
+out
+squarespace-undiscovered / OUT_FACT_ORDERS
+﻿OUT_FACT_ORDERS_3_UNDISCOVERED	
+
+
+
+out
+transformation-in-typeform-l58q9aab / OUT_RESPONSE_ANSWERS
+﻿OUT_RESPONSE_ANSWERS_TYPEFORM	
+
+
+
+out
+squarespace-undiscovered / OUT_DIM_PRODUCTS
+﻿OUT_DIM_PRODUCTS_UNDISCOVERED	
+
+
+
+out
+squarespace-undiscovered / OUT_FACT_ORDER_LINES
+﻿OUT_FACT_ORDER_LINES_UNDISCOVERED	
+
+
+
+out
+squarespace_forms_data_undiscovered / STG_UNDISCOVERED_ORDERS_CLEANED
+﻿STG_UNDISCOVERED_ORDERS_CLEANED_UNDISCOVERED_FORMS	
+
+
+
+out
+squarespace-kultivate-labs / OUT_FACT_ORDER_LINES
+﻿OUT_FACT_ORDER_LINES_2_KULTIVATE_LABS	
+
+
+
+out
+transformation-in-typeform-l58q9aab / OUT_QUESTION_CHOICES
+﻿OUT_QUESTION_CHOICES_TYPEFORM	
+
+
+
+out
+squarespace-kultivate-labs / OUT_DIM_PRODUCTS
+﻿OUT_DIM_PRODUCTS_2_KULTIVATE_LABS	
+
+
+
+out
+squarespace-kultivate-labs / OUT_DIM_CUSTOMERS
+﻿OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS	
+
+
+
+out
+squarespace-undiscovered / OUT_DIM_CUSTOMERS
+﻿OUT_DIM_CUSTOMERS_4_UNDISCOVERED	
+
+
+
+out
+squarespace-kultivate-labs / OUT_FACT_PAYMENTS
+﻿OUT_FACT_PAYMENTS_2_KULTIVATE_LABS	
+
+
+
+out
+squarespace-undiscovered / OUT_FACT_PAYMENTS
+﻿OUT_FACT_PAYMENTS_3_UNDISCOVERED	
+
+
+
+out
+squarespace_forms_data_kapwa_gardens / STG_KAPWA_ORDERS_CLEANED
+﻿STG_KAPWA_ORDERS_CLEANED_KAPWA_GARDENS	
+
+
+
+out
+squarespace-kultivate-labs / OUT_FACT_SHIPPING_DETAILS
+﻿OUT_FACT_SHIPPING_DETAILS_KULTIVATE_LABS	
+
+
+
+out
+squarespace-kapwa-gardens / OUT_DIM_PRODUCTS
+﻿OUT_DIM_PRODUCTS_3_KAPWA_GARDENS	
+
+
+
+out
+squarespace-kapwa-gardens / OUT_FACT_ORDER_LINES
+﻿OUT_FACT_ORDER_LINES_3_KAPWA_GARDENS	
+
+
+
+out
+squarespace_forms_data_undiscovered / OUT_DIM_PRODUCTS
+﻿OUT_DIM_PRODUCTS_4_UNDISCOVERED_FORMS	
+
+
+
+out
+squarespace_forms_data_undiscovered / OUT_FACT_ORDER_LINES
+﻿OUT_FACT_ORDER_LINES_4_UNDISCOVERED_FORMS	
+
+
+
+out
+squarespace-balay-kreative / OUT_FACT_ORDERS
+﻿OUT_FACT_ORDERS_4_BALAY_KREATIVE	
+
+
+
+out
+squarespace-kultivate-labs / OUT_FACT_FULFILLMENTS
+﻿OUT_FACT_FULFILLMENTS_KULTIVATE_LABS	
+
+
+
+out
+squarespace_forms_data_kapwa_gardens / OUT_FACT_ORDERS
+﻿OUT_FACT_ORDERS_5_KAPWA_GARDENS	
+
+
+
+out
+transformation-in-typeform-l58q9aab / OUT_RESPONSE_METADATA
+﻿OUT_RESPONSE_METADATA_TYPEFORM	
+
+
+
+out
+transformation-in-typeform-l58q9aab / OUT_QUESTIONS
+﻿OUT_QUESTIONS_TYPEFORM	
+
+
+
+out
+squarespace_forms_data_kapwa_gardens / OUT_DIM_PRODUCTS
+﻿OUT_DIM_PRODUCTS_5_KAPWA_GARDENS	
+
+
+
+out
+squarespace_forms_data_kapwa_gardens / OUT_FACT_ORDER_LINES
+﻿OUT_FACT_ORDER_LINES_5_KAPWA_GARDENS	
+
+
+
+out
+squarespace-balay-kreative / OUT_DIM_CUSTOMERS
+﻿OUT_DIM_CUSTOMERS_5_BALAY_KREATIVE	
+
+
+
+out
+transformation-in-typeform-l58q9aab / OUT_FORMS
+﻿OUT_FORMS_TYPEFORM	
+
+
+
+out
+squarespace-balay-kreative / OUT_DIM_PRODUCTS
+﻿OUT_DIM_PRODUCTS_6_BALAY_KREATIVE	
+
+
+
+out
+squarespace-balay-kreative / OUT_FACT_ORDER_LINES
+﻿OUT_FACT_ORDER_LINES_6_BALAY_KREATIVE	
+
+
+
+out
+squarespace_forms_data_kapwa_gardens / OUT_DIM_CUSTOMERS
+﻿OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS	
+
+
+
+out
+squarespace-balay-kreative / OUT_FACT_PAYMENTS
+﻿OUT_FACT_PAYMENTS_4_BALAY_KREATIVE	
+
+
+
+out
+squarespace_forms_data_undiscovered / OUT_FACT_ORDERS
+﻿OUT_FACT_ORDERS_6_UNDISCOVERED_FORMS	
+
+Table Output Mapping
+New Table Output
+Connect
+Disable sharing
+Documentation
+Delete workspace
+Last Use
+Success job(Duration 58 sec)
+2 hours ago by RJ Moscardon
+Success job(Duration 58 sec)
+2 hours ago by RJ Moscardon
+Success job(Duration 20 sec)
+a day ago by RJ Moscardon
+Show All Uses
+Versions
+See Latest Changes
+#41
+Update input table out.c-squarespace-kultivate-labs.OUT_FACT_FULFILLMENTS
+2 hours ago by RJ Moscardon
+#40
+Update input table out.c-squarespace-kultivate-labs.OUT_FACT_SHIPPING_DETAILS
+2 hours ago by RJ Moscardon
+#39
+Update input table out.c-squarespace-kultivate-labs.OUT_DIM_CUSTOMERS
+2 hours ago by RJ Moscardon
+Show All Versions
+
+27
