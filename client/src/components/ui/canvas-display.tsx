@@ -78,47 +78,50 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
         const columns = Object.keys(tableData[0]);
         
         return (
-          <div className="border rounded-md">
-            <ScrollArea className="max-h-80">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {columns.map((column) => (
-                      <TableHead key={column} className="whitespace-nowrap">
-                        {column}
-                      </TableHead>
-                    ))}
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tableData.map((row, i) => (
-                    <TableRow key={i} className={i % 2 === 0 ? "" : "bg-neutral-50"}>
+          <div className="border rounded-md w-full overflow-hidden">
+            <ScrollArea className="max-h-96 w-full">
+              <div className="overflow-x-auto">
+                <Table className="min-w-full">
+                  <TableHeader>
+                    <TableRow>
                       {columns.map((column) => (
-                        <TableCell key={column} className="whitespace-nowrap">
-                          {row[column]}
-                        </TableCell>
+                        <TableHead key={column} className="px-3 py-2 text-left font-medium text-xs uppercase tracking-wider">
+                          {column}
+                        </TableHead>
                       ))}
-                      <TableCell>
-                        <Button variant="ghost" size="sm" className="text-primary hover:text-primary-dark">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-                        </Button>
-                        <Button variant="ghost" size="sm" className="text-neutral-500 hover:text-neutral-700">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pencil"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                        </Button>
-                      </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-            <div className="flex items-center justify-between p-4 border-t border-neutral-200">
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm">Previous</Button>
-                <span className="text-sm text-neutral-500">Page 1 of 1</span>
-                <Button variant="outline" size="sm">Next</Button>
+                  </TableHeader>
+                  <TableBody>
+                    {tableData.map((row, i) => (
+                      <TableRow key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        {columns.map((column) => (
+                          <TableCell key={column} className="px-3 py-2 text-sm text-gray-900 break-words max-w-xs">
+                            {String(row[column] || '').length > 50 
+                              ? String(row[column] || '').substring(0, 50) + '...'
+                              : String(row[column] || '')
+                            }
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              <Button size="sm">Export CSV</Button>
+            </ScrollArea>
+            <div className="flex items-center justify-between p-3 border-t border-neutral-200 bg-gray-50">
+              <span className="text-sm text-neutral-600">
+                Showing {tableData.length} {tableData.length === 1 ? 'record' : 'records'}
+              </span>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleCopy(JSON.stringify(tableData, null, 2))}
+                >
+                  <Copy className="h-3 w-3 mr-1" />
+                  Copy Data
+                </Button>
+              </div>
             </div>
           </div>
         );
