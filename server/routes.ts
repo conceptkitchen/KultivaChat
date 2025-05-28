@@ -214,36 +214,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                data.content.toLowerCase().includes("pipeline") ||
                                data.content.toLowerCase().includes("transformation");
                                   
-        // MCP server should handle ALL data questions as the primary data source
-        const isAskingAboutKeboola = data.content.toLowerCase().includes("keboola") ||
-                                      data.content.toLowerCase().includes("api") ||
-                                      data.content.toLowerCase().includes("data") ||
-                                      data.content.toLowerCase().includes("table") ||
-                                      data.content.toLowerCase().includes("bucket") ||
-                                      data.content.toLowerCase().includes("job") ||
-                                      data.content.toLowerCase().includes("how many") ||
-                                      data.content.toLowerCase().includes("show me") ||
-                                      data.content.toLowerCase().includes("what") ||
-                                      data.content.toLowerCase().includes("query") ||
-                                      data.content.toLowerCase().includes("count") ||
-                                      data.content.toLowerCase().includes("find") ||
-                                      data.content.toLowerCase().includes("search") ||
-                                      data.content.toLowerCase().includes("squarespace") ||
-                                      data.content.toLowerCase().includes("closeout") ||
-                                      data.content.toLowerCase().includes("kapwa") ||
-                                      data.content.toLowerCase().includes("zip") ||
-                                      data.content.toLowerCase().includes("postal") ||
-                                      data.content.toLowerCase().includes("customer") ||
-                                      data.content.toLowerCase().includes("order") ||
-                                      data.content.toLowerCase().includes("city") ||
-                                      data.content.toLowerCase().includes("cities") ||
-                                      data.content.toLowerCase().includes("san francisco") ||
-                                      data.content.toLowerCase().includes("workspace") ||
-                                      data.content.toLowerCase().includes("looking for") ||
-                                      isAskingForTable || isAskingForBuckets || isAskingForJobs;
+        // Simple greeting check - only use Gemini for basic greetings
+        const isSimpleGreeting = data.content.toLowerCase().trim() === "hello" ||
+                                 data.content.toLowerCase().trim() === "hi" ||
+                                 data.content.toLowerCase().trim() === "hey";
 
-        // Use proper MCP Server for intelligent data responses
-        if (isAskingAboutKeboola) {
+        // MCP server handles ALL data and business questions by default
+        if (!isSimpleGreeting) {
           try {
             const mcpResponse = await getMCPResponse(data.content);
             
