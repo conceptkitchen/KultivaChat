@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getKeboolaData, generateVisualization } from "./services/keboola";
 import { generateGeminiResponse } from "./services/gemini";
 import { KeboolaMCP } from "./services/keboola-mcp";
+import { getMCPResponse } from "./mcp-server";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
 const messageSchema = z.object({
@@ -231,260 +232,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                       data.content.toLowerCase().includes("closeout") ||
                                       isAskingForTable || isAskingForBuckets || isAskingForJobs;
 
-        // Handle Keboola MCP requests
-        if (keboolaMCP && isAskingAboutKeboola) {
+        // Use proper MCP Server for intelligent data responses
+        if (isAskingAboutKeboola) {
           try {
-            if (isAskingForBuckets) {
-              const buckets = await keboolaMCP.retrieveBuckets();
-              const response = keboolaMCP.generateDataResponse(buckets, data.content, 'buckets');
-              
-              assistantMessage = {
-                id: uuidv4(),
-                role: "assistant" as const,
-                content: response.message,
-                timestamp: new Date(),
-                displays: response.displays
-              };
-            } else if (isAskingForJobs) {
-              const jobs = await keboolaMCP.retrieveJobs();
-              const response = keboolaMCP.generateDataResponse(jobs, data.content, 'jobs');
-              
-              assistantMessage = {
-                id: uuidv4(),
-                role: "assistant" as const,
-                content: response.message,
-                timestamp: new Date(),
-                displays: response.displays
-              };
-            } else if (isAskingForTable) {
-              // For table requests, first get available buckets and tables
-              const buckets = await keboolaMCP.retrieveBuckets();
-              
-              if (buckets.length === 0) {
-                assistantMessage = {
-                  id: uuidv4(),
-                  role: "assistant" as const,
-                  content: "No data buckets found in your Keboola project. Please check your project configuration and ensure you have data available.",
-                  timestamp: new Date(),
-                  displays: []
-                };
-              } else {
-                // Look for specific buckets mentioned in the query
-                const queryLower = data.content.toLowerCase();
-                let targetBucket = buckets[0]; // Default to first bucket
-                
-                // Check if user mentioned a specific bucket name
-                for (const bucket of buckets) {
-                  if (queryLower.includes(bucket.name.toLowerCase()) || 
-                      queryLower.includes(bucket.id.toLowerCase())) {
-                    targetBucket = bucket;
-                    break;
-                  }
-                }
-                
-                const tables = await keboolaMCP.retrieveBucketTables(targetBucket.id);
-                
-                if (tables.length > 0) {
-                  // If asking about specific data like "closeout" or "squarespace", try to query actual data
-                  if (queryLower.includes("closeout") || queryLower.includes("how many")) {
-                    try {
-                      // Try to query the first table for sample data
-                      const sampleQuery = `SELECT * FROM ${tables[0].id} LIMIT 10`;
-                      const queryResults = await keboolaMCP.queryTable(sampleQuery);
-                      
-                      assistantMessage = {
-                        id: uuidv4(),
-                        role: "assistant" as const,
-                        content: `Here's a sample of data from your "${tables[0].name}" table in bucket "${targetBucket.name}":`,
-                        timestamp: new Date(),
-                        displays: [{
-                          type: "table",
-                          title: `Sample Data: ${tables[0].name}`,
-                          content: queryResults
-                        }]
-                      };
-                    } catch (queryError) {
-                      // If query fails, show table structure instead
-                      const tableDetail = await keboolaMCP.getTableDetail(tables[0].id);
-                      assistantMessage = {
-                        id: uuidv4(),
-                        role: "assistant" as const,
-                        content: `Found ${tables.length} tables in bucket "${targetBucket.name}". Here's the structure of "${tableDetail.name}":`,
-                        timestamp: new Date(),
-                        displays: [{
-                          type: "table",
-                          title: `Table Structure: ${tableDetail.name}`,
-                          content: [{
-                            'Table ID': tableDetail.id,
-                            'Rows': tableDetail.rowsCount,
-                            'Columns': tableDetail.columns.join(', '),
-                            'Size': `${Math.round(tableDetail.dataSizeBytes / 1024 / 1024 * 100) / 100} MB`,
-                            'Last Updated': new Date(tableDetail.lastChangeDate).toLocaleDateString()
-                          }]
-                        }]
-                      };
-                    }
-                  } else {
-                    // Show all tables in the bucket
-                    const tablesList = tables.map(table => ({
-                      'Table Name': table.name || 'Unknown',
-                      'Table ID': table.id || 'Unknown',
-                      'Rows': table.rowsCount || 0,
-                      'Columns': (table.columns && table.columns.length) || 0,
-                      'Size (MB)': table.dataSizeBytes ? Math.round(table.dataSizeBytes / 1024 / 1024 * 100) / 100 : 0,
-                      'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
-                    }));
-                    
-                    assistantMessage = {
-                      id: uuidv4(),
-                      role: "assistant" as const,
-                      content: `Found ${tables.length} tables in bucket "${targetBucket.name}":`,
-                      timestamp: new Date(),
-                      displays: [{
-                        type: "table",
-                        title: `Tables in ${targetBucket.name}`,
-                        content: tablesList
-                      }]
-                    };
-                  }
-                } else {
-                  assistantMessage = {
-                    id: uuidv4(),
-                    role: "assistant" as const,
-                    content: `Found ${buckets.length} buckets but no tables in "${targetBucket.name}". You may need to load data into this bucket first.`,
-                    timestamp: new Date(),
-                    displays: []
-                  };
-                }
-              }
-            } else if (isAskingForVisualization) {
-              // For visualization, we'd need to implement chart generation
-              assistantMessage = {
-                id: uuidv4(),
-                role: "assistant" as const,
-                content: "Visualization features are being set up. For now, I can show you data tables and bucket information from your Keboola project.",
-                timestamp: new Date(),
-                displays: []
-              };
-            } else {
-              // Intelligent data analysis - understand the question and provide context
-              const buckets = await keboolaMCP.retrieveBuckets();
-              const queryLower = data.content.toLowerCase();
-              
-              // Try to find relevant buckets and provide intelligent responses
-              let relevantData = [];
-              let responseMessage = "";
-              
-              if (queryLower.includes("squarespace") || queryLower.includes("undiscovered") || queryLower.includes("forms")) {
-                // Smart bucket matching based on query context
-                let targetBuckets = [];
-                
-                if (queryLower.includes("undiscovered")) {
-                  targetBuckets = buckets.filter(b => 
-                    b.name.toLowerCase().includes("undiscovered") || 
-                    b.id.toLowerCase().includes("undiscovered")
-                  );
-                } else if (queryLower.includes("forms")) {
-                  targetBuckets = buckets.filter(b => 
-                    b.name.toLowerCase().includes("forms") || 
-                    b.id.toLowerCase().includes("forms")
-                  );
-                } else {
-                  targetBuckets = buckets.filter(b => 
-                    b.name.toLowerCase().includes("squarespace") || 
-                    b.id.toLowerCase().includes("squarespace")
-                  );
-                }
-                
-                if (targetBuckets.length > 0) {
-                  // Get tables from the most relevant bucket
-                  const primaryBucket = targetBuckets[0];
-                  const tables = await keboolaMCP.retrieveBucketTables(primaryBucket.id);
-                  
-                  if (tables.length > 0) {
-                    // Try to get actual data from the first table
-                    try {
-                      const firstTable = tables[0];
-                      const sampleQuery = `SELECT * FROM "${firstTable.id}" LIMIT 10`;
-                      const actualData = await keboolaMCP.queryTable(sampleQuery);
-                      
-                      responseMessage = `Here's actual data from "${firstTable.name}" in bucket "${primaryBucket.name}":`;
-                      relevantData = actualData;
-                    } catch (queryError) {
-                      console.log("Query failed, showing table structure instead");
-                      // Fallback to table structure
-                      responseMessage = `Found ${tables.length} tables in "${primaryBucket.name}". Here are the table details:`;
-                      relevantData = tables.map(table => ({
-                        'Table Name': table.name || 'Unknown',
-                        'Records': table.rowsCount || 0,
-                        'Columns': (table.columns && table.columns.length) || 0,
-                        'Column Names': (table.columns || []).join(', '),
-                        'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
-                      }));
-                    }
-                  } else {
-                    responseMessage = `Found bucket "${primaryBucket.name}" but it contains no tables.`;
-                    relevantData = [];
-                  }
-                } else {
-                  responseMessage = `No specific buckets found for your query. Here are all available buckets:`;
-                  relevantData = buckets.map(bucket => ({
-                    'Bucket Name': bucket.name,
-                    'Bucket ID': bucket.id,
-                    'Stage': bucket.stage,
-                    'Description': bucket.description || 'No description'
-                  }));
-                }
-              } else if (queryLower.includes("closeout") || queryLower.includes("how many")) {
-                // Try to find data that might contain "closeout" information
-                responseMessage = `Searching through your ${buckets.length} data buckets for relevant information:`;
-                
-                // Get a sample from each bucket to provide context
-                for (const bucket of buckets.slice(0, 3)) { // Limit to first 3 buckets
-                  try {
-                    const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
-                    if (tables.length > 0) {
-                      relevantData.push({
-                        'Bucket': bucket.name,
-                        'Tables': tables.length,
-                        'Total Records': tables.reduce((sum, table) => sum + table.rowsCount, 0),
-                        'Example Table': tables[0].name
-                      });
-                    }
-                  } catch (err) {
-                    console.log(`Could not access bucket ${bucket.name}`);
-                  }
-                }
-              } else {
-                // General data overview
-                responseMessage = `Here's your complete Keboola data overview with ${buckets.length} buckets:`;
-                relevantData = buckets.map(bucket => ({
-                  'Bucket Name': bucket.name,
-                  'Bucket ID': bucket.id,
-                  'Stage': bucket.stage,
-                  'Created': new Date(bucket.created).toLocaleDateString(),
-                  'Description': bucket.description || 'No description'
-                }));
-              }
-              
-              assistantMessage = {
-                id: uuidv4(),
-                role: "assistant" as const,
-                content: responseMessage,
-                timestamp: new Date(),
-                displays: [{
-                  type: "table",
-                  title: "Your Data",
-                  content: relevantData
-                }]
-              };
-            }
-          } catch (mcpError) {
-            console.error("Keboola MCP error:", mcpError);
+            const mcpResponse = await getMCPResponse(data.content);
+            
             assistantMessage = {
               id: uuidv4(),
               role: "assistant" as const,
-              content: "I'm having trouble connecting to your Keboola data right now. This could be due to authentication issues or network connectivity. Please check your Keboola credentials and try again.",
+              content: mcpResponse.content,
+              timestamp: new Date(),
+              displays: mcpResponse.displays || []
+            };
+          } catch (mcpError) {
+            console.error("MCP Server error:", mcpError);
+            assistantMessage = {
+              id: uuidv4(),
+              role: "assistant" as const,
+              content: "I'm having trouble accessing your Keboola data right now. This could be due to authentication issues or network connectivity. Please check your Keboola credentials and try again.",
               timestamp: new Date(),
               displays: []
             };
