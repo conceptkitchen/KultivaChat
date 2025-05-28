@@ -221,6 +221,187 @@ export class KeboolaMCP {
   }
 
   // Helper method to generate smart responses based on data
+  async getComponent(componentId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.apiUrl}/v2/components/${componentId}`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to retrieve component: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting component:', error);
+      throw error;
+    }
+  }
+
+  async retrieveComponentConfigurations(componentId?: string): Promise<any[]> {
+    try {
+      let url = `${this.apiUrl}/v2/components`;
+      if (componentId) {
+        url += `/${componentId}/configs`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to retrieve configurations: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error retrieving configurations:', error);
+      throw error;
+    }
+  }
+
+  async getComponentConfiguration(componentId: string, configurationId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.apiUrl}/v2/components/${componentId}/configs/${configurationId}`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to retrieve configuration: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting configuration:', error);
+      throw error;
+    }
+  }
+
+  async retrieveTransformations(transformationId?: string): Promise<any[]> {
+    try {
+      let url = `${this.apiUrl}/v2/components/transformation/configs`;
+      if (transformationId) {
+        url += `/${transformationId}`;
+      }
+
+      const response = await fetch(url, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to retrieve transformations: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error retrieving transformations:', error);
+      throw error;
+    }
+  }
+
+  async startJob(componentId: string, configurationId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.apiUrl}/v2/components/${componentId}/configs/${configurationId}/jobs`, {
+        method: 'POST',
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to start job: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error starting job:', error);
+      throw error;
+    }
+  }
+
+  async updateBucketDescription(bucketId: string, description: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.apiUrl}/v2/storage/buckets/${bucketId}`, {
+        method: 'PUT',
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ description })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update bucket description: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating bucket description:', error);
+      throw error;
+    }
+  }
+
+  async updateTableDescription(tableId: string, description: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.apiUrl}/v2/storage/tables/${tableId}`, {
+        method: 'PUT',
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ description })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update table description: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating table description:', error);
+      throw error;
+    }
+  }
+
+  async updateColumnDescription(tableId: string, columnName: string, description: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.apiUrl}/v2/storage/tables/${tableId}/columns/${columnName}`, {
+        method: 'PUT',
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ description })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to update column description: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating column description:', error);
+      throw error;
+    }
+  }
+
+  async docsQuery(query: string): Promise<string> {
+    return `For questions about "${query}", please refer to the Keboola documentation at https://help.keboola.com/ or contact Keboola support for detailed assistance.`;
+  }
+
   generateDataResponse(data: any[], query: string, type: 'table' | 'buckets' | 'jobs' = 'table') {
     if (!data || data.length === 0) {
       return {
