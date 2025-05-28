@@ -548,8 +548,8 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
   const message = userMessage.toLowerCase();
   
   try {
-    // Show available data tables using Storage API instead of workspace
-    if (message.includes('workspace') || (message.includes('table') && message.includes('show'))) {
+    // Show available data tables using Storage API
+    if (message.includes('workspace') || message.includes('table') || message.includes('show')) {
       try {
         console.log('Getting available buckets from Storage API...');
         const buckets = await keboolaMCP.retrieveBuckets();
@@ -578,17 +578,28 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
           }
           
           return {
-            content: `Here are your available data tables from ${outputBuckets.length} output buckets:`,
+            content: `Here are your available data tables from ${outputBuckets.length} output buckets. You can ask questions about this data like "show me Kapwa Gardens orders" or "how many customers are in San Francisco":`,
             displays: [{
               type: "table",
-              title: "Available Data Tables",
+              title: "Your Business Data Tables",
               content: allTables
             }]
           };
         } else {
+          // Fallback to show all buckets
+          const bucketList = buckets.map(bucket => ({
+            name: bucket.name,
+            stage: bucket.stage,
+            description: bucket.description || 'No description'
+          }));
+          
           return {
-            content: `Found ${buckets.length} buckets but no output buckets with business data.`,
-            displays: []
+            content: `Found ${buckets.length} buckets in your Keboola project:`,
+            displays: [{
+              type: "table",
+              title: "Available Buckets",
+              content: bucketList
+            }]
           };
         }
       } catch (error) {
