@@ -568,40 +568,64 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
       }
     }
 
-    // Smart query for specific business data - query workspace directly
+    // Smart query for specific business data - access through storage buckets
     if (message.includes('kapwa') && (message.includes('order') || message.includes('data'))) {
       try {
-        // Query Kapwa Gardens orders directly from workspace using the exact table name from your screenshot
-        const kapwaQuery = `SELECT * FROM OUT_FACT_ORDERS_KAPWA_GARDENS LIMIT 20`;
-        const kapwaData = await keboolaMCP.queryTable(kapwaQuery);
+        // Get tables from the Kapwa Gardens output bucket
+        const kapwaTables = await keboolaMCP.retrieveBucketTables('out.c-squarespace-kapwa-gardens');
+        
+        if (kapwaTables && kapwaTables.length > 0) {
+          // Find the orders table
+          const ordersTable = kapwaTables.find(table => 
+            table.name.toLowerCase().includes('order') ||
+            table.id.toLowerCase().includes('order')
+          );
+          
+          if (ordersTable && ordersTable.rowsCount > 0) {
+            // Get sample data from the orders table via the Storage API
+            const response = await fetch(`${process.env.KBC_API_URL}/v2/storage/tables/${ordersTable.id}/data-preview`, {
+              headers: {
+                'X-StorageApi-Token': process.env.KBC_STORAGE_TOKEN!,
+              }
+            });
+            
+            if (response.ok) {
+              const csvData = await response.text();
+              // Parse CSV to JSON for display
+              const lines = csvData.split('\n').filter(line => line.trim());
+              if (lines.length > 1) {
+                const headers = lines[0].split(',');
+                const rows = lines.slice(1, 11).map(line => {
+                  const values = line.split(',');
+                  const row: any = {};
+                  headers.forEach((header, i) => {
+                    row[header] = values[i] || '';
+                  });
+                  return row;
+                });
+                
+                return {
+                  content: `Here's a preview of your Kapwa Gardens orders from table "${ordersTable.name}" (${ordersTable.rowsCount} total rows):`,
+                  displays: [{
+                    type: "table",
+                    title: `Kapwa Gardens - ${ordersTable.name}`,
+                    content: rows
+                  }]
+                };
+              }
+            }
+          }
+        }
         
         return {
-          content: `Here are the recent Kapwa Gardens orders from your workspace:`,
-          displays: [{
-            type: "table",
-            title: "Kapwa Gardens Orders",
-            content: kapwaData
-          }]
+          content: `Found Kapwa Gardens bucket but unable to access order data. The bucket contains ${kapwaTables.length} tables.`,
+          displays: []
         };
-      } catch (queryError) {
-        // Try alternative table name
-        try {
-          const altQuery = `SELECT * FROM OUT_FACT_ORDERS_5_KAPWA_GARDENS LIMIT 20`;
-          const altData = await keboolaMCP.queryTable(altQuery);
-          return {
-            content: `Here are the recent Kapwa Gardens orders:`,
-            displays: [{
-              type: "table",
-              title: "Kapwa Gardens Orders",
-              content: altData
-            }]
-          };
-        } catch (altError) {
-          return {
-            content: `Unable to access Kapwa Gardens order data. Try asking "show me workspace tables" to see what's available.`,
-            displays: []
-          };
-        }
+      } catch (error) {
+        return {
+          content: `Unable to access Kapwa Gardens data. Error: ${error.message}`,
+          displays: []
+        };
       }
     }
 

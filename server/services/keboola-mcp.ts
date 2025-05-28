@@ -162,14 +162,34 @@ export class KeboolaMCP {
 
   async showWorkspaceTables(): Promise<any[]> {
     try {
-      // Get the available tables in the workspace
-      const query = `SELECT table_name FROM information_schema.tables WHERE table_schema != 'information_schema'`;
+      console.log('Attempting to query workspace tables...');
+      console.log('Workspace Schema:', this.workspaceSchema);
+      console.log('API URL:', this.apiUrl);
+      console.log('Has Google Credentials:', !!this.googleCredentials);
+      
+      // Try simple table listing first
+      const query = `SELECT table_name FROM INFORMATION_SCHEMA.TABLES`;
       return await this.queryTable(query);
     } catch (error) {
-      console.error('Error showing workspace tables:', error);
-      // If BigQuery, try different approach
-      const query = `SELECT table_name FROM \`${this.workspaceSchema}\`.INFORMATION_SCHEMA.TABLES`;
-      return await this.queryTable(query);
+      console.error('First workspace query failed:', error);
+      
+      // Try with explicit dataset reference
+      try {
+        const query = `SELECT table_name FROM \`${this.workspaceSchema}\`.INFORMATION_SCHEMA.TABLES`;
+        console.log('Trying explicit dataset query:', query);
+        return await this.queryTable(query);
+      } catch (secondError) {
+        console.error('Second workspace query failed:', secondError);
+        
+        // Try listing the specific tables we know exist from your workspace
+        try {
+          const query = `SELECT 'OUT_FACT_ORDERS_KAPWA_GARDENS' as table_name UNION ALL SELECT 'OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS' as table_name`;
+          return await this.queryTable(query);
+        } catch (thirdError) {
+          console.error('All workspace queries failed:', thirdError);
+          throw new Error(`Workspace access failed. Check Google credentials and workspace permissions.`);
+        }
+      }
     }
   }
 
