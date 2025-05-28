@@ -610,7 +610,109 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
       }
     }
 
-    // Smart query for specific business data - access through storage buckets
+    // Handle customer analysis questions using Storage API
+    if (message.includes('customer') || message.includes('postal') || message.includes('zip') || message.includes('san francisco')) {
+      try {
+        // Get all output buckets to find customer data
+        const buckets = await keboolaMCP.retrieveBuckets();
+        const outputBuckets = buckets.filter(bucket => bucket.stage === 'out');
+        
+        // Look for customer tables across all output buckets
+        let customerTable = null;
+        for (const bucket of outputBuckets) {
+          try {
+            const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
+            customerTable = tables.find(table => 
+              table.name.toLowerCase().includes('customer') ||
+              table.name.toLowerCase().includes('dim_customer')
+            );
+            if (customerTable) break;
+          } catch (tableError) {
+            continue;
+          }
+        }
+        
+        if (customerTable && customerTable.rowsCount > 0) {
+          // Get customer data via Storage API
+          const response = await fetch(`${process.env.KBC_API_URL}/v2/storage/tables/${customerTable.id}/data-preview`, {
+            headers: {
+              'X-StorageApi-Token': process.env.KBC_STORAGE_TOKEN!,
+            }
+          });
+          
+          if (response.ok) {
+            const csvData = await response.text();
+            const lines = csvData.split('\n').filter(line => line.trim());
+            if (lines.length > 1) {
+              const headers = lines[0].split(',');
+              const rows = lines.slice(1).map(line => {
+                const values = line.split(',');
+                const row: any = {};
+                headers.forEach((header, i) => {
+                  row[header] = values[i] || '';
+                });
+                return row;
+              });
+              
+              // Analyze postal codes for San Francisco area
+              const postalField = headers.find(h => 
+                h.toLowerCase().includes('postal') || 
+                h.toLowerCase().includes('zip') ||
+                h.toLowerCase().includes('code')
+              );
+              
+              if (postalField) {
+                // SF zip codes typically start with 941xx
+                const sfZipPattern = /^941\d{2}$/;
+                let sfCustomers = 0;
+                let outsideSfCustomers = 0;
+                
+                rows.forEach(row => {
+                  const postal = row[postalField];
+                  if (postal && postal.trim()) {
+                    if (sfZipPattern.test(postal.trim())) {
+                      sfCustomers++;
+                    } else {
+                      outsideSfCustomers++;
+                    }
+                  }
+                });
+                
+                return {
+                  content: `Based on postal code analysis from ${customerTable.name}:\n\n• Customers in San Francisco (941xx zip codes): ${sfCustomers}\n• Customers outside San Francisco: ${outsideSfCustomers}\n• Total customers with postal codes: ${sfCustomers + outsideSfCustomers}`,
+                  displays: [{
+                    type: "table",
+                    title: "Geographic Distribution",
+                    content: [
+                      { location: "San Francisco (941xx)", count: sfCustomers },
+                      { location: "Outside San Francisco", count: outsideSfCustomers },
+                      { location: "Total", count: sfCustomers + outsideSfCustomers }
+                    ]
+                  }]
+                };
+              } else {
+                return {
+                  content: `Found customer table "${customerTable.name}" with ${customerTable.rowsCount} rows, but no postal code field found. Available fields: ${headers.join(', ')}`,
+                  displays: []
+                };
+              }
+            }
+          }
+        }
+        
+        return {
+          content: `Could not find customer data table. Available output buckets: ${outputBuckets.map(b => b.name).join(', ')}`,
+          displays: []
+        };
+      } catch (error) {
+        return {
+          content: `Unable to analyze customer data. Error: ${error.message}`,
+          displays: []
+        };
+      }
+    }
+
+    // Smart query for Kapwa Gardens orders using Storage API
     if (message.includes('kapwa') && (message.includes('order') || message.includes('data'))) {
       try {
         // Get tables from the Kapwa Gardens output bucket
