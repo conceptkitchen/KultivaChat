@@ -47,7 +47,13 @@ export function ChatBubble({ message, className }: ChatBubbleProps) {
               isUser ? "text-white" : "text-neutral-800" 
             )}
           >
-            <div className="whitespace-pre-wrap">{message.content}</div>
+            <div className="whitespace-pre-wrap">
+              {/* Clean up JSON formatting if present */}
+              {message.content.startsWith('{"content":') ? 
+                JSON.parse(message.content).content : 
+                message.content
+              }
+            </div>
             
             {!isUser && message.displays && message.displays.length > 0 && (
               <div className="mt-4">

@@ -263,9 +263,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             assistantMessage = {
               id: uuidv4(),
               role: "assistant" as const,
-              content: geminiResponse,
+              content: geminiResponse.content,
               timestamp: new Date(),
-              displays: []
+              displays: geminiResponse.displays || []
             };
           } catch (error) {
             console.error("Error generating Gemini response:", error);
