@@ -767,58 +767,9 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
       }
     }
 
-    if (message.includes('undiscovered') && (message.includes('order') || message.includes('data'))) {
-      const undiscoveredQuery = `SELECT * FROM \`OUT_FACT_ORDERS_3_UNDISCOVERED\` LIMIT 20`;
-      const undiscoveredData = await keboolaMCP.queryTable(undiscoveredQuery);
-      return {
-        content: `Here are the recent Undiscovered orders:`,
-        displays: [{
-          type: "table",
-          title: "Undiscovered Orders",
-          content: undiscoveredData
-        }]
-      };
-    }
+    // Workspace queries disabled - use Storage API only
 
-    if (message.includes('balay') && (message.includes('order') || message.includes('data'))) {
-      const balayQuery = `SELECT * FROM \`OUT_FACT_ORDERS_4_BALAY_KREATIVE\` LIMIT 20`;
-      const balayData = await keboolaMCP.queryTable(balayQuery);
-      return {
-        content: `Here are the recent Balay Kreative orders:`,
-        displays: [{
-          type: "table",
-          title: "Balay Kreative Orders", 
-          content: balayData
-        }]
-      };
-    }
-
-    if (message.includes('form') && message.includes('data')) {
-      const formQuery = `SELECT * FROM \`OUT_FORMS_TYPEFORM\` LIMIT 20`;
-      const formData = await keboolaMCP.queryTable(formQuery);
-      return {
-        content: `Here's your Typeform data:`,
-        displays: [{
-          type: "table",
-          title: "Form Data",
-          content: formData
-        }]
-      };
-    }
-
-    if (message.includes('customer')) {
-      // Try Kapwa customers first
-      const customerQuery = `SELECT * FROM \`OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS\` LIMIT 20`;
-      const customerData = await keboolaMCP.queryTable(customerQuery);
-      return {
-        content: `Here are your Kapwa Gardens customers:`,
-        displays: [{
-          type: "table",
-          title: "Kapwa Gardens Customers",
-          content: customerData
-        }]
-      };
-    }
+    // All workspace queries disabled - using Storage API only
 
     if (message.includes('bucket')) {
       const buckets = await keboolaMCP.retrieveBuckets();
