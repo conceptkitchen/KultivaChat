@@ -153,6 +153,20 @@ export class KeboolaMCP {
         console.log('✗ Google credentials file not found or not set');
       }
 
+      // First check if workspace exists and is accessible
+      console.log('Checking workspace status...');
+      try {
+        const workspaceInfo = await axios.get(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}`, {
+          headers: {
+            'X-StorageApi-Token': this.storageToken,
+          },
+        });
+        console.log('✓ Workspace found:', workspaceInfo.data);
+      } catch (wsError) {
+        console.error('Workspace check failed:', wsError.response?.data);
+      }
+
+      // Try the query with different payload formats
       const jobData = {
         configData: {
           parameters: {
@@ -161,6 +175,7 @@ export class KeboolaMCP {
         },
       };
 
+      console.log('Attempting workspace query...');
       const response = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/query`, jobData, {
         headers: {
           'X-StorageApi-Token': this.storageToken,
@@ -169,12 +184,32 @@ export class KeboolaMCP {
       });
 
       console.log('✓ Workspace query successful');
-      return response.data.results || response.data.rows || [];
+      return response.data.results || response.data.rows || response.data || [];
     } catch (error) {
       console.error('=== WORKSPACE QUERY FAILED ===');
       console.error('Status:', error.response?.status);
       console.error('Error:', error.response?.data || error.message);
       console.error('URL:', error.config?.url);
+      
+      // Try alternative workspace query endpoint
+      try {
+        console.log('Trying alternative workspace endpoint...');
+        const altResponse = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/load`, {
+          input: [{
+            source: this.workspaceSchema,
+            destination: 'temp_table'
+          }]
+        }, {
+          headers: {
+            'X-StorageApi-Token': this.storageToken,
+            'Content-Type': 'application/json',
+          },
+        });
+        console.log('Alternative endpoint response:', altResponse.data);
+      } catch (altError) {
+        console.log('Alternative endpoint also failed');
+      }
+      
       throw error;
     }
   }
