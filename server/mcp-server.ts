@@ -547,11 +547,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 export async function getMCPResponse(userMessage: string): Promise<{ content: string; displays?: any[] }> {
   const message = userMessage.toLowerCase();
   
+  console.log('=== MCP DEBUG ===');
+  console.log('Original message:', userMessage);
+  console.log('Lowercase message:', message);
+  console.log('Contains undiscovered?', message.includes('undiscovered'));
+  console.log('Contains form?', message.includes('form'));
+  console.log('Contains data?', message.includes('data'));
+  
   try {
     // Context-aware data access - understand what the user is asking for
     
     // Handle specific data requests for Undiscovered
     if (message.includes('undiscovered') && (message.includes('form') || message.includes('data'))) {
+      console.log('🎯 HIT UNDISCOVERED FORMS HANDLER!');
       try {
         const buckets = await keboolaMCP.retrieveBuckets();
         const undiscoveredBucket = buckets.find(bucket => bucket.name.toLowerCase().includes('undiscovered'));
