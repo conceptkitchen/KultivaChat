@@ -230,6 +230,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                       data.content.toLowerCase().includes("search") ||
                                       data.content.toLowerCase().includes("squarespace") ||
                                       data.content.toLowerCase().includes("closeout") ||
+                                      data.content.toLowerCase().includes("kapwa") ||
+                                      data.content.toLowerCase().includes("zip") ||
+                                      data.content.toLowerCase().includes("postal") ||
+                                      data.content.toLowerCase().includes("customer") ||
+                                      data.content.toLowerCase().includes("order") ||
+                                      data.content.toLowerCase().includes("city") ||
+                                      data.content.toLowerCase().includes("cities") ||
+                                      data.content.toLowerCase().includes("san francisco") ||
+                                      data.content.toLowerCase().includes("workspace") ||
+                                      data.content.toLowerCase().includes("looking for") ||
                                       isAskingForTable || isAskingForBuckets || isAskingForJobs;
 
         // Use proper MCP Server for intelligent data responses

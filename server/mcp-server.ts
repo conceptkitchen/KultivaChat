@@ -611,7 +611,7 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
     }
 
     // Handle customer analysis questions using Storage API
-    if (message.includes('customer') || message.includes('postal') || message.includes('zip') || message.includes('san francisco')) {
+    if (message.includes('customer') || message.includes('postal') || message.includes('zip') || message.includes('san francisco') || message.includes('city') || message.includes('cities')) {
       try {
         // Get all output buckets to find customer data
         const buckets = await keboolaMCP.retrieveBuckets();
