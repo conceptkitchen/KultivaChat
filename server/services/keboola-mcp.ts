@@ -1,0 +1,278 @@
+import axios from 'axios';
+
+// Types for Keboola API responses
+interface KeboolaBucket {
+  id: string;
+  name: string;
+  stage: string;
+  description?: string;
+  created: string;
+  lastChangeDate: string;
+}
+
+interface KeboolaTable {
+  id: string;
+  name: string;
+  primaryKey: string[];
+  columns: string[];
+  rowsCount: number;
+  dataSizeBytes: number;
+  created: string;
+  lastChangeDate: string;
+  lastImportDate: string;
+  bucket: {
+    id: string;
+    name: string;
+    stage: string;
+  };
+}
+
+interface KeboolaJob {
+  id: string;
+  runId: string;
+  status: string;
+  component: string;
+  config: string;
+  configRowIds: string[];
+  createdTime: string;
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+}
+
+// Keboola MCP Server implementation
+export class KeboolaMCP {
+  private storageToken: string;
+  private workspaceSchema: string;
+  private apiUrl: string;
+  private googleCredentials?: string;
+
+  constructor() {
+    this.storageToken = process.env.KBC_STORAGE_TOKEN || '';
+    this.workspaceSchema = process.env.KBC_WORKSPACE_SCHEMA || '';
+    this.apiUrl = process.env.KBC_API_URL || '';
+    this.googleCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+    if (!this.storageToken || !this.workspaceSchema || !this.apiUrl) {
+      throw new Error('Missing required Keboola configuration');
+    }
+  }
+
+  // Storage Tools
+  async retrieveBuckets(): Promise<KeboolaBucket[]> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/storage/buckets`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error retrieving buckets:', error);
+      throw error;
+    }
+  }
+
+  async getBucketDetail(bucketId: string): Promise<KeboolaBucket> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/storage/buckets/${bucketId}`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting bucket detail:', error);
+      throw error;
+    }
+  }
+
+  async retrieveBucketTables(bucketId: string): Promise<KeboolaTable[]> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/storage/buckets/${bucketId}/tables`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error retrieving bucket tables:', error);
+      throw error;
+    }
+  }
+
+  async getTableDetail(tableId: string): Promise<KeboolaTable> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/storage/tables/${tableId}`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting table detail:', error);
+      throw error;
+    }
+  }
+
+  // SQL Tools
+  async getSqlDialect(): Promise<string> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/storage/workspaces`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      
+      // Find workspace by schema name
+      const workspace = response.data.find((w: any) => w.schema === this.workspaceSchema);
+      return workspace?.backend || 'snowflake';
+    } catch (error) {
+      console.error('Error getting SQL dialect:', error);
+      throw error;
+    }
+  }
+
+  async queryTable(sqlQuery: string): Promise<any[]> {
+    try {
+      // Create a temporary workspace job to execute the query
+      const jobData = {
+        configData: {
+          parameters: {
+            query: sqlQuery,
+          },
+        },
+      };
+
+      const response = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/query`, jobData, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      return response.data.results || [];
+    } catch (error) {
+      console.error('Error querying table:', error);
+      throw error;
+    }
+  }
+
+  // Job Tools
+  async retrieveJobs(componentId?: string, configId?: string, status?: string): Promise<KeboolaJob[]> {
+    try {
+      let url = `${this.apiUrl}/v2/storage/jobs`;
+      const params = new URLSearchParams();
+      
+      if (componentId) params.append('component', componentId);
+      if (configId) params.append('config', configId);
+      if (status) params.append('status', status);
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
+      }
+
+      const response = await axios.get(url, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error retrieving jobs:', error);
+      throw error;
+    }
+  }
+
+  async getJobDetail(jobId: string): Promise<KeboolaJob> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/storage/jobs/${jobId}`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error getting job detail:', error);
+      throw error;
+    }
+  }
+
+  // Component Tools
+  async findComponentId(query: string): Promise<string[]> {
+    try {
+      const response = await axios.get(`${this.apiUrl}/v2/components`, {
+        headers: {
+          'X-StorageApi-Token': this.storageToken,
+        },
+      });
+      
+      // Filter components by query
+      const components = response.data.filter((component: any) => 
+        component.name.toLowerCase().includes(query.toLowerCase()) ||
+        component.id.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      return components.map((component: any) => component.id);
+    } catch (error) {
+      console.error('Error finding component ID:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to generate smart responses based on data
+  generateDataResponse(data: any[], query: string, type: 'table' | 'buckets' | 'jobs' = 'table') {
+    if (!data || data.length === 0) {
+      return {
+        message: "No data found for your query. This could be because:\n• The data source is empty\n• You don't have access to this data\n• The query parameters need to be adjusted",
+        displays: []
+      };
+    }
+
+    let message = '';
+    let displays = [];
+
+    switch (type) {
+      case 'table':
+        message = `Found ${data.length} records. Here's your data:`;
+        displays = [{
+          type: 'table',
+          title: 'Query Results',
+          content: data.slice(0, 100) // Limit to first 100 rows
+        }];
+        break;
+      
+      case 'buckets':
+        message = `Found ${data.length} buckets in your Keboola project:`;
+        displays = [{
+          type: 'table',
+          title: 'Storage Buckets',
+          content: data.map((bucket: KeboolaBucket) => ({
+            'Bucket ID': bucket.id,
+            'Name': bucket.name,
+            'Stage': bucket.stage,
+            'Description': bucket.description || 'No description',
+            'Created': new Date(bucket.created).toLocaleDateString()
+          }))
+        }];
+        break;
+      
+      case 'jobs':
+        message = `Found ${data.length} jobs:`;
+        displays = [{
+          type: 'table',
+          title: 'Jobs',
+          content: data.map((job: KeboolaJob) => ({
+            'Job ID': job.id,
+            'Status': job.status,
+            'Component': job.component,
+            'Duration': `${job.durationSeconds}s`,
+            'Created': new Date(job.createdTime).toLocaleDateString()
+          }))
+        }];
+        break;
+    }
+
+    return { message, displays };
+  }
+}
