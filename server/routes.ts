@@ -375,24 +375,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
               let relevantData = [];
               let responseMessage = "";
               
-              if (queryLower.includes("squarespace")) {
-                // Look for Squarespace-related buckets
-                const squarespaceBucket = buckets.find(b => 
-                  b.name.toLowerCase().includes("squarespace") || 
-                  b.id.toLowerCase().includes("squarespace")
-                );
+              if (queryLower.includes("squarespace") || queryLower.includes("undiscovered") || queryLower.includes("forms")) {
+                // Smart bucket matching based on query context
+                let targetBuckets = [];
                 
-                if (squarespaceBucket) {
-                  const tables = await keboolaMCP.retrieveBucketTables(squarespaceBucket.id);
-                  responseMessage = `Found Squarespace data in bucket "${squarespaceBucket.name}" with ${tables.length} tables:`;
-                  relevantData = tables.map(table => ({
-                    'Table Name': table.name || 'Unknown',
-                    'Records': table.rowsCount || 0,
-                    'Columns': (table.columns && table.columns.length) || 0,
-                    'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
-                  }));
+                if (queryLower.includes("undiscovered")) {
+                  targetBuckets = buckets.filter(b => 
+                    b.name.toLowerCase().includes("undiscovered") || 
+                    b.id.toLowerCase().includes("undiscovered")
+                  );
+                } else if (queryLower.includes("forms")) {
+                  targetBuckets = buckets.filter(b => 
+                    b.name.toLowerCase().includes("forms") || 
+                    b.id.toLowerCase().includes("forms")
+                  );
                 } else {
-                  responseMessage = `Looking through all ${buckets.length} buckets for Squarespace data...`;
+                  targetBuckets = buckets.filter(b => 
+                    b.name.toLowerCase().includes("squarespace") || 
+                    b.id.toLowerCase().includes("squarespace")
+                  );
+                }
+                
+                if (targetBuckets.length > 0) {
+                  // Get tables from the most relevant bucket
+                  const primaryBucket = targetBuckets[0];
+                  const tables = await keboolaMCP.retrieveBucketTables(primaryBucket.id);
+                  
+                  if (tables.length > 0) {
+                    // Try to get actual data from the first table
+                    try {
+                      const firstTable = tables[0];
+                      const sampleQuery = `SELECT * FROM "${firstTable.id}" LIMIT 10`;
+                      const actualData = await keboolaMCP.queryTable(sampleQuery);
+                      
+                      responseMessage = `Here's actual data from "${firstTable.name}" in bucket "${primaryBucket.name}":`;
+                      relevantData = actualData;
+                    } catch (queryError) {
+                      console.log("Query failed, showing table structure instead");
+                      // Fallback to table structure
+                      responseMessage = `Found ${tables.length} tables in "${primaryBucket.name}". Here are the table details:`;
+                      relevantData = tables.map(table => ({
+                        'Table Name': table.name || 'Unknown',
+                        'Records': table.rowsCount || 0,
+                        'Columns': (table.columns && table.columns.length) || 0,
+                        'Column Names': (table.columns || []).join(', '),
+                        'Last Updated': table.lastChangeDate ? new Date(table.lastChangeDate).toLocaleDateString() : 'Unknown'
+                      }));
+                    }
+                  } else {
+                    responseMessage = `Found bucket "${primaryBucket.name}" but it contains no tables.`;
+                    relevantData = [];
+                  }
+                } else {
+                  responseMessage = `No specific buckets found for your query. Here are all available buckets:`;
                   relevantData = buckets.map(bucket => ({
                     'Bucket Name': bucket.name,
                     'Bucket ID': bucket.id,
