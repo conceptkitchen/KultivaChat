@@ -829,25 +829,18 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
       };
     }
     
-    // Default: show recent orders across all brands
-    const recentOrdersQuery = `SELECT * FROM \`OUT_FACT_ORDERS_KAPWA_GARDENS\` LIMIT 10`;
+    // Default: show available buckets and tables using Storage API only
     try {
-      const recentData = await keboolaMCP.queryTable(recentOrdersQuery);
-      return {
-        content: `Here's a sample of your recent business data:`,
-        displays: [{
-          type: "table",
-          title: "Recent Orders",
-          content: recentData
-        }]
-      };
-    } catch (error) {
-      // Fallback to buckets if no data access
       const buckets = await keboolaMCP.retrieveBuckets();
       const response = keboolaMCP.generateDataResponse(buckets, userMessage, 'buckets');
       return {
         content: `Here's your Keboola project overview with ${buckets.length} buckets:`,
         displays: response.displays
+      };
+    } catch (error) {
+      return {
+        content: `Unable to access your Keboola data. Please check your connection.`,
+        displays: []
       };
     }
     

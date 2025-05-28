@@ -134,117 +134,15 @@ export class KeboolaMCP {
   }
 
   async queryTable(sqlQuery: string): Promise<any[]> {
-    try {
-      console.log('=== WORKSPACE QUERY ATTEMPT ===');
-      console.log('Query:', sqlQuery);
-      console.log('Workspace Schema:', this.workspaceSchema);
-      console.log('API URL:', this.apiUrl);
-      console.log('Has Storage Token:', !!this.storageToken);
-      console.log('Google Credentials Path:', this.googleCredentials);
-      
-      // Check if credentials file exists
-      const { readFileSync, existsSync } = await import('fs');
-      if (this.googleCredentials && existsSync(this.googleCredentials)) {
-        console.log('✓ Google credentials file exists');
-        const credContent = JSON.parse(readFileSync(this.googleCredentials, 'utf8'));
-        console.log('✓ Credentials project:', credContent.project_id);
-        console.log('✓ Service account email:', credContent.client_email);
-      } else {
-        console.log('✗ Google credentials file not found or not set');
-      }
-
-      // First check if workspace exists and is accessible
-      console.log('Checking workspace status...');
-      try {
-        const workspaceInfo = await axios.get(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}`, {
-          headers: {
-            'X-StorageApi-Token': this.storageToken,
-          },
-        });
-        console.log('✓ Workspace found:', workspaceInfo.data);
-      } catch (wsError) {
-        console.error('Workspace check failed:', wsError.response?.data);
-      }
-
-      // Try the query with different payload formats
-      const jobData = {
-        configData: {
-          parameters: {
-            query: sqlQuery,
-          },
-        },
-      };
-
-      console.log('Attempting workspace query...');
-      const response = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/query`, jobData, {
-        headers: {
-          'X-StorageApi-Token': this.storageToken,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('✓ Workspace query successful');
-      return response.data.results || response.data.rows || response.data || [];
-    } catch (error) {
-      console.error('=== WORKSPACE QUERY FAILED ===');
-      console.error('Status:', error.response?.status);
-      console.error('Error:', error.response?.data || error.message);
-      console.error('URL:', error.config?.url);
-      
-      // Try alternative workspace query endpoint
-      try {
-        console.log('Trying alternative workspace endpoint...');
-        const altResponse = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/load`, {
-          input: [{
-            source: this.workspaceSchema,
-            destination: 'temp_table'
-          }]
-        }, {
-          headers: {
-            'X-StorageApi-Token': this.storageToken,
-            'Content-Type': 'application/json',
-          },
-        });
-        console.log('Alternative endpoint response:', altResponse.data);
-      } catch (altError) {
-        console.log('Alternative endpoint also failed');
-      }
-      
-      throw error;
-    }
+    // DISABLED - NO MORE WORKSPACE QUERIES
+    console.log('Workspace queries disabled - use Storage API only');
+    throw new Error('Workspace queries disabled - use Storage API instead');
   }
 
   async showWorkspaceTables(): Promise<any[]> {
-    try {
-      console.log('Attempting to query workspace tables...');
-      console.log('Workspace Schema:', this.workspaceSchema);
-      console.log('API URL:', this.apiUrl);
-      console.log('Has Google Credentials:', !!this.googleCredentials);
-      
-      // Try simple table listing first
-      const query = `SELECT table_name FROM INFORMATION_SCHEMA.TABLES`;
-      return await this.queryTable(query);
-    } catch (error) {
-      console.error('First workspace query failed:', error);
-      
-      // Try with explicit dataset reference
-      try {
-        const query = `SELECT table_name FROM \`${this.workspaceSchema}\`.INFORMATION_SCHEMA.TABLES`;
-        console.log('Trying explicit dataset query:', query);
-        return await this.queryTable(query);
-      } catch (secondError) {
-        console.error('Second workspace query failed:', secondError);
-        
-        // Try listing the specific tables we know exist from your workspace
-        try {
-          const query = `SELECT 'OUT_FACT_ORDERS_KAPWA_GARDENS' as table_name UNION ALL SELECT 'OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS' as table_name`;
-          return await this.queryTable(query);
-        } catch (thirdError) {
-          console.error('All workspace queries failed:', thirdError);
-          throw new Error(`Workspace access failed. Check Google credentials and workspace permissions.`);
-        }
-      }
-    }
+    // DISABLED - NO MORE WORKSPACE QUERIES, USE STORAGE API ONLY
+    console.log('Workspace table queries disabled - use Storage API bucket/table listing instead');
+    throw new Error('Workspace table queries disabled - use Storage API instead');
   }
 
   // Job Tools
