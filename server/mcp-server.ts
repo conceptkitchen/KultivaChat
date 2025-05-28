@@ -610,31 +610,20 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
       }
     }
 
-    // Handle customer analysis questions using Storage API - prioritize this
+    // Handle customer analysis questions using Storage API - analyze from order data
     if (message.includes('customer') || message.includes('postal') || message.includes('zip') || message.includes('san francisco') || message.includes('city') || message.includes('cities') || message.includes('sf') || message.includes('how may') || message.includes('how many')) {
       try {
-        // Get all output buckets to find customer data
-        const buckets = await keboolaMCP.retrieveBuckets();
-        const outputBuckets = buckets.filter(bucket => bucket.stage === 'out');
+        // Use Kapwa Gardens order data which already has postal codes
+        const kapwaTables = await keboolaMCP.retrieveBucketTables('out.c-squarespace-kapwa-gardens');
         
-        // Look for customer tables across all output buckets
-        let customerTable = null;
-        for (const bucket of outputBuckets) {
-          try {
-            const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
-            customerTable = tables.find(table => 
-              table.name.toLowerCase().includes('customer') ||
-              table.name.toLowerCase().includes('dim_customer')
-            );
-            if (customerTable) break;
-          } catch (tableError) {
-            continue;
-          }
-        }
+        const ordersTable = kapwaTables.find(table => 
+          table.name.toLowerCase().includes('order') ||
+          table.id.toLowerCase().includes('order')
+        );
         
-        if (customerTable && customerTable.rowsCount > 0) {
-          // Get customer data via Storage API
-          const response = await fetch(`${process.env.KBC_API_URL}/v2/storage/tables/${customerTable.id}/data-preview`, {
+        if (ordersTable && ordersTable.rowsCount > 0) {
+          // Get order data which contains customer postal codes
+          const response = await fetch(`${process.env.KBC_API_URL}/v2/storage/tables/${ordersTable.id}/data-preview`, {
             headers: {
               'X-StorageApi-Token': process.env.KBC_STORAGE_TOKEN!,
             }
@@ -649,29 +638,34 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
                 const values = line.split(',');
                 const row: any = {};
                 headers.forEach((header, i) => {
-                  row[header] = values[i] || '';
+                  row[header] = values[i] ? values[i].replace(/"/g, '') : '';
                 });
                 return row;
               });
               
-              // Analyze postal codes for San Francisco area
+              // Find postal code field (billing_postal_code in your data)
               const postalField = headers.find(h => 
                 h.toLowerCase().includes('postal') || 
-                h.toLowerCase().includes('zip') ||
-                h.toLowerCase().includes('code')
+                h.toLowerCase().includes('zip')
               );
               
               if (postalField) {
-                // SF zip codes typically start with 941xx
+                // SF zip codes are 941xx (94102, 94103, etc.)
                 const sfZipPattern = /^941\d{2}$/;
                 let sfCustomers = 0;
                 let outsideSfCustomers = 0;
+                const sfZipCodes = new Set();
+                const allZipCodes = new Set();
                 
                 rows.forEach(row => {
                   const postal = row[postalField];
                   if (postal && postal.trim()) {
-                    if (sfZipPattern.test(postal.trim())) {
+                    const zipCode = postal.trim();
+                    allZipCodes.add(zipCode);
+                    
+                    if (sfZipPattern.test(zipCode)) {
                       sfCustomers++;
+                      sfZipCodes.add(zipCode);
                     } else {
                       outsideSfCustomers++;
                     }
@@ -679,20 +673,20 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
                 });
                 
                 return {
-                  content: `Based on postal code analysis from ${customerTable.name}:\n\n• Customers in San Francisco (941xx zip codes): ${sfCustomers}\n• Customers outside San Francisco: ${outsideSfCustomers}\n• Total customers with postal codes: ${sfCustomers + outsideSfCustomers}`,
+                  content: `Based on analysis of your ${ordersTable.name} data with ${rows.length} orders:\n\n• Customers in San Francisco (941xx zip codes): ${sfCustomers}\n• Customers outside San Francisco: ${outsideSfCustomers}\n• SF zip codes found: ${Array.from(sfZipCodes).join(', ')}\n• Total orders analyzed: ${sfCustomers + outsideSfCustomers}`,
                   displays: [{
                     type: "table",
-                    title: "Geographic Distribution",
+                    title: "Customer Geographic Distribution",
                     content: [
-                      { location: "San Francisco (941xx)", count: sfCustomers },
-                      { location: "Outside San Francisco", count: outsideSfCustomers },
-                      { location: "Total", count: sfCustomers + outsideSfCustomers }
+                      { location: "San Francisco (941xx)", count: sfCustomers, percentage: `${Math.round((sfCustomers / (sfCustomers + outsideSfCustomers)) * 100)}%` },
+                      { location: "Outside San Francisco", count: outsideSfCustomers, percentage: `${Math.round((outsideSfCustomers / (sfCustomers + outsideSfCustomers)) * 100)}%` },
+                      { location: "Total", count: sfCustomers + outsideSfCustomers, percentage: "100%" }
                     ]
                   }]
                 };
               } else {
                 return {
-                  content: `Found customer table "${customerTable.name}" with ${customerTable.rowsCount} rows, but no postal code field found. Available fields: ${headers.join(', ')}`,
+                  content: `Found orders table "${ordersTable.name}" but no postal code field. Available fields: ${headers.join(', ')}`,
                   displays: []
                 };
               }
@@ -701,12 +695,12 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
         }
         
         return {
-          content: `Could not find customer data table. Available output buckets: ${outputBuckets.map(b => b.name).join(', ')}`,
+          content: `Could not find Kapwa Gardens orders table to analyze postal codes.`,
           displays: []
         };
       } catch (error) {
         return {
-          content: `Unable to analyze customer data. Error: ${error.message}`,
+          content: `Unable to analyze customer postal codes. Error: ${error.message}`,
           displays: []
         };
       }
