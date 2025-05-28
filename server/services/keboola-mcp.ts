@@ -135,7 +135,24 @@ export class KeboolaMCP {
 
   async queryTable(sqlQuery: string): Promise<any[]> {
     try {
-      // Query the workspace directly using the workspace API
+      console.log('=== WORKSPACE QUERY ATTEMPT ===');
+      console.log('Query:', sqlQuery);
+      console.log('Workspace Schema:', this.workspaceSchema);
+      console.log('API URL:', this.apiUrl);
+      console.log('Has Storage Token:', !!this.storageToken);
+      console.log('Google Credentials Path:', this.googleCredentials);
+      
+      // Check if credentials file exists
+      const fs = require('fs');
+      if (this.googleCredentials && fs.existsSync(this.googleCredentials)) {
+        console.log('✓ Google credentials file exists');
+        const credContent = JSON.parse(fs.readFileSync(this.googleCredentials, 'utf8'));
+        console.log('✓ Credentials project:', credContent.project_id);
+        console.log('✓ Service account email:', credContent.client_email);
+      } else {
+        console.log('✗ Google credentials file not found or not set');
+      }
+
       const jobData = {
         configData: {
           parameters: {
@@ -144,7 +161,6 @@ export class KeboolaMCP {
         },
       };
 
-      console.log(`Querying workspace ${this.workspaceSchema} with query: ${sqlQuery}`);
       const response = await axios.post(`${this.apiUrl}/v2/storage/workspaces/${this.workspaceSchema}/query`, jobData, {
         headers: {
           'X-StorageApi-Token': this.storageToken,
@@ -152,10 +168,13 @@ export class KeboolaMCP {
         },
       });
 
-      console.log('Workspace query response:', response.data);
+      console.log('✓ Workspace query successful');
       return response.data.results || response.data.rows || [];
     } catch (error) {
-      console.error('Error querying workspace:', error);
+      console.error('=== WORKSPACE QUERY FAILED ===');
+      console.error('Status:', error.response?.status);
+      console.error('Error:', error.response?.data || error.message);
+      console.error('URL:', error.config?.url);
       throw error;
     }
   }
