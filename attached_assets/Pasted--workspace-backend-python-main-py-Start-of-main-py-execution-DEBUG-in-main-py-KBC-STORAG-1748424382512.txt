@@ -1,0 +1,64 @@
+~/workspace/backend$ python main.py
+--- Start of main.py execution ---
+DEBUG in main.py - KBC_STORAGE_TOKEN: 839-642196-7otbn5BJVvB57HOxHtLnfvsaqtdbs3PkPyNPPvpl
+DEBUG in main.py - KBC_WORKSPACE_SCHEMA: WORKSPACE_21894820
+DEBUG in main.py - GOOGLE_APPLICATION_CREDENTIALS: /home/runner/workspace/backend/credentials-839-21894808.json
+DEBUG in main.py - KBC_API_URL: https://connection.us-east4.gcp.keboola.com
+DEBUG in main.py - GEMINI_API_KEY present: YES
+--- End of initial debug prints ---
+Attempting to start MCP Server in HTTP mode on port 8765...
+Starting MCP Server with command: python -m keboola_mcp_server.cli --api-url https://connection.us-east4.gcp.keboola.com --storage-token 839-642196-7otbn5BJVvB57HOxHtLnfvsaqtdbs3PkPyNPPvpl --workspace-schema WORKSPACE_21894820 --transport streamable-http --port 8765 --host 0.0.0.0 --log-level DEBUG
+MCP Server (HTTP mode) process started with PID: 8259
+MCP Server should be starting in HTTP mode.
+Check MCP stderr below for startup messages.
+This script will now wait for 120 seconds to allow server to start and for you to run curl.
+The MCP server process will continue running in the background in Replit if started successfully.
+MCP stderr: 2025-05-28 09:24:26,364 __main__ INFO: Creating server with config: Config(storage_api_url='https://connection.us-east4.gcp.keboola.com', storage_token='****', workspace_schema='WORKSPACE_21894820')
+MCP stderr: 2025-05-28 09:24:26,367 mcp.server.lowlevel.server DEBUG: Initializing server 'Keboola Explorer'
+MCP stderr: 2025-05-28 09:24:26,367 mcp.server.lowlevel.server DEBUG: Registering handler for ListToolsRequest
+MCP stderr: 2025-05-28 09:24:26,367 mcp.server.lowlevel.server DEBUG: Registering handler for CallToolRequest
+MCP stderr: 2025-05-28 09:24:26,367 mcp.server.lowlevel.server DEBUG: Registering handler for ListResourcesRequest
+MCP stderr: 2025-05-28 09:24:26,367 mcp.server.lowlevel.server DEBUG: Registering handler for ReadResourceRequest
+MCP stderr: 2025-05-28 09:24:26,367 mcp.server.lowlevel.server DEBUG: Registering handler for PromptListRequest
+MCP stderr: 2025-05-28 09:24:26,368 mcp.server.lowlevel.server DEBUG: Registering handler for GetPromptRequest
+MCP stderr: 2025-05-28 09:24:26,368 mcp.server.lowlevel.server DEBUG: Registering handler for ListResourceTemplatesRequest
+MCP stderr: 2025-05-28 09:24:26,369 keboola_mcp_server.tools.components.tools INFO: Added tool: get_component_configuration.
+MCP stderr: 2025-05-28 09:24:26,371 keboola_mcp_server.tools.components.tools INFO: Added tool: retrieve_component_configurations.
+MCP stderr: 2025-05-28 09:24:26,373 keboola_mcp_server.tools.components.tools INFO: Added tool: retrieve_transformations.
+MCP stderr: 2025-05-28 09:24:26,375 keboola_mcp_server.tools.components.tools INFO: Added tool: create_sql_transformation.
+MCP stderr: 2025-05-28 09:24:26,377 keboola_mcp_server.tools.components.tools INFO: Added tool: update_sql_transformation_configuration.
+MCP stderr: 2025-05-28 09:24:26,378 keboola_mcp_server.tools.components.tools INFO: Added tool: get_component.
+MCP stderr: 2025-05-28 09:24:26,380 keboola_mcp_server.tools.components.tools INFO: Added tool: create_component_root_configuration.
+MCP stderr: 2025-05-28 09:24:26,382 keboola_mcp_server.tools.components.tools INFO: Added tool: create_component_row_configuration.
+MCP stderr: 2025-05-28 09:24:26,383 keboola_mcp_server.tools.components.tools INFO: Added tool: update_component_root_configuration.
+MCP stderr: 2025-05-28 09:24:26,385 keboola_mcp_server.tools.components.tools INFO: Added tool: update_component_row_configuration.
+MCP stderr: 2025-05-28 09:24:26,386 keboola_mcp_server.tools.components.tools INFO: Added tool: get_component_configuration_examples.
+MCP stderr: 2025-05-28 09:24:26,387 keboola_mcp_server.tools.components.tools INFO: Added tool: find_component_id.
+MCP stderr: 2025-05-28 09:24:26,387 keboola_mcp_server.tools.components.tools INFO: Component tools initialized.
+MCP stderr: 2025-05-28 09:24:26,387 keboola_mcp_server.tools.doc INFO: Adding tool docs_query to the MCP server.
+MCP stderr: 2025-05-28 09:24:26,388 keboola_mcp_server.tools.doc INFO: Doc tools initialized.
+MCP stderr: 2025-05-28 09:24:26,388 keboola_mcp_server.tools.jobs INFO: Adding tool retrieve_jobs to the MCP server.
+MCP stderr: 2025-05-28 09:24:26,390 keboola_mcp_server.tools.jobs INFO: Adding tool get_job_detail to the MCP server.
+MCP stderr: 2025-05-28 09:24:26,391 keboola_mcp_server.tools.jobs INFO: Adding tool start_job to the MCP server.
+MCP stderr: 2025-05-28 09:24:26,392 keboola_mcp_server.tools.jobs INFO: Job tools initialized.
+MCP stderr: 2025-05-28 09:24:26,399 keboola_mcp_server.tools.storage INFO: Storage tools added to the MCP server.
+MCP stderr: 2025-05-28 09:24:26,401 keboola_mcp_server.tools.sql INFO: SQL tools added to the MCP server.
+MCP stderr: [05/28/25 09:24:26] INFO     Starting MCP server   server.py:823
+MCP stderr: 'Keboola Explorer'
+MCP stderr: with transport
+MCP stderr: 'streamable-http' on
+MCP stderr: http://0.0.0.0:8765/m
+MCP stderr: cp
+MCP stderr: 2025-05-28 09:24:26,406 FastMCP.fastmcp.server.server INFO: Starting MCP server 'Keboola Explorer' with transport 'streamable-http' on http://0.0.0.0:8765/mcp
+MCP stderr: INFO:     Started server process [8259]
+MCP stderr: INFO:     Waiting for application startup.
+MCP stderr: 2025-05-28 09:24:26,434 mcp.server.streamable_http_manager INFO: StreamableHTTP session manager started
+MCP stderr: INFO:     Application startup complete.
+MCP stderr: INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
+
+--- Checking initial MCP stderr (HTTP mode startup) ---
+MCP stderr: (No new messages)
+INFO:     127.0.0.1:34238 - "POST /mcp/ HTTP/1.1" 400 Bad Request
+MCP stderr: 2025-05-28 09:24:50,750 mcp.server.streamable_http_manager DEBUG: Creating new transport
+MCP stderr: 2025-05-28 09:24:50,750 mcp.server.streamable_http_manager INFO: Created new transport with session ID: 16aa418ee01945ad8000b2a92dbd30fd
+INFO:     172.31.128.45:37316 - "GET / HTTP/1.1" 200 OK
