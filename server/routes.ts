@@ -242,9 +242,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           }
         } else {
-          // For all other requests, use Gemini model
+          // For simple greetings, use Gemini
           try {
-            // Get response from Gemini
             const geminiResponse = await generateGeminiResponse(data.content, previousMessages);
             
             assistantMessage = {
@@ -256,11 +255,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             };
           } catch (error) {
             console.error("Error generating Gemini response:", error);
-            // Fallback if Gemini fails
             assistantMessage = {
               id: uuidv4(),
               role: "assistant" as const,
-              content: "I'm sorry, but I'm having trouble connecting to my AI service right now. Please try again in a few moments.",
+              content: "Hello! How can I help you with your business data today?",
               timestamp: new Date()
             };
           }
