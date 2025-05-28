@@ -548,21 +548,52 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
   const message = userMessage.toLowerCase();
   
   try {
-    // Show workspace tables first if asking about data
+    // Show available data tables using Storage API instead of workspace
     if (message.includes('workspace') || (message.includes('table') && message.includes('show'))) {
       try {
-        const workspaceTables = await keboolaMCP.showWorkspaceTables();
-        return {
-          content: `Here are all the tables available in your workspace:`,
-          displays: [{
-            type: "table",
-            title: "Workspace Tables",
-            content: workspaceTables
-          }]
-        };
+        console.log('Getting available buckets from Storage API...');
+        const buckets = await keboolaMCP.retrieveBuckets();
+        
+        // Focus on output buckets which contain your business data
+        const outputBuckets = buckets.filter(bucket => bucket.stage === 'out');
+        
+        if (outputBuckets.length > 0) {
+          let allTables = [];
+          for (const bucket of outputBuckets) {
+            try {
+              const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
+              for (const table of tables) {
+                allTables.push({
+                  bucket: bucket.name,
+                  table_name: table.name,
+                  id: table.id,
+                  rows: table.rowsCount,
+                  size_mb: Math.round(table.dataSizeBytes / 1024 / 1024),
+                  last_updated: table.lastChangeDate
+                });
+              }
+            } catch (tableError) {
+              console.log(`Could not get tables for bucket ${bucket.id}`);
+            }
+          }
+          
+          return {
+            content: `Here are your available data tables from ${outputBuckets.length} output buckets:`,
+            displays: [{
+              type: "table",
+              title: "Available Data Tables",
+              content: allTables
+            }]
+          };
+        } else {
+          return {
+            content: `Found ${buckets.length} buckets but no output buckets with business data.`,
+            displays: []
+          };
+        }
       } catch (error) {
         return {
-          content: `Unable to access workspace tables. Error: ${error.message}`,
+          content: `Unable to access your data tables. Error: ${error.message}`,
           displays: []
         };
       }
