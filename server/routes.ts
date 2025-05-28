@@ -199,8 +199,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isAskingForTable = data.content.toLowerCase().includes("table") || 
                                   data.content.toLowerCase().includes("data table") ||
                                   data.content.toLowerCase().includes("show data") ||
-                                  data.content.toLowerCase().includes("apple") ||
-                                  data.content.toLowerCase().includes("stock data");
+                                  data.content.toLowerCase().includes("data is in") ||
+                                  data.content.toLowerCase().includes("data from") ||
+                                  data.content.toLowerCase().includes("squarespace") ||
+                                  data.content.toLowerCase().includes("closeout") ||
+                                  data.content.toLowerCase().includes("how many");
 
         const isAskingForBuckets = data.content.toLowerCase().includes("bucket") ||
                                    data.content.toLowerCase().includes("what buckets") ||
@@ -252,35 +255,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   displays: []
                 };
               } else {
-                // Get tables from the first bucket as an example
-                const tables = await keboolaMCP.retrieveBucketTables(buckets[0].id);
+                // Look for specific buckets mentioned in the query
+                const queryLower = data.content.toLowerCase();
+                let targetBucket = buckets[0]; // Default to first bucket
+                
+                // Check if user mentioned a specific bucket name
+                for (const bucket of buckets) {
+                  if (queryLower.includes(bucket.name.toLowerCase()) || 
+                      queryLower.includes(bucket.id.toLowerCase())) {
+                    targetBucket = bucket;
+                    break;
+                  }
+                }
+                
+                const tables = await keboolaMCP.retrieveBucketTables(targetBucket.id);
                 
                 if (tables.length > 0) {
-                  // Get detail of the first table
-                  const tableDetail = await keboolaMCP.getTableDetail(tables[0].id);
-                  
-                  assistantMessage = {
-                    id: uuidv4(),
-                    role: "assistant" as const,
-                    content: `Found ${tables.length} tables in bucket "${buckets[0].name}". Here's information about the table "${tableDetail.name}":`,
-                    timestamp: new Date(),
-                    displays: [{
-                      type: "table",
-                      title: `Table: ${tableDetail.name}`,
-                      content: [{
-                        'Table ID': tableDetail.id,
-                        'Rows': tableDetail.rowsCount,
-                        'Columns': tableDetail.columns.join(', '),
-                        'Size': `${Math.round(tableDetail.dataSizeBytes / 1024 / 1024 * 100) / 100} MB`,
-                        'Last Updated': new Date(tableDetail.lastChangeDate).toLocaleDateString()
+                  // If asking about specific data like "closeout" or "squarespace", try to query actual data
+                  if (queryLower.includes("closeout") || queryLower.includes("how many")) {
+                    try {
+                      // Try to query the first table for sample data
+                      const sampleQuery = `SELECT * FROM ${tables[0].id} LIMIT 10`;
+                      const queryResults = await keboolaMCP.queryTable(sampleQuery);
+                      
+                      assistantMessage = {
+                        id: uuidv4(),
+                        role: "assistant" as const,
+                        content: `Here's a sample of data from your "${tables[0].name}" table in bucket "${targetBucket.name}":`,
+                        timestamp: new Date(),
+                        displays: [{
+                          type: "table",
+                          title: `Sample Data: ${tables[0].name}`,
+                          content: queryResults
+                        }]
+                      };
+                    } catch (queryError) {
+                      // If query fails, show table structure instead
+                      const tableDetail = await keboolaMCP.getTableDetail(tables[0].id);
+                      assistantMessage = {
+                        id: uuidv4(),
+                        role: "assistant" as const,
+                        content: `Found ${tables.length} tables in bucket "${targetBucket.name}". Here's the structure of "${tableDetail.name}":`,
+                        timestamp: new Date(),
+                        displays: [{
+                          type: "table",
+                          title: `Table Structure: ${tableDetail.name}`,
+                          content: [{
+                            'Table ID': tableDetail.id,
+                            'Rows': tableDetail.rowsCount,
+                            'Columns': tableDetail.columns.join(', '),
+                            'Size': `${Math.round(tableDetail.dataSizeBytes / 1024 / 1024 * 100) / 100} MB`,
+                            'Last Updated': new Date(tableDetail.lastChangeDate).toLocaleDateString()
+                          }]
+                        }]
+                      };
+                    }
+                  } else {
+                    // Show all tables in the bucket
+                    const tablesList = tables.map(table => ({
+                      'Table Name': table.name,
+                      'Table ID': table.id,
+                      'Rows': table.rowsCount,
+                      'Columns': table.columns.length,
+                      'Size (MB)': Math.round(table.dataSizeBytes / 1024 / 1024 * 100) / 100,
+                      'Last Updated': new Date(table.lastChangeDate).toLocaleDateString()
+                    }));
+                    
+                    assistantMessage = {
+                      id: uuidv4(),
+                      role: "assistant" as const,
+                      content: `Found ${tables.length} tables in bucket "${targetBucket.name}":`,
+                      timestamp: new Date(),
+                      displays: [{
+                        type: "table",
+                        title: `Tables in ${targetBucket.name}`,
+                        content: tablesList
                       }]
-                    }]
-                  };
+                    };
+                  }
                 } else {
                   assistantMessage = {
                     id: uuidv4(),
                     role: "assistant" as const,
-                    content: `Found ${buckets.length} buckets but no tables in the first bucket. You may need to load data into your Keboola project first.`,
+                    content: `Found ${buckets.length} buckets but no tables in "${targetBucket.name}". You may need to load data into this bucket first.`,
                     timestamp: new Date(),
                     displays: []
                   };
