@@ -548,63 +548,58 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
   const message = userMessage.toLowerCase();
   
   try {
-    // Show available data tables using Storage API
-    if (message.includes('workspace') || message.includes('table') || message.includes('show')) {
+    // Context-aware data access - understand what the user is asking for
+    
+    // Handle specific data requests for Undiscovered
+    if (message.includes('undiscovered') && (message.includes('form') || message.includes('data'))) {
       try {
-        console.log('Getting available buckets from Storage API...');
         const buckets = await keboolaMCP.retrieveBuckets();
+        const undiscoveredBucket = buckets.find(bucket => bucket.name.toLowerCase().includes('undiscovered'));
         
-        // Focus on output buckets which contain your business data
-        const outputBuckets = buckets.filter(bucket => bucket.stage === 'out');
-        
-        if (outputBuckets.length > 0) {
-          let allTables = [];
-          for (const bucket of outputBuckets) {
-            try {
-              const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
-              for (const table of tables) {
-                allTables.push({
-                  bucket: bucket.name,
-                  table_name: table.name,
-                  id: table.id,
-                  rows: table.rowsCount,
-                  size_mb: Math.round(table.dataSizeBytes / 1024 / 1024),
-                  last_updated: table.lastChangeDate
+        if (undiscoveredBucket) {
+          const tables = await keboolaMCP.retrieveBucketTables(undiscoveredBucket.id);
+          const formsTable = tables.find(table => table.name.toLowerCase().includes('form'));
+          
+          if (formsTable && formsTable.rowsCount > 0) {
+            // Get actual data from the forms table
+            const response = await fetch(`${process.env.KBC_API_URL}/v2/storage/tables/${formsTable.id}/data-preview`, {
+              headers: { 'X-StorageApi-Token': process.env.KBC_STORAGE_TOKEN! }
+            });
+            
+            if (response.ok) {
+              const csvData = await response.text();
+              const lines = csvData.split('\n').filter(line => line.trim());
+              if (lines.length > 1) {
+                const headers = lines[0].split(',');
+                const rows = lines.slice(1, 21).map(line => {
+                  const values = line.split(',');
+                  const row: any = {};
+                  headers.forEach((header, i) => {
+                    row[header] = values[i] || '';
+                  });
+                  return row;
                 });
+                
+                return {
+                  content: `Here's your Undiscovered forms data from "${formsTable.name}" (${formsTable.rowsCount} total entries):`,
+                  displays: [{
+                    type: "table",
+                    title: `Undiscovered - ${formsTable.name}`,
+                    content: rows
+                  }]
+                };
               }
-            } catch (tableError) {
-              console.log(`Could not get tables for bucket ${bucket.id}`);
             }
           }
-          
-          return {
-            content: `Here are your available data tables from ${outputBuckets.length} output buckets. You can ask questions about this data like "show me Kapwa Gardens orders" or "how many customers are in San Francisco":`,
-            displays: [{
-              type: "table",
-              title: "Your Business Data Tables",
-              content: allTables
-            }]
-          };
-        } else {
-          // Fallback to show all buckets
-          const bucketList = buckets.map(bucket => ({
-            name: bucket.name,
-            stage: bucket.stage,
-            description: bucket.description || 'No description'
-          }));
-          
-          return {
-            content: `Found ${buckets.length} buckets in your Keboola project:`,
-            displays: [{
-              type: "table",
-              title: "Available Buckets",
-              content: bucketList
-            }]
-          };
         }
+        
+        return {
+          content: `I couldn't find Undiscovered forms data in your available tables. Let me show you what's available instead.`,
+          displays: []
+        };
       } catch (error) {
         return {
-          content: `Unable to access your data tables. Error: ${error.message}`,
+          content: `Unable to access Undiscovered forms data. Error: ${error.message}`,
           displays: []
         };
       }
