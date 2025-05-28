@@ -79,44 +79,42 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
         
         return (
           <div className="border rounded-md w-full overflow-hidden">
-            <ScrollArea className="max-h-96 w-full">
-              <div className="overflow-x-auto">
-                <Table className="min-w-full">
-                  <TableHeader>
-                    <TableRow>
+            <div className="overflow-x-auto overflow-y-auto max-h-96 bg-white">
+              <Table className="w-full min-w-max">
+                <TableHeader className="sticky top-0 bg-gray-50 z-10">
+                  <TableRow>
+                    {columns.map((column) => (
+                      <TableHead key={column} className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-gray-700 border-b whitespace-nowrap min-w-32">
+                        {column}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tableData.map((row, i) => (
+                    <TableRow key={i} className={i % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
                       {columns.map((column) => (
-                        <TableHead key={column} className="px-3 py-2 text-left font-medium text-xs uppercase tracking-wider">
-                          {column}
-                        </TableHead>
+                        <TableCell key={column} className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap border-b border-gray-200">
+                          <div className="max-w-48 truncate" title={String(row[column] || '')}>
+                            {String(row[column] || '')}
+                          </div>
+                        </TableCell>
                       ))}
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {tableData.map((row, i) => (
-                      <TableRow key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                        {columns.map((column) => (
-                          <TableCell key={column} className="px-3 py-2 text-sm text-gray-900 break-words max-w-xs">
-                            {String(row[column] || '').length > 50 
-                              ? String(row[column] || '').substring(0, 50) + '...'
-                              : String(row[column] || '')
-                            }
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </ScrollArea>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
             <div className="flex items-center justify-between p-3 border-t border-neutral-200 bg-gray-50">
-              <span className="text-sm text-neutral-600">
-                Showing {tableData.length} {tableData.length === 1 ? 'record' : 'records'}
+              <span className="text-sm text-neutral-600 font-medium">
+                Showing {tableData.length} {tableData.length === 1 ? 'record' : 'records'} from your Keboola workspace
               </span>
               <div className="flex space-x-2">
                 <Button 
                   variant="outline" 
                   size="sm"
                   onClick={() => handleCopy(JSON.stringify(tableData, null, 2))}
+                  className="text-xs"
                 >
                   <Copy className="h-3 w-3 mr-1" />
                   Copy Data
