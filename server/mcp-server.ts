@@ -780,14 +780,49 @@ export async function getMCPResponse(userMessage: string): Promise<{ content: st
       };
     }
     
-    // Default: show available buckets and tables using Storage API only
+    // For any other requests, show available data through Storage API
     try {
+      console.log('Getting available buckets from Storage API...');
       const buckets = await keboolaMCP.retrieveBuckets();
-      const response = keboolaMCP.generateDataResponse(buckets, userMessage, 'buckets');
-      return {
-        content: `Here's your Keboola project overview with ${buckets.length} buckets:`,
-        displays: response.displays
-      };
+      
+      // Focus on output buckets which contain your business data
+      const outputBuckets = buckets.filter(bucket => bucket.stage === 'out');
+      
+      if (outputBuckets.length > 0) {
+        let allTables = [];
+        for (const bucket of outputBuckets) {
+          try {
+            const tables = await keboolaMCP.retrieveBucketTables(bucket.id);
+            for (const table of tables) {
+              allTables.push({
+                bucket: bucket.name,
+                table_name: table.name,
+                id: table.id,
+                rows: table.rowsCount,
+                size_mb: Math.round(table.dataSizeBytes / 1024 / 1024),
+                last_updated: table.lastChangeDate
+              });
+            }
+          } catch (tableError) {
+            console.log(`Could not get tables for bucket ${bucket.id}`);
+          }
+        }
+        
+        return {
+          content: `Here are your available data tables from ${outputBuckets.length} output buckets. You can ask questions about this data like "show me Kapwa Gardens orders" or "how many customers are in San Francisco":`,
+          displays: [{
+            type: "table",
+            title: "Your Business Data Tables",
+            content: allTables
+          }]
+        };
+      } else {
+        const response = keboolaMCP.generateDataResponse(buckets, userMessage, 'buckets');
+        return {
+          content: `Here's your Keboola project overview with ${buckets.length} buckets:`,
+          displays: response.displays
+        };
+      }
     } catch (error) {
       return {
         content: `Unable to access your Keboola data. Please check your connection.`,
