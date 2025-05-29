@@ -699,15 +699,33 @@ def chat_with_gemini_client_style():
                     app.logger.error(f"Error during fallback display generation: {e_fallback}", exc_info=True)
 
             # Original text parsing logic for bulleted lists (if no other display was generated)
-            if not displays and final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
+            if not displays and final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "here is a list"]):
                 lines = final_answer.split('\n')
                 table_names = []
-                # ... (rest of your bulleted list parsing logic - keep it concise) ...
-                # For brevity, assuming this part is correctly implemented from your previous code if needed.
-                # Ensure it only adds to display if no other display was added from tools or specific fallbacks.
-                # Example of how it might start:
-                # if table_names_from_text_parsing: 
-                # displays.append({"type": "table", "title": "Identified Tables (from text)", "content": [{"Table Name": name} for name in table_names_from_text_parsing]})
+                
+                # Parse table names from the text response
+                for line in lines:
+                    line = line.strip()
+                    # Look for lines that contain table names (starting with OUT_, DIM_, FACT_, STG_)
+                    if line and any(prefix in line.upper() for prefix in ['OUT_', 'DIM_', 'FACT_', 'STG_']):
+                        # Extract just the table name part
+                        table_pattern = r'\b(OUT|DIM|FACT|STG)_[A-Z_0-9]+\b'
+                        matches = re.findall(table_pattern, line, re.IGNORECASE)
+                        for match in matches:
+                            if match not in table_names:
+                                table_names.append(match)
+                
+                if table_names:
+                    # Create a table display with the parsed table names
+                    table_data = [{"Table Name": name} for name in table_names]
+                    displays.append({
+                        "type": "table", 
+                        "title": "Available Tables in BigQuery Dataset", 
+                        "content": table_data
+                    })
+                    app.logger.info(f"Created table display from text parsing with {len(table_names)} table names")
+                else:
+                    app.logger.warning("Failed to parse any table names from the AI response text")
 
 
         return jsonify({
