@@ -415,7 +415,7 @@ def chat_with_gemini_client_style():
                     app.logger.error(f"Fallback table query error: {e}")
             
             # Original text parsing logic as additional fallback
-            if any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
+            if final_answer and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
                 lines = final_answer.split('\n')
                 table_names = []
                 in_table_list_context = False
