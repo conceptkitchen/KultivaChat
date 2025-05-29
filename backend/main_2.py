@@ -359,8 +359,20 @@ def chat_with_gemini_client_style():
                                        func_resp_content.get('status') in ['success', 'success_truncated'] and \
                                        'data' in func_resp_content:
                                         retrieved_data = func_resp_content['data']
-                                        if isinstance(retrieved_data, list) and all(isinstance(item, dict) for item in retrieved_data):
-                                            query_data = retrieved_data
+                                        app.logger.info(f"Retrieved data type: {type(retrieved_data)}, length: {len(retrieved_data) if isinstance(retrieved_data, list) else 'N/A'}")
+                                        if isinstance(retrieved_data, list) and len(retrieved_data) > 0:
+                                            # Check if at least some items are dictionaries (allowing for mixed types)
+                                            if any(isinstance(item, dict) for item in retrieved_data):
+                                                query_data = retrieved_data
+                                                app.logger.info(f"Successfully extracted query data with {len(query_data)} items")
+                                            else:
+                                                app.logger.warning(f"Retrieved data list contains no dictionary items: {[type(item) for item in retrieved_data[:3]]}")
+                                        elif isinstance(retrieved_data, list) and len(retrieved_data) == 0:
+                                            app.logger.warning("Retrieved data is an empty list")
+                                        else:
+                                            app.logger.warning(f"Retrieved data is not a list: {type(retrieved_data)}")
+                                        
+                                        if query_data:
                                             tool_display_title = f"Results from: {part.function_response.name}"
                                             # Specific titles for known functions
                                             if part.function_response.name == "internal_execute_sql_query":
@@ -406,23 +418,43 @@ def chat_with_gemini_client_style():
         else: 
             app.logger.warning("No query_data extracted from tool calls, checking text response for table information")
             # Check if the AI is trying to show tables but the data wasn't captured
-            if final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below"]):
-                # Try to directly query for tables as fallback
-                app.logger.info("AI mentioned retrieving tables but no data was extracted. Attempting direct table query as fallback.")
+            if final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below", "retrieved the data", "retrieved the schema", "sample row from"]):
+                # Try to directly query based on what the AI mentioned
+                app.logger.info("AI mentioned retrieving data but no data was extracted. Attempting direct query as fallback.")
                 try:
-                    fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
-                    fallback_result = internal_execute_sql_query(fallback_query)
-                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                        displays.append({
-                            "type": "table",
-                            "title": "Available Tables",
-                            "content": fallback_result['data']
-                        })
-                        app.logger.info(f"Fallback table query successful, created display with {len(fallback_result['data'])} tables")
-                    else:
-                        app.logger.warning(f"Fallback table query failed: {fallback_result}")
+                    fallback_query = None
+                    fallback_title = "Query Results"
+                    
+                    # Check if AI mentioned a specific table
+                    import re
+                    table_pattern = r'OUT_[A-Z_0-9]+|STG_[A-Z_0-9]+'
+                    table_matches = re.findall(table_pattern, final_answer)
+                    
+                    if table_matches:
+                        # Query the specific table mentioned
+                        table_name = table_matches[0]
+                        fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
+                        fallback_title = f"Data from {table_name}"
+                        app.logger.info(f"Found table name {table_name} in AI response, querying it directly")
+                    elif any(phrase in final_answer.lower() for phrase in ["list of tables", "all tables"]):
+                        # Query for table list
+                        fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+                        fallback_title = "Available Tables"
+                        app.logger.info("AI mentioned table list, querying table names")
+                    
+                    if fallback_query:
+                        fallback_result = internal_execute_sql_query(fallback_query)
+                        if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                            displays.append({
+                                "type": "table",
+                                "title": fallback_title,
+                                "content": fallback_result['data']
+                            })
+                            app.logger.info(f"Fallback query successful, created display with {len(fallback_result['data'])} rows")
+                        else:
+                            app.logger.warning(f"Fallback query failed: {fallback_result}")
                 except Exception as e:
-                    app.logger.error(f"Fallback table query error: {e}")
+                    app.logger.error(f"Fallback query error: {e}")
             
             # Original text parsing logic as additional fallback
             if final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
