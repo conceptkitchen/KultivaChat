@@ -346,6 +346,12 @@ def chat_with_gemini_client_style():
                                 try:
                                     func_resp_content = part.function_response.response
                                     app.logger.info(f"Function response content type: {type(func_resp_content)}, content: {func_resp_content}")
+                                    
+                                    # Handle nested result structure
+                                    if isinstance(func_resp_content, dict) and 'result' in func_resp_content:
+                                        func_resp_content = func_resp_content['result']
+                                        app.logger.info(f"Extracted nested result: {func_resp_content}")
+                                    
                                     if isinstance(func_resp_content, dict) and \
                                        func_resp_content.get('status') in ['success', 'success_truncated'] and \
                                        'data' in func_resp_content:
