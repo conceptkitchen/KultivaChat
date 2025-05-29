@@ -295,9 +295,9 @@ def chat_with_gemini_client_style():
         # Initialize chat history with the system instruction
         # The system instruction sets the context for the AI
         initial_history = [
-            google_genai_types.Content(role="user", parts=[google_genai_types.Part.from_text(SYSTEM_INSTRUCTION_PROMPT)]),
-            google_genai_types.Content(role="model", parts=[google_genai_types.Part.from_text(
-                "Understood. I am ready to assist you with your Keboola project data. How can I help you?"
+            google_genai_types.Content(role="user", parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]),
+            google_genai_types.Content(role="model", parts=[google_genai_types.Part(
+                text="Understood. I am ready to assist you with your Keboola project data. How can I help you?"
             )]) # Optional: Priming model response
         ]
 
