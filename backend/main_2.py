@@ -45,7 +45,6 @@ KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
 # --- Define System Instruction Constant ---
-# This is your detailed system prompt, without the f-string placeholder for user_message
 SYSTEM_INSTRUCTION_PROMPT = """You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: kbc-use4-839-261b, dataset/workspace schema: WORKSPACE_21894820) for querying data that has been loaded into the workspace.
 
 When users ask about:
@@ -189,7 +188,6 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         for row in results:
             row_dict = {}
             for key, value in dict(row).items():
-                # Convert Decimal objects to float to avoid JSON serialization issues
                 if hasattr(value, '__class__') and 'Decimal' in str(type(value)):
                     row_dict[key] = float(value)
                 else:
@@ -214,7 +212,7 @@ def get_current_time() -> dict:
 gemini_tool_functions_list = [internal_execute_sql_query, get_current_time]
 
 # --- Initialize Gemini Client (using genai.Client and GenerateContentConfig) ---
-gemini_sdk_client = None # Renamed to avoid confusion
+gemini_sdk_client = None
 gemini_generation_config_with_tools = None
 
 if GEMINI_API_KEY and GEMINI_SDK_AVAILABLE:
@@ -224,15 +222,8 @@ if GEMINI_API_KEY and GEMINI_SDK_AVAILABLE:
         app.logger.info("Successfully initialized google.genai.Client.")
 
         app.logger.info(f"Defining tools for Gemini: {[f.__name__ for f in gemini_tool_functions_list]}")
-        # Create GenerateContentConfig with the Python function objects as tools
         gemini_generation_config_with_tools = google_genai_types.GenerateContentConfig(
             tools=gemini_tool_functions_list,
-            # Optional: Add safety settings if needed directly in GenerateContentConfig
-            # safety_settings=[...]
-            # Optional: Configure function calling mode if needed, e.g., "ANY"
-            # tool_config=google_genai_types.ToolConfig(
-            # function_calling_config=google_genai_types.FunctionCallingConfig(mode="ANY")
-            # )
         )
         app.logger.info("Gemini GenerateContentConfig with tools created successfully.")
 
@@ -289,30 +280,26 @@ def chat_with_gemini_client_style():
         if not user_message_data or 'message' not in user_message_data:
             return jsonify({"error": "Missing 'message' in JSON payload."}), 400
 
-        user_message_text = user_message_data['message'] # Renamed to avoid conflict
+        user_message_text = user_message_data['message']
         app.logger.info(f"Received user message for Gemini (genai.Client): {user_message_text}")
 
-        # Initialize chat history with the system instruction
-        # The system instruction sets the context for the AI
-        initial_history = [
-            google_genai_types.Content(role="user", parts=[google_genai_types.Part.from_text(SYSTEM_INSTRUCTION_PROMPT)]),
-            google_genai_types.Content(role="model", parts=[google_genai_types.Part.from_text(
-                "Understood. I am ready to assist you with your Keboola project data. How can I help you?"
-            )]) # Optional: Priming model response
-        ]
+        initial_history = []
+        if GEMINI_SDK_AVAILABLE: # Ensure types are available for Content and Part
+            initial_history = [
+                google_genai_types.Content(role="user", parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]),
+                google_genai_types.Content(role="model", parts=[google_genai_types.Part(text=
+                    "Understood. I am ready to assist you with your Keboola project data. How can I help you?"
+                )])
+            ]
 
-        # For simplicity, we'll create a new chat for each request.
         chat_session = gemini_sdk_client.chats.create(
-            model='gemini-1.5-flash', # Or your preferred model like 'gemini-2.0-flash' etc.
+            model='gemini-1.5-flash',
             config=gemini_generation_config_with_tools,
-            history=initial_history # Pass the system instruction as initial history
+            history=initial_history
         )
         app.logger.info(f"Created Gemini chat session with initial history. Sending user message: '{user_message_text}'")
 
-        # Now, send only the user's actual message.
-        # The context (system instructions, tools) is already part of the chat session.
         response = chat_session.send_message(user_message_text)
-
 
         final_answer = ""
         try:
@@ -320,152 +307,125 @@ def chat_with_gemini_client_style():
             app.logger.info(f"Gemini final answer (genai.Client/chat): {final_answer}")
         except ValueError as ve:
             app.logger.error(f"Gemini response did not directly yield text: {ve}. Parts: {response.parts if hasattr(response, 'parts') else 'N/A'}", exc_info=True)
-            # Check if the response might be a function call that wasn't automatically resolved to text
-            # or if it's genuinely missing text and has other parts.
             if response.parts:
-                # Attempt to construct a meaningful message if parts exist but text doesn't
                 part_summary = []
                 for part in response.parts:
                     if hasattr(part, 'function_call') and part.function_call:
                         part_summary.append(f"Pending function call: {part.function_call.name}")
                     elif hasattr(part, 'text') and part.text:
-                         part_summary.append(part.text) # Should have been caught by response.text
-
+                         part_summary.append(part.text)
                 if part_summary:
                     final_answer = "The model's response includes non-textual parts or actions: " + "; ".join(part_summary)
                     app.logger.warning(f"Constructed final_answer from parts: {final_answer}")
                 else:
                     final_answer = f"LLM response processing error: The response did not contain direct text and parts were inconclusive. Details: {str(ve)}"
                     app.logger.error(final_answer)
-                    # Depending on desired behavior, you might return an error here or use the constructed final_answer
-            else: # No parts and no text
+            else:
                 app.logger.error(f"LLM response error: No text and no parts in response. Details: {ve}")
                 return jsonify({"error": f"LLM response error: {ve}. The response was empty."}), 500
-
         except Exception as e_gen:
             app.logger.error(f"Generic error accessing response.text: {e_gen}", exc_info=True)
             return jsonify({"error": f"Error processing LLM response: {str(e_gen)}"}), 500
 
-
-        # Create displays for structured data visualization
         displays = []
-
-        # If the response contains table names, format as a structured display
-        if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower() or "list of tables" in final_answer.lower():
-            lines = final_answer.split('\n')
-            table_names = []
-            in_table_list_context = False # Flag to identify if we are in a list of tables
-
-            # Heuristics to find table names, often listed after specific phrases or as bullet points
-            if "here are the tables" in final_answer.lower() or "following tables" in final_answer.lower():
-                in_table_list_context = True
-
-            for line in lines:
-                stripped_line = line.strip()
-                # Check for bullet points or common table name patterns
-                if stripped_line.startswith('- ') or stripped_line.startswith('* '):
-                    table_name = stripped_line[2:].strip('`"') # Remove markdown and quotes
-                    if table_name and ('.' in table_name or KBC_WORKSPACE_SCHEMA in table_name or not any(char in table_name for char in ['(', ')', ':', '?'])): # Basic filter
-                        table_names.append(table_name)
-                elif in_table_list_context and stripped_line and not stripped_line.endswith(':'): # If in table list context, consider non-empty lines
-                     if KBC_WORKSPACE_SCHEMA in stripped_line or '`' in stripped_line: # If it looks like a qualified name
-                        table_names.append(stripped_line.strip('`"'))
-
-
-            # Deduplicate and ensure they look like table names
-            # This part might need more sophisticated parsing based on actual LLM output format
-            if table_names:
-                # A simple filter: assume table names might contain dots (schema.table) or are mentioned after "table"
-                # This is a heuristic and might need refinement based on observed LLM output.
-                processed_table_names = []
-                for name_candidate in table_names:
-                    # Further refine, e.g. avoid lines that are full sentences.
-                    if len(name_candidate.split()) < 5 and ('.' in name_candidate or KBC_WORKSPACE_SCHEMA in name_candidate): # Arbitrary short length and structure check
-                        processed_table_names.append(name_candidate)
-                    elif "table" in final_answer.lower() and len(name_candidate.split()) < 5: # If "table" is in general response, be more lenient
-                        processed_table_names.append(name_candidate)
-
-
-                unique_table_names = sorted(list(set(processed_table_names)))
-                if unique_table_names:
-                    app.logger.info(f"Extracted table names for display: {unique_table_names}")
-                    displays.append({
-                        "type": "table",
-                        "title": "Identified Data Tables",
-                        "content": [{"Table Name": name} for name in unique_table_names]
-                    })
-        # Enhanced: Check if Gemini executed a data query and format results
-        # This logic needs to access the function call responses from the chat history.
-        # The `response` object itself might not directly hold all tool call results if automatic function calling is deep.
-        # We need to inspect chat_session.history for function responses.
-
         query_data = None
-        tool_display_title = "Tool Execution Result" # Default title
+        tool_display_title = "Tool Execution Result"
 
-        # Iterate through the chat history (which now includes the latest turn)
-        # The history is ordered: system_prompt (user), initial_model_response (model), user_query (user), tool_calls (model/tool), tool_results (user/tool), final_llm_answer (model)
-        if GEMINI_SDK_AVAILABLE: # Ensure google_genai_types.Part is available
-            for message_content in reversed(chat_session.history): # Check recent messages first
-                if message_content.role == "user": # Tool responses are added as 'user' role with tool_name
-                    for part in message_content.parts:
-                        if hasattr(part, 'function_response') and part.function_response:
-                            app.logger.info(f"Found function_response in history part: {part.function_response.name}")
-                            try:
-                                func_resp_content = part.function_response.response
-                                # The actual data is often nested under 'data'
-                                if isinstance(func_resp_content, dict) and \
-                                   func_resp_content.get('status') in ['success', 'success_truncated'] and \
-                                   'data' in func_resp_content:
+        if GEMINI_SDK_AVAILABLE:
+            app.logger.info("Attempting to retrieve chat history using get_history()...")
+            try:
+                retrieved_history = chat_session.get_history()
+                app.logger.info(f"Successfully called get_history(). Number of messages: {len(retrieved_history) if retrieved_history else 0}")
 
-                                    retrieved_data = func_resp_content['data']
-                                    # For display, we typically want lists of dicts (tabular data)
-                                    if isinstance(retrieved_data, list) and all(isinstance(item, dict) for item in retrieved_data):
-                                        query_data = retrieved_data # Actual tabular data
-                                        tool_display_title = f"Results from: {part.function_response.name}"
-                                        if part.function_response.name == "internal_execute_sql_query":
-                                            # Try to find the SQL query for a better title
-                                            # This requires looking at the preceding 'model' message that made the call
-                                            # For simplicity, we'll use a generic title or refine later
-                                            tool_display_title = "SQL Query Results"
-                                        elif part.function_response.name == "list_tables_in_keboola_bucket":
-                                            tool_display_title = "Tables in Bucket"
-                                        elif part.function_response.name == "list_keboola_buckets":
-                                            tool_display_title = "Keboola Buckets"
-                                        elif part.function_response.name == "get_keboola_table_detail":
-                                            tool_display_title = "Table Schema Detail"
-
-                                        app.logger.info(f"Found query data from tool {part.function_response.name} with {len(query_data)} items/rows.")
-                                        break # Found data, exit part loop
-                                    elif isinstance(retrieved_data, dict) and part.function_response.name == "get_current_time":
-                                        # Handle get_current_time specifically if needed, though it's not tabular
-                                        app.logger.info(f"Tool {part.function_response.name} returned: {retrieved_data}")
-                                        # query_data could be set to [retrieved_data] if you want to display it as a single-row table
-                                    else:
-                                        app.logger.info(f"Tool {part.function_response.name} returned data but not in expected tabular format: {type(retrieved_data)}")
-
-                                elif isinstance(func_resp_content, dict) and func_resp_content.get('status') == 'error':
-                                    app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_resp_content.get('error_message')}")
-
-
-                            except Exception as e_parse:
-                                app.logger.error(f"Error parsing function_response content from history: {e_parse}", exc_info=True)
-                    if query_data:
-                        break # Found data, exit history loop
+                for message_content in reversed(retrieved_history):
+                    # Tool responses are added as 'user' role containing a FunctionResponse part
+                    if message_content.role == "user":
+                        for part in message_content.parts:
+                            if hasattr(part, 'function_response') and part.function_response:
+                                app.logger.info(f"Found function_response in history part: {part.function_response.name}")
+                                try:
+                                    func_resp_content = part.function_response.response
+                                    if isinstance(func_resp_content, dict) and \
+                                       func_resp_content.get('status') in ['success', 'success_truncated'] and \
+                                       'data' in func_resp_content:
+                                        retrieved_data = func_resp_content['data']
+                                        if isinstance(retrieved_data, list) and all(isinstance(item, dict) for item in retrieved_data):
+                                            query_data = retrieved_data
+                                            tool_display_title = f"Results from: {part.function_response.name}"
+                                            # Specific titles for known functions
+                                            if part.function_response.name == "internal_execute_sql_query":
+                                                tool_display_title = "SQL Query Results"
+                                            elif part.function_response.name == "list_tables_in_keboola_bucket":
+                                                tool_display_title = "Tables in Bucket"
+                                            elif part.function_response.name == "list_keboola_buckets":
+                                                tool_display_title = "Keboola Buckets"
+                                            elif part.function_response.name == "get_keboola_table_detail":
+                                                tool_display_title = "Table Schema Detail"
+                                            app.logger.info(f"Found query data from tool {part.function_response.name} with {len(query_data)} items/rows.")
+                                            break
+                                        elif isinstance(retrieved_data, dict) and part.function_response.name == "get_current_time":
+                                            app.logger.info(f"Tool {part.function_response.name} returned: {retrieved_data}")
+                                        else:
+                                            app.logger.info(f"Tool {part.function_response.name} returned data but not in expected tabular format: {type(retrieved_data)}")
+                                    elif isinstance(func_resp_content, dict) and func_resp_content.get('status') == 'error':
+                                        app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_resp_content.get('error_message')}")
+                                except Exception as e_parse:
+                                    app.logger.error(f"Error parsing function_response content from history: {e_parse}", exc_info=True)
+                        if query_data:
+                            break
+            except AttributeError:
+                 app.logger.error(f"'Chat' object (type: {type(chat_session)}) has no attribute 'get_history'. This indicates an API mismatch or an unexpected object type.")
+            except Exception as e_hist:
+                 app.logger.error(f"An error occurred while trying to get or process chat history: {e_hist}", exc_info=True)
 
 
-        # If we found table data from a tool, create a table display
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
-            # Check if a display for this data type already exists to avoid duplicates
-            # (e.g., if LLM text also listed tables and tool also returned tables)
-            # For simplicity, we add it. Frontend can decide on deduplication if necessary.
             displays.append({
                 "type": "table",
-                "title": tool_display_title, # Use the title derived from tool name
+                "title": tool_display_title,
                 "content": query_data
             })
             app.logger.info(f"Created table display for '{tool_display_title}' with {len(query_data)} rows")
-        elif query_data: # query_data is not None but not a list or is empty
+        elif query_data:
              app.logger.info(f"Query data found but not suitable for table display or empty: {query_data}")
+        else: # This block handles case where no query_data was extracted from tool calls
+            # but we might still want to parse the LLM's textual response for table names
+            # if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower() or "list of tables" in final_answer.lower(): # Copied from original code
+            if any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
+                lines = final_answer.split('\n')
+                table_names = []
+                in_table_list_context = False
+                if "here are the tables" in final_answer.lower() or "following tables" in final_answer.lower():
+                    in_table_list_context = True
+
+                for line in lines:
+                    stripped_line = line.strip()
+                    if stripped_line.startswith(('- ', '* ')):
+                        table_name = stripped_line[2:].strip('`"')
+                        if table_name and ('.' in table_name or (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in table_name) or not any(char in table_name for char in ['(', ')', ':', '?'])):
+                            table_names.append(table_name)
+                    elif in_table_list_context and stripped_line and not stripped_line.endswith(':'):
+                         if (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in stripped_line) or '`' in stripped_line:
+                            table_names.append(stripped_line.strip('`"'))
+
+                processed_table_names = []
+                if table_names:
+                    for name_candidate in table_names:
+                        if len(name_candidate.split()) < 7 and ('.' in name_candidate or (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in name_candidate)): 
+                            processed_table_names.append(name_candidate)
+                        elif "table" in final_answer.lower() and len(name_candidate.split()) < 7 :
+                             processed_table_names.append(name_candidate)
+
+                unique_table_names = sorted(list(set(processed_table_names)))
+                if unique_table_names:
+                    app.logger.info(f"Extracted table names from LLM text for display: {unique_table_names}")
+                    # Avoid adding if similar data already came from a tool call
+                    if not any(d.get("title") == "Identified Data Tables" or d.get("title") == "Tables in Bucket" for d in displays):
+                        displays.append({
+                            "type": "table",
+                            "title": "Identified Data Tables (from text)",
+                            "content": [{"Table Name": name} for name in unique_table_names]
+                        })
 
 
         return jsonify({
@@ -489,9 +449,7 @@ if __name__ == '__main__':
         app.logger.critical("CRITICAL ERROR: google.genai SDK style could not be imported. Chat functionality will not work.")
     elif not all([KBC_API_URL, KBC_STORAGE_TOKEN, GOOGLE_APPLICATION_CREDENTIALS_PATH, KBC_WORKSPACE_SCHEMA, GEMINI_API_KEY]):
         app.logger.critical("CRITICAL ERROR: One or more essential environment variables are missing. Server cannot function fully.")
-    # Sanity check that dummy types are not being used if SDK was expected
-    if GEMINI_SDK_AVAILABLE and isinstance(google_genai_types.Content(), type(None.__class__)): # A bit of a hack to check if it's a dummy
+    if GEMINI_SDK_AVAILABLE and isinstance(google_genai_types.Content(), type(None.__class__)):
         app.logger.warning("GEMINI_SDK_AVAILABLE is True, but google_genai_types seem to be dummy classes. Imports might not have fully succeeded as expected.")
-
 
     app.run(host='0.0.0.0', port=8081, debug=False, use_reloader=False)
