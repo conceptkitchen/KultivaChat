@@ -274,11 +274,11 @@ You have the following tools at your disposal to achieve this:
 
 * **CRITICAL INSTRUCTIONS FOR SQL:**
 
-* Table names in your SQL queries **MUST** be fully qualified: `` `kbc-use4-839-261b.WORKSPACE_21894820.ACTUAL_TABLE_NAME_FROM_WORKSPACE` ``. The `ACTUAL_TABLE_NAME_FROM_WORKSPACE` is the name of the table as it appears *after* being loaded into the BigQuery workspace via Keboola's Table Input Mapping (this might be different from its name in the Storage bucket if aliased).
+* Table names in your SQL queries **MUST** be fully qualified: kbc-use4-839-261b.WORKSPACE_21894820.ACTUAL_TABLE_NAME_FROM_WORKSPACE. The ACTUAL_TABLE_NAME_FROM_WORKSPACE is the name of the table as it appears *after* being loaded into the BigQuery workspace via Keboola's Table Input Mapping (this might be different from its name in the Storage bucket if aliased).
 
 * Use standard BigQuery SQL syntax.
 
-* Quote column and table names with backticks (`) if they contain special characters or are reserved keywords.
+* Quote column and table names with backticks if they contain special characters or are reserved keywords.
 
 * **Returns:** A list of dictionaries, where each dictionary represents a row from the query result, or an error if the query fails.
 
