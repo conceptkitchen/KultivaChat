@@ -1,0 +1,27 @@
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 19:00:57] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): show data from the OUT_DIM_CUSTOMERS table in the out.c-squarespace-undiscovered bucket
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show data from the OUT_DIM_CUSTOMERS table in the out.c-squarespace-undiscovered bucket'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: get_keboola_table_detail with table_id: out.c-squarespace-undiscovered.OUT_DIM_CUSTOMERS
+ERROR:main_2:Tool Call: Error getting table detail for out.c-squarespace-undiscovered.OUT_DIM_CUSTOMERS: 'str' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend/main_2.py", line 293, in get_keboola_table_detail
+AttributeError: 'str' object has no attribute 'get'
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): I apologize, but I encountered an error trying to retrieve details for the `OUT_DIM_CUSTOMERS` table:  `'str' object has no attribute 'get'`. This indicates a problem with how the table information is accessed within the available tools.  Could you please double-check the name of the bucket and table to ensure they are correctly spelled and exist in your Keboola project?  Perhaps there's a typo, or the table might not be accessible through the provided APIs.  Once you've confirmed the correct names, I'll be happy to help you retrieve the data.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history part: get_keboola_table_detail
+INFO:main_2:Function response content type: <class 'dict'>, content: {'result': {'status': 'error', 'error_message': "Error getting table detail for out.c-squarespace-undiscovered.OUT_DIM_CUSTOMERS: 'str' object has no attribute 'get'"}}...
+INFO:main_2:Found nested result, extracted: {'status': 'error', 'error_message': "Error getting table detail for out.c-squarespace-undiscovered.OUT_DIM_CUSTOMERS: 'str' object has no attribute 'get'"}...
+WARNING:main_2:Response doesn't match expected structure. Status: error
+INFO:main_2:Processing displays - query_data type: <class 'NoneType'>, length: N/A
+INFO:main_2:Query data content preview: None
+INFO:main_2:Final answer type: <class 'str'>, value: I apologize, but I encountered an error trying to retrieve details for the `OUT_DIM_CUSTOMERS` table:  `'str' object has no attribute 'get'`. This indicates a problem with how the table information is accessed within the available tools.  Could you please double-check the name of the bucket and table to ensure they are correctly spelled and exist in your Keboola project?  Perhaps there's a typo, or the table might not be accessible through the provided APIs.  Once you've confirmed the correct names, I'll be happy to help you retrieve the data.
+
+WARNING:main_2:No query_data extracted from tool calls, checking text response for table information
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 20:28:31] "POST /api/chat HTTP/1.1" 200 -

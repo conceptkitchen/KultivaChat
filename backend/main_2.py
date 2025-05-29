@@ -59,6 +59,7 @@ IMPORTANT: When users ask for data from a specific table name (like "OUT_DIM_CUS
 1. First identify which bucket contains that table using list_tables_in_keboola_bucket
 2. Use the FULL table ID format (e.g., "out.c-squarespace-undiscovered.OUT_DIM_CUSTOMERS")
 3. Never guess or construct table IDs - always use the exact IDs from the bucket listings
+4. If get_keboola_table_detail fails, proceed directly to querying the data with internal_execute_sql_query using SELECT * FROM kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME LIMIT 10
 
 The database details:
 - Project: kbc-use4-839-261b
@@ -294,12 +295,25 @@ def get_keboola_table_detail(table_id: str) -> dict:
     app.logger.info(f"Tool Call: get_keboola_table_detail with table_id: {table_id}")
     try:
         table_detail = keboola_storage_client.tables.detail(table_id)
+        app.logger.info(f"Table detail response type: {type(table_detail)}, content: {table_detail}")
+        
+        # Handle different response types from Keboola API
+        if isinstance(table_detail, str):
+            app.logger.error(f"Received string response instead of dict: {table_detail}")
+            return {"status": "error", "error_message": f"API returned unexpected string response: {table_detail}"}
+        
+        if not isinstance(table_detail, dict):
+            return {"status": "error", "error_message": f"API returned unexpected response type: {type(table_detail)}"}
+        
         columns_info = []
         for col in table_detail.get("columns", []):
-            columns_info.append({
-                "name": col.get("name"),
-                "type": col.get("type", "string")
-            })
+            if isinstance(col, dict):
+                columns_info.append({
+                    "name": col.get("name"),
+                    "type": col.get("type", "string")
+                })
+            else:
+                app.logger.warning(f"Column is not a dict: {col}")
         
         detail_info = {
             "id": table_detail.get("id"),
