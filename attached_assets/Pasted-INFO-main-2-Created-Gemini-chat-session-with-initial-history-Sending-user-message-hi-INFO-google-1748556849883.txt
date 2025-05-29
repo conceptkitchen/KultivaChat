@@ -1,0 +1,36 @@
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'hi'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+ERROR:main_2:Error in /api/chat endpoint (genai.Client style): Default value None of parameter state_code: str = None of function get_zip_codes_for_city is not compatible with the parameter annotation <class 'str'>.
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend/main_2.py", line 562, in chat_with_gemini_client_style
+    response = chat_session.send_message(user_message_text)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/chats.py", line 259, in send_message
+    response = self._modules.generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/models.py", line 5930, in generate_content
+    response = self._generate_content(
+               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/models.py", line 4869, in _generate_content
+    request_dict = _GenerateContentParameters_to_mldev(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/models.py", line 933, in _GenerateContentParameters_to_mldev
+    _GenerateContentConfig_to_mldev(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/models.py", line 839, in _GenerateContentConfig_to_mldev
+    for item in t.t_tools(api_client, getv(from_object, ['tools']))
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/_transformers.py", line 939, in t_tools
+    transformed_tool = t_tool(client, tool)
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/_transformers.py", line 918, in t_tool
+    types.FunctionDeclaration.from_callable(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/types.py", line 1980, in from_callable
+    return cls.from_callable_with_api_option(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/types.py", line 1925, in from_callable_with_api_option
+    schema = _automatic_function_calling_util._parse_schema_from_parameter(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/genai/_automatic_function_calling_util.py", line 113, in _parse_schema_from_parameter
+    raise ValueError(default_value_error_msg)
+ValueError: Default value None of parameter state_code: str = None of function get_zip_codes_for_city is not compatible with the parameter annotation <class 'str'>.
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 22:13:57] "POST /api/chat HTTP/1.1" 500 -
