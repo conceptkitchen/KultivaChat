@@ -3,10 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
-import { getKeboolaData, generateVisualization } from "./services/keboola";
-import { generateGeminiResponse } from "./services/gemini";
-import { KeboolaMCP } from "./services/keboola-mcp";
-import { getMCPResponse } from "./mcp-server";
+
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
 const messageSchema = z.object({
@@ -22,25 +19,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
   await setupAuth(app);
   
-  // Add Keboola test endpoint
-  app.get('/api/keboola/test', async (req, res) => {
-    try {
-      const data = await getKeboolaData();
-      res.json({
-        success: true,
-        message: 'Successfully connected to Keboola',
-        data: data.slice(0, 5), // Only return the first 5 records
-        total_records: data.length
-      });
-    } catch (error) {
-      console.error('Keboola test error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to connect to Keboola',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      });
-    }
-  });
+
 
   // User auth route
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
