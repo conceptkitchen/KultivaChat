@@ -454,4 +454,4 @@ if __name__ == '__main__':
     app.logger.info(f"KBC_WORKSPACE_SCHEMA from env (BigQuery Dataset ID): {'SET' if KBC_WORKSPACE_SCHEMA else 'NOT SET'}")
     app.logger.info(f"GEMINI_API_KEY from env: {'SET' if GEMINI_API_KEY else 'NOT SET'}")
 
-    app.run(host='0.0.0.0', port=8082, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=True)
