@@ -1,0 +1,29 @@
+INFO:werkzeug:Press CTRL+C to quit
+INFO:main_2:Received user message for Gemini (genai.Client): show me data from OUT_FACT_ORDERS_5_KAPWA_GARDENS
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show me data from OUT_FACT_ORDERS_5_KAPWA_GARDENS'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: execute_sql_query with query: SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT_FACT_ORDERS_5_KAPWA_GARDENS` LIMIT 1
+INFO:main_2:Tool Call: query executed, returned 1 rows.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Excellent! I've got the schema for `OUT_FACT_ORDERS_5_KAPWA_GARDENS`.  It contains columns such as `order_id`, `created_at_ts`, `total`, `customer_id_fk`, `shipping_address1`, and many more related to order details.
+
+To give you the best possible overview, would you like to see all the data,  or are you interested in specific columns or a subset of orders (e.g., orders from a particular date range, orders above a certain total amount)?  Knowing your specific needs will allow me to generate a more relevant and efficient query.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history part: internal_execute_sql_query
+INFO:main_2:Function response content type: <class 'dict'>, content: {'result': {'status': 'success', 'data': [{'order_id': '4096', 'customer_id_fk': '', 'channel_order_number': '', 'financial_status': '', 'paid_at_ts': None, 'fulfillment_status': '', 'fulfilled_at_ts'...
+INFO:main_2:Found nested result, extracted: {'status': 'success', 'data': [{'order_id': '4096', 'customer_id_fk': '', 'channel_order_number': '', 'financial_status': '', 'paid_at_ts': None, 'fulfillment_status': '', 'fulfilled_at_ts': None, 'cr...
+INFO:main_2:Successfully found data array with 1 items
+INFO:main_2:SUCCESSFULLY EXTRACTED: 1 rows of data from internal_execute_sql_query
+INFO:main_2:Processing displays - query_data type: <class 'list'>, length: 1
+INFO:main_2:Query data content preview: [{'order_id': '4096', 'customer_id_fk': '', 'channel_order_number': '', 'financial_status': '', 'paid_at_ts': None, 'fulfillment_status': '', 'fulfilled_at_ts': None, 'created_at_ts': None, 'cancelled_at_ts': None, 'currency': '', 'subtotal': None, 'shipping': None, 'taxes': None, 'amount_refunded': None, 'total': None, 'discount_code': '', 'discount_amount': None, 'shipping_method': '', 'billing_name': '', 'billing_address1': '', 'billing_address2': '', 'billing_city': '', 'billing_zip': '', 'billing_province': '', 'billing_country': '', 'billing_phone': '', 'shipping_name': '', 'shipping_address1': '', 'shipping_address2': '', 'shipping_city': '', 'shipping_zip': '', 'shipping_province': '', 'shipping_country': '', 'shipping_phone': '', 'private_notes': '', 'channel_type': '', 'channel_name': '', 'ca_local_tax': None, 'ca_tax': None, 'payment_method': '', 'payment_reference': '', 'source_website': 'Kapwa Gardens', 'order_data_loaded_at': datetime.datetime(2025, 5, 26, 22, 41, 48, 82471, tzinfo=datetime.timezone.utc), 'etl_created_at': datetime.datetime(2025, 5, 26, 22, 41, 54, 369031, tzinfo=datetime.timezone.utc), '_timestamp': datetime.datetime(2025, 5, 26, 22, 42, 17, tzinfo=datetime.timezone.utc)}]
+INFO:main_2:Final answer type: <class 'str'>, value: Excellent! I've got the schema for `OUT_FACT_ORDERS_5_KAPWA_GARDENS`.  It contains columns such as `order_id`, `created_at_ts`, `total`, `customer_id_fk`, `shipping_address1`, and many more related to order details.
+
+To give you the best possible overview, would you like to see all the data,  or are you interested in specific columns or a subset of orders (e.g., orders from a particular date range, orders above a certain total amount)?  Knowing your specific needs will allow me to generate a more relevant and efficient query.
+
+INFO:main_2:Created table display for 'SQL Query Results' with 1 rows
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:39:57] "POST /api/chat HTTP/1.1" 200 -
