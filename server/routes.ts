@@ -159,8 +159,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Call your Python Flask backend for ALL messages
         try {
-          console.log("Calling Python backend at http://localhost:8080/api/chat");
-          const response = await fetch('http://localhost:8080/api/chat', {
+          console.log("Calling Python backend at http://localhost:8082/api/chat");
+          const response = await fetch('http://localhost:8082/api/chat', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assistantMessage = {
             id: uuidv4(),
             role: "assistant" as const,
-            content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8080.",
+            content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8082.",
             timestamp: new Date(),
             displays: []
           };
