@@ -211,7 +211,7 @@ def chat_with_gemini_client_style():
         app.logger.info(f"Created Gemini chat session. Sending message: '{user_message}'")
 
         # Add context to help Gemini understand it should use the tools proactively
-        enhanced_prompt = f"""You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: `kbc-use4-839-261b`, dataset/workspace schema: `WORKSPACE_21894820`) for querying data that has been loaded into the workspace.
+        enhanced_prompt = f"""You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: kbc-use4-839-261b, dataset/workspace schema: WORKSPACE_21894820) for querying data that has been loaded into the workspace.
         
 When users ask about:
 - Tables, data, or datasets: Use the internal_execute_sql_query tool to query the database
@@ -222,7 +222,7 @@ When users ask about:
 The database details:
 - Project: kbc-use4-839-261b
 - Dataset: WORKSPACE_21894820
-- Always use fully qualified table names: `kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`
+- Always use fully qualified table names: kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME
 
 User question: {user_message}
 
