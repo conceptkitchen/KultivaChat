@@ -235,7 +235,31 @@ User question: {user_message}"""
             app.logger.error(f"Generic error accessing response.text: {e_gen}", exc_info=True)
             return jsonify({"error": f"Error processing LLM response: {str(e_gen)}"}), 500
 
-        return jsonify({"reply": final_answer})
+        # Create displays for structured data visualization
+        displays = []
+        
+        # If the response contains table names or data, format it as a structured display
+        if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower():
+            # Extract table names from the response - handle both formats
+            lines = final_answer.split('\n')
+            table_names = []
+            for line in lines:
+                if line.strip().startswith('- '):
+                    table_name = line.strip()[2:]  # Remove "- " prefix
+                    if table_name:
+                        table_names.append(table_name)
+            
+            if table_names:
+                displays.append({
+                    "type": "table",
+                    "title": "Your Data Tables",
+                    "content": [{"Table Name": name} for name in table_names]
+                })
+        
+        return jsonify({
+            "reply": final_answer,
+            "displays": displays
+        })
 
     except Exception as e:
         app.logger.error(f"Error in /api/chat endpoint (genai.Client style): {e}", exc_info=True)
