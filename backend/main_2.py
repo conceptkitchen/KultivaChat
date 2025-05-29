@@ -607,6 +607,7 @@ def chat_with_gemini_client_style():
                                     # The 'response' field within FunctionResponse contains the actual dict your tool returned
                                     func_tool_result = part.function_response.response
                                     app.logger.info(f"Tool '{part.function_response.name}' returned: {str(func_tool_result)[:300]}...") # Log snippet
+                                    app.logger.info(f"Full func_tool_result structure: {func_tool_result}") # Debug: log full structure
 
                                     # Check if this tool result is what we expect for data display
                                     # Handle both direct format and nested 'result' format
@@ -621,6 +622,7 @@ def chat_with_gemini_client_style():
                                     
                                     if tool_data is not None:
                                         retrieved_data_from_tool = tool_data
+                                        app.logger.info(f"Extracted tool_data: {retrieved_data_from_tool}")
                                         # Ensure data is a list of dicts for table display
                                         if isinstance(retrieved_data_from_tool, list) and \
                                            (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):
@@ -628,7 +630,7 @@ def chat_with_gemini_client_style():
 
                                             # Determine title based on which tool provided the data
                                             if part.function_response.name == "internal_execute_sql_query":
-                                                tool_display_title = "SQL Query Results"
+                                                tool_display_title = "Available Tables"
                                             elif part.function_response.name == "list_tables_in_keboola_bucket":
                                                 tool_display_title = func_tool_result.get("display_title", f"Tables in Bucket")
                                             elif part.function_response.name == "list_keboola_buckets":
@@ -642,8 +644,10 @@ def chat_with_gemini_client_style():
                                             break # Found data from a successful tool call
                                         else:
                                             app.logger.warning(f"Tool '{part.function_response.name}' provided 'data' but it's not a list of dicts: {type(retrieved_data_from_tool)}")
+                                    else:
+                                        app.logger.warning(f"tool_data is None for tool '{part.function_response.name}'")
 
-                                    elif isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
+                                    if isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
                                         app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_tool_result.get('error_message')}")
                                     # Add handling for other tools like get_zip_codes_for_city if they don't fit the 'data' for table model
                                     elif part.function_response.name == "get_zip_codes_for_city" and isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'success':
