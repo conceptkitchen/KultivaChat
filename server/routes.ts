@@ -157,105 +157,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let displays = [];
 
       try {
-        // Extract previous messages for context
-        const previousMessages = conversation.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })).slice(-10); // Get last 10 messages for context
-        
-        // Initialize Keboola MCP Server
-        let keboolaMCP: KeboolaMCP | null = null;
+        // Call your Python Flask backend for ALL messages
         try {
-          keboolaMCP = new KeboolaMCP();
-        } catch (err) {
-          console.error("Keboola MCP initialization failed:", err);
-        }
+          console.log("Calling Python backend at http://localhost:8081/api/chat");
+          const response = await fetch('http://localhost:8081/api/chat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              message: data.content
+            })
+          });
 
-        // Enhanced keyword detection for Keboola operations
-        const isAskingForVisualization = data.content.toLowerCase().includes("visualization") || 
-                                         data.content.toLowerCase().includes("chart") ||
-                                         data.content.toLowerCase().includes("graph");
-        
-        const isAskingForTable = data.content.toLowerCase().includes("table") || 
-                                  data.content.toLowerCase().includes("data table") ||
-                                  data.content.toLowerCase().includes("show data") ||
-                                  data.content.toLowerCase().includes("data is in") ||
-                                  data.content.toLowerCase().includes("data from") ||
-                                  data.content.toLowerCase().includes("squarespace") ||
-                                  data.content.toLowerCase().includes("closeout") ||
-                                  data.content.toLowerCase().includes("how many");
-
-        const isAskingForBuckets = data.content.toLowerCase().includes("bucket") ||
-                                   data.content.toLowerCase().includes("what buckets") ||
-                                   data.content.toLowerCase().includes("list buckets");
-
-        const isAskingForJobs = data.content.toLowerCase().includes("job") ||
-                               data.content.toLowerCase().includes("pipeline") ||
-                               data.content.toLowerCase().includes("transformation");
-                                  
-        // Simple greeting check - only use Gemini for basic greetings
-        const isSimpleGreeting = data.content.toLowerCase().trim() === "hello" ||
-                                 data.content.toLowerCase().trim() === "hi" ||
-                                 data.content.toLowerCase().trim() === "hey";
-
-        // Use Python Flask backend for ALL data and business questions by default
-        if (!isSimpleGreeting) {
-          try {
-            // Call your Python Flask backend at port 8080
-            const response = await fetch('http://localhost:8081/api/chat', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                message: data.content
-              })
-            });
-
-            if (!response.ok) {
-              throw new Error(`Python backend responded with status: ${response.status}`);
-            }
-
-            const backendResponse = await response.json();
-            
-            assistantMessage = {
-              id: uuidv4(),
-              role: "assistant" as const,
-              content: backendResponse.reply || backendResponse.error || "No response from backend",
-              timestamp: new Date(),
-              displays: backendResponse.displays || []
-            };
-          } catch (backendError) {
-            console.error("Python backend error:", backendError);
-            assistantMessage = {
-              id: uuidv4(),
-              role: "assistant" as const,
-              content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8080 and that your Keboola and Gemini credentials are properly configured.",
-              timestamp: new Date(),
-              displays: []
-            };
+          if (!response.ok) {
+            throw new Error(`Python backend responded with status: ${response.status}`);
           }
-        } else {
-          // For simple greetings, use Gemini
-          try {
-            const geminiResponse = await generateGeminiResponse(data.content, previousMessages);
-            
-            assistantMessage = {
-              id: uuidv4(),
-              role: "assistant" as const,
-              content: geminiResponse.content,
-              timestamp: new Date(),
-              displays: geminiResponse.displays || []
-            };
-          } catch (error) {
-            console.error("Error generating Gemini response:", error);
-            assistantMessage = {
-              id: uuidv4(),
-              role: "assistant" as const,
-              content: "Hello! How can I help you with your business data today?",
-              timestamp: new Date()
-            };
-          }
+
+          const backendResponse = await response.json();
+          console.log("Python backend response:", backendResponse);
+          
+          assistantMessage = {
+            id: uuidv4(),
+            role: "assistant" as const,
+            content: backendResponse.reply || backendResponse.error || "No response from backend",
+            timestamp: new Date(),
+            displays: backendResponse.displays || []
+          };
+        } catch (backendError) {
+          console.error("Python backend error:", backendError);
+          assistantMessage = {
+            id: uuidv4(),
+            role: "assistant" as const,
+            content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8081.",
+            timestamp: new Date(),
+            displays: []
+          };
         }
       } catch (error) {
         console.error("Error processing message:", error);
