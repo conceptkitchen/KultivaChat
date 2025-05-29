@@ -2,142 +2,149 @@ import os
 from flask import Flask, jsonify, request
 from kbcstorage.client import Client as KeboolaStorageClient
 from google.cloud import bigquery
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
-# Attempt to import the specific protobuf types for tool definition
+
+# Using the import style from the documentation you provided
 try:
-    from google.ai import generativelanguage as glm
-    GLM_TYPES_AVAILABLE = True
+    from google import genai as google_genai_for_client # Alias to avoid conflict with older genai import
+    from google.genai import types as google_genai_types
+    GEMINI_SDK_AVAILABLE = True
+    print("Successfully imported 'google.genai' and 'google.genai.types'")
+except ImportError as e:
+    print(f"Failed to import 'google.genai' or 'google.genai.types': {e}. Make sure 'google-generativeai' is installed and accessible with this import style (it might be part of google-cloud-aiplatform or a specific version).")
+    GEMINI_SDK_AVAILABLE = False
+    # Define dummy classes if import fails, so Flask app can still load other routes
+    class google_genai_types:
+        class GenerateContentConfig: pass
+        class Content: pass
+        class Part: pass
+    class google_genai_for_client:
+        class Client: pass
+
+# We still need HarmCategory and HarmBlockThreshold, try from google.generativeai.types
+try:
+    from google.generativeai.types import HarmCategory, HarmBlockThreshold
 except ImportError:
-    app.logger.error("Could not import 'google.ai.generativelanguage' (glm). Will attempt dictionary-based tools.")
-    GLM_TYPES_AVAILABLE = False
+    # Fallback if the primary SDK doesn't have them at this path either
+    class HarmCategory: HARM_CATEGORY_HARASSMENT=None; HARM_CATEGORY_HATE_SPEECH=None; HARM_CATEGORY_SEXUALLY_EXPLICIT=None; HARM_CATEGORY_DANGEROUS_CONTENT=None # Add all relevant
+    class HarmBlockThreshold: BLOCK_MEDIUM_AND_ABOVE=None; BLOCK_NONE=None # Add all relevant
+
 import logging
 import json
+import time 
 
 # --- Initialize Flask App ---
 app = Flask(__name__)
-
-# --- Configure logging ---
 logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 
-# --- Load Configuration from Environment Variables (Replit Secrets) ---
+# --- Load Configuration ---
 KBC_API_URL = os.environ.get('KBC_API_URL')
 KBC_STORAGE_TOKEN = os.environ.get('KBC_STORAGE_TOKEN')
 GOOGLE_APPLICATION_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
-KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA') 
+KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
-# --- Initialize Clients ---
-# (Keboola and BigQuery client initializations remain the same)
+# --- Initialize Keboola and BigQuery Clients ---
 keboola_storage_client = None
-if KBC_API_URL and KBC_STORAGE_TOKEN:
-    try:
+try:
+    if KBC_API_URL and KBC_STORAGE_TOKEN:
         app.logger.info(f"Attempting to initialize Keboola Storage Client with URL: {KBC_API_URL}")
         keboola_storage_client = KeboolaStorageClient(KBC_API_URL, KBC_STORAGE_TOKEN)
         app.logger.info("Successfully initialized Keboola Storage Client.")
-    except Exception as e:
-        app.logger.error(f"Error initializing Keboola Storage Client: {e}", exc_info=True)
-else:
-    app.logger.error("CRITICAL ERROR (Keboola Client): KBC_API_URL or KBC_STORAGE_TOKEN not set.")
+    else: app.logger.error("CRITICAL (Keboola Client): KBC_API_URL or KBC_STORAGE_TOKEN not set.")
+except Exception as e: app.logger.error(f"Error initializing Keboola Storage Client: {e}", exc_info=True)
 
 bigquery_client = None
-if GOOGLE_APPLICATION_CREDENTIALS_PATH:
-    try:
+try:
+    if GOOGLE_APPLICATION_CREDENTIALS_PATH:
         app.logger.info(f"Attempting to initialize Google BigQuery Client using credentials from: {GOOGLE_APPLICATION_CREDENTIALS_PATH}")
         bigquery_client = bigquery.Client.from_service_account_json(GOOGLE_APPLICATION_CREDENTIALS_PATH)
         app.logger.info(f"Successfully initialized Google BigQuery Client. Project: {bigquery_client.project}")
-    except Exception as e:
-        app.logger.error(f"Error initializing Google BigQuery Client: {e}", exc_info=True)
-else:
-    app.logger.error("CRITICAL ERROR (BigQuery Client): GOOGLE_APPLICATION_CREDENTIALS environment variable not set or file not found.")
+    else: app.logger.error("CRITICAL (BigQuery Client): GOOGLE_APPLICATION_CREDENTIALS path not set.")
+except Exception as e: app.logger.error(f"Error initializing Google BigQuery Client: {e}", exc_info=True)
 
-# --- Define Tools & Initialize Gemini Client ---
-gemini_model_instance = None
-gemini_tools_list = []
+# --- Tool Functions (Ensure good docstrings and type hints for ADK/Gemini Automatic Function Calling) ---
+def internal_execute_sql_query(sql_query: str) -> dict:
+    """Executes a BigQuery SQL query against the Keboola project's data warehouse 
+    (dataset: WORKSPACE_21894820, project: kbc-use4-839-261b) and returns the results.
+    Use this to answer questions about specific data, counts, aggregations, etc. 
+    The query should be a standard SQL SELECT statement. 
+    Ensure table names are fully qualified: `project_id.dataset_id.table_name` 
+    (e.g., `kbc-use4-839-261b.WORKSPACE_21894820.YOUR_TABLE_NAME`).
 
-if GEMINI_API_KEY:
-    try:
-        app.logger.info("Configuring Gemini API...")
-        genai.configure(api_key=GEMINI_API_KEY)
-        app.logger.info("Successfully configured Gemini API.")
+    Args:
+        sql_query (str): The BigQuery SQL SELECT query to execute.
 
-        if GLM_TYPES_AVAILABLE:
-            app.logger.info("Attempting to define tools using explicit glm.Schema and glm.Type...")
-            sql_tool_parameters_schema = glm.Schema(
-                type=glm.Type.OBJECT,
-                properties={
-                    'sql_query': glm.Schema(type=glm.Type.STRING, description="The BigQuery SQL SELECT query to execute. Ensure table names are fully qualified, e.g., `project_id.dataset_id.table_name`.")
-                },
-                required=['sql_query']
-            )
-            sql_function_declaration = glm.FunctionDeclaration(
-                name='execute_sql_query',
-                description="Executes a BigQuery SQL query against the Keboola project's data warehouse (dataset: WORKSPACE_21894820, project: kbc-use4-839-261b) and returns the results. Use this to answer questions about specific data, counts, aggregations, etc.",
-                parameters=sql_tool_parameters_schema
-            )
-            gemini_tools_list = [glm.Tool(function_declarations=[sql_function_declaration])]
-            tool_names_for_log = [fd.name for fd in gemini_tools_list[0].function_declarations] if gemini_tools_list else []
-        else:
-            # Fallback to dictionary definition if glm types are not available (which led to errors before)
-            # This part is unlikely to work given previous KeyErrors, but kept as a fallback concept.
-            app.logger.warning("glm types not available, falling back to dictionary-based tool definition (might cause errors).")
-            execute_sql_query_tool_declaration_dict = {
-                "name": "execute_sql_query",
-                "description": "Executes a BigQuery SQL query...",
-                "parameters": { "type": "object", "properties": { "sql_query": {"type": "string", "description": "..."}}, "required": ["sql_query"]}
-            }
-            # The GenerativeModel 'tools' arg expects a list of genai.Tool or dicts that can be converted.
-            # If we directly pass the dict, it needs to be convertible to FunctionDeclaration by the SDK.
-            gemini_tools_list = [execute_sql_query_tool_declaration_dict] # This might need to be wrapped in a Tool dict
-            tool_names_for_log = [execute_sql_query_tool_declaration_dict.get("name")]
-
-
-        gemini_model_instance = genai.GenerativeModel(
-            model_name='gemini-1.5-flash-latest', 
-            tools=gemini_tools_list, 
-            safety_settings=[ 
-                {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE},
-                {"category": HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE},
-                {"category": HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE},
-                {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE},
-            ]
-        )
-        app.logger.info(f"Gemini GenerativeModel initialized with model 'gemini-1.5-flash-latest' and tools: {tool_names_for_log}")
-
-    except ImportError as ie:
-         app.logger.error(f"An ImportError occurred during Gemini setup: {ie}. This likely means a required Google library (e.g., google.ai.generativelanguage) is not installed or accessible. Please check your 'google-generativeai' installation and its dependencies.", exc_info=True)
-         gemini_model_instance = None
-    except Exception as e:
-        app.logger.error(f"Error configuring Gemini API or initializing model: {e}", exc_info=True)
-        gemini_model_instance = None 
-else:
-    app.logger.error("CRITICAL ERROR (Gemini Client): GEMINI_API_KEY environment variable not set.")
-
-# --- Internal functions to execute our tools (internal_execute_sql_query remains the same) ---
-def internal_execute_sql_query(sql_query: str):
-    # ... (implementation from before) ...
+    Returns:
+        dict: A dictionary containing 'status' ('success', 'success_truncated', or 'error') 
+              and either 'data' (list of rows) or 'error_message'.
+    """
     if not bigquery_client:
-        app.logger.error("BigQuery client not initialized for internal_execute_sql_query.")
-        return {"error": "BigQuery client not initialized."}
-    app.logger.info(f"Internal tool call: execute_sql_query with query: {sql_query}")
+        msg = "BigQuery client not initialized."
+        app.logger.error(f"Tool call execute_sql_query: {msg}")
+        return {"status": "error", "error_message": msg}
+    app.logger.info(f"Tool Call: execute_sql_query with query: {sql_query}")
     try:
         query_job = bigquery_client.query(sql_query)
         results = query_job.result(timeout=60) 
         rows_list = [dict(row) for row in results]
-        app.logger.info(f"Internal tool call: query executed, returned {len(rows_list)} rows.")
-        result_str = json.dumps(rows_list)
-        if len(result_str) > 3500: 
-            return {"status": "success_truncated", "message": f"Query returned {len(rows_list)} rows. Result too large. Sample: " + result_str[:3500]}
-        return rows_list 
+        app.logger.info(f"Tool Call: query executed, returned {len(rows_list)} rows.")
+        result_payload = {"status": "success", "data": rows_list}
+        # Gemini expects the tool function to return a dict that can be JSON serialized.
+        # If data is too large, the SDK might truncate, or we can do it here.
+        # The examples show returning the direct result, and the SDK wraps it for the model.
+        return result_payload 
     except Exception as e:
-        app.logger.error(f"Internal tool call: Error executing BigQuery query: {e}", exc_info=True)
-        return {"error": f"Error executing BigQuery query: {str(e)}"}
+        app.logger.error(f"Tool Call: Error executing BigQuery query: {e}", exc_info=True)
+        return {"status": "error", "error_message": f"Error executing BigQuery query: {str(e)}"}
 
-# --- API Endpoints (/, /api/list_buckets, etc. remain the same) ---
+def get_current_time() -> dict:
+    """Returns the current date, time, and timezone.
+    Returns:
+        dict: A dictionary containing the current time string with a key 'current_time' and 'status'.
+    """
+    app.logger.info("Tool Call: get_current_time")
+    current_time_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
+    return {"status": "success", "current_time": current_time_str}
+
+gemini_tool_functions_list = [internal_execute_sql_query, get_current_time]
+
+# --- Initialize Gemini Client (using genai.Client and GenerateContentConfig) ---
+gemini_sdk_client = None # Renamed to avoid confusion
+gemini_generation_config_with_tools = None
+
+if GEMINI_API_KEY and GEMINI_SDK_AVAILABLE:
+    try:
+        app.logger.info("Initializing google.genai.Client with API key...")
+        gemini_sdk_client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
+        app.logger.info("Successfully initialized google.genai.Client.")
+
+        app.logger.info(f"Defining tools for Gemini: {[f.__name__ for f in gemini_tool_functions_list]}")
+        # Create GenerateContentConfig with the Python function objects as tools
+        gemini_generation_config_with_tools = google_genai_types.GenerateContentConfig(
+            tools=gemini_tool_functions_list,
+            # Optional: Add safety settings if needed directly in GenerateContentConfig
+            # safety_settings=[...] 
+            # Optional: Configure function calling mode if needed, e.g., "ANY"
+            # tool_config=google_genai_types.ToolConfig(
+            #    function_calling_config=google_genai_types.FunctionCallingConfig(mode="ANY")
+            # )
+        )
+        app.logger.info("Gemini GenerateContentConfig with tools created successfully.")
+
+    except Exception as e:
+        app.logger.error(f"Error initializing Gemini client or GenerateContentConfig: {e}", exc_info=True)
+        gemini_sdk_client = None
+        gemini_generation_config_with_tools = None
+else:
+    if not GEMINI_API_KEY: app.logger.error("CRITICAL (Gemini): GEMINI_API_KEY not set.")
+    if not GEMINI_SDK_AVAILABLE: app.logger.error("CRITICAL (Gemini): SDK 'google.genai' not available.")
+
+# --- API Endpoints ---
 @app.route('/')
-def hello(): return "Hello from your custom Keboola API Gateway!"
+def hello(): return "Hello from your custom Keboola API Gateway (using genai.Client)!"
 
+# (Your existing /api/list_buckets, etc. can remain for direct testing)
 @app.route('/api/list_buckets', methods=['GET'])
 def list_keboola_buckets_endpoint():
     if not keboola_storage_client: return jsonify({"error": "Keboola client not initialized."}), 500
@@ -163,94 +170,73 @@ def query_data_endpoint():
         return jsonify({"error": "Missing 'sql_query' in JSON payload."}), 400
     sql_query = request_data['sql_query']
     result = internal_execute_sql_query(sql_query)
-    if isinstance(result, dict) and "error" in result:
+    if isinstance(result, dict) and result.get("status") != "success" and result.get("status") != "success_truncated":
         return jsonify(result), 500
     return jsonify(result)
 
-# --- CHAT ENDPOINT (Logic for handling function call response slightly adjusted for robustness) ---
+# --- CHAT ENDPOINT using genai.Client and Automatic Function Calling ---
 @app.route('/api/chat', methods=['POST'])
-def chat_with_gemini():
-    if not gemini_model_instance: 
-        app.logger.error("/api/chat called but Gemini model is not initialized.")
-        return jsonify({"error": "Gemini model not initialized. Check server logs."}), 500
+def chat_with_gemini_client_style():
+    if not gemini_sdk_client or not gemini_generation_config_with_tools:
+        app.logger.error("/api/chat called but Gemini client or tool config is not initialized.")
+        return jsonify({"error": "Gemini client/config not initialized. Check server logs."}), 500
+
     try:
         user_message_data = request.get_json()
         if not user_message_data or 'message' not in user_message_data:
             return jsonify({"error": "Missing 'message' in JSON payload."}), 400
 
         user_message = user_message_data['message']
-        app.logger.info(f"Received user message for Gemini: {user_message}")
+        app.logger.info(f"Received user message for Gemini (genai.Client): {user_message}")
 
-        chat_session = gemini_model_instance.start_chat(enable_automatic_function_calling=False) 
-        app.logger.info(f"Sending message to Gemini: '{user_message}'")
+        # The documentation uses client.chats.create for multi-turn with automatic function calling.
+        # Let's try to replicate that. We'll need to manage chat history if we want multi-turn.
+        # For a single request-response with automatic function calling:
+        # response = gemini_sdk_client.models.generate_content(...) from the doc might be simpler.
+        # Let's try the chat style first.
+
+        # For simplicity, we'll create a new chat for each request.
+        # In a real app, you would manage chat history.
+        chat_session = gemini_sdk_client.chats.create(
+            model='gemini-2.0-flash', # Your preferred model
+            config=gemini_generation_config_with_tools,
+            # History would go here for multi-turn
+        )
+        app.logger.info(f"Created Gemini chat session. Sending message: '{user_message}'")
+
         response = chat_session.send_message(user_message)
 
-        while True:
-            function_call = None
-            if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                part_content = response.candidates[0].content.parts[0]
-                if hasattr(part_content, 'function_call') and part_content.function_call:
-                    function_call = part_content.function_call
+        # With automatic function calling, the SDK should handle the loop.
+        # response.text should contain the final answer.
+        final_answer = ""
+        try:
+            final_answer = response.text
+            app.logger.info(f"Gemini final answer (genai.Client/chat): {final_answer}")
+        except ValueError as ve:
+            app.logger.error(f"Gemini response did not directly yield text: {ve}. Parts: {response.parts if hasattr(response, 'parts') else 'N/A'}", exc_info=True)
+            if response.parts:
+                final_answer = f"LLM finished with non-text parts: {str(response.parts)}"
+            else:
+                return jsonify({"error": f"LLM response error: {ve}"}), 500
+        except Exception as e_gen:
+            app.logger.error(f"Generic error accessing response.text: {e_gen}", exc_info=True)
+            return jsonify({"error": f"Error processing LLM response: {str(e_gen)}"}), 500
 
-            if function_call:
-                tool_name = function_call.name
-                tool_args = {key: value for key, value in function_call.args.items()}
-                app.logger.info(f"Gemini wants to call tool: {tool_name} with args: {tool_args}")
-
-                tool_execution_result = None
-                sql_query_from_llm = None 
-                if tool_name == "execute_sql_query":
-                    sql_query_from_llm = tool_args.get("sql_query")
-                    if sql_query_from_llm:
-                        tool_execution_result = internal_execute_sql_query(sql_query_from_llm)
-                    else:
-                        tool_execution_result = {"error": "Missing sql_query argument from LLM for execute_sql_query."}
-                else:
-                    tool_execution_result = {"error": f"Unknown or unhandled tool requested by LLM: {tool_name}"}
-
-                app.logger.info(f"Sending tool response back to Gemini for tool {tool_name}")
-
-                # Construct the function response for the SDK.
-                # The SDK expects the actual result data to be in a dictionary under the 'response' key
-                # when you build a FunctionResponse object or its dictionary equivalent.
-                function_response_part_for_sdk = {
-                    "name": tool_name,
-                    "response": tool_execution_result # tool_execution_result is already a dict (list of dicts for success, or error dict)
-                }
-
-                # The send_message method expects an iterable of Parts (or dicts convertible to Parts).
-                # A dict representing a FunctionResponse is one such Part.
-                response = chat_session.send_message([ # Send as a list of parts
-                    {"function_response": function_response_part_for_sdk}
-                ]) 
-            else: # No more function calls, this should be the final text answer
-                final_answer = ""
-                try:
-                    final_answer = response.text
-                except ValueError: # Handles "Could not convert part.function_call to text"
-                    if response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                        final_answer = "".join(p.text for p in response.candidates[0].content.parts if hasattr(p, 'text'))
-                    if not final_answer:
-                         app.logger.error(f"Gemini response did not contain a direct text answer or a recognized function call. Parts: {response.candidates[0].content.parts if response.candidates else 'No candidates'}")
-                         return jsonify({"error": "Received an unexpected response structure from LLM after tool execution."}), 500
-
-                app.logger.info(f"Gemini final answer: {final_answer}")
-                return jsonify({"reply": final_answer})
+        return jsonify({"reply": final_answer})
 
     except Exception as e:
-        app.logger.error(f"Error in /api/chat endpoint: {e}", exc_info=True)
+        app.logger.error(f"Error in /api/chat endpoint (genai.Client style): {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    # ... (env var checks remain the same) ...
     app.logger.info(f"KBC_API_URL from env: {'SET' if KBC_API_URL else 'NOT SET'}")
-    app.logger.info(f"KBC_STORAGE_TOKEN from env: {'SET' if KBC_STORAGE_TOKEN else 'NOT SET'}")
-    app.logger.info(f"GOOGLE_APPLICATION_CREDENTIALS from env: {'SET' if GOOGLE_APPLICATION_CREDENTIALS_PATH else 'NOT SET'}")
-    app.logger.info(f"KBC_WORKSPACE_SCHEMA from env (BigQuery Dataset ID): {'SET' if KBC_WORKSPACE_SCHEMA else 'NOT SET'}")
+    # ... (other env var checks) ...
     app.logger.info(f"GEMINI_API_KEY from env: {'SET' if GEMINI_API_KEY else 'NOT SET'}")
 
-    if not all([KBC_API_URL, KBC_STORAGE_TOKEN, GOOGLE_APPLICATION_CREDENTIALS_PATH, KBC_WORKSPACE_SCHEMA, GEMINI_API_KEY]):
+    if not GEMINI_SDK_AVAILABLE:
+        app.logger.critical("CRITICAL ERROR: google.genai SDK style could not be imported. Chat functionality will not work.")
+    elif not all([KBC_API_URL, KBC_STORAGE_TOKEN, GOOGLE_APPLICATION_CREDENTIALS_PATH, KBC_WORKSPACE_SCHEMA, GEMINI_API_KEY]):
         app.logger.critical("CRITICAL ERROR: One or more essential environment variables are missing. Server cannot function fully.")
 
     app.run(host='0.0.0.0', port=8080, debug=True)
