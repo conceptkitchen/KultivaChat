@@ -30,7 +30,7 @@ except ImportError:
 
 import logging
 import json
-import time 
+import time
 
 # --- Initialize Flask App ---
 app = Flask(__name__)
@@ -43,6 +43,104 @@ KBC_STORAGE_TOKEN = os.environ.get('KBC_STORAGE_TOKEN')
 GOOGLE_APPLICATION_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')
 KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+# --- Define System Instruction Constant ---
+# This is your detailed system prompt, without the f-string placeholder for user_message
+SYSTEM_INSTRUCTION_PROMPT = """You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: kbc-use4-839-261b, dataset/workspace schema: WORKSPACE_21894820) for querying data that has been loaded into the workspace.
+
+When users ask about:
+- Tables, data, or datasets: Use the internal_execute_sql_query tool to query the database
+- "Show me tables" or "what tables do I have": Query INFORMATION_SCHEMA.TABLES to list tables
+- Specific data like "kapwa gardens" or "Undiscovered" or "Balay Kreative" or "Kulivate Labs": Search for it in the available tables
+- Data analysis requests: Write and execute appropriate SQL queries
+
+The database details:
+- Project: kbc-use4-839-261b
+- Dataset: WORKSPACE_21894820
+- Always use fully qualified table names: kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME
+
+You have the following tools at your disposal to achieve this:
+
+1. `list_keboola_buckets`:
+* **Description:** Lists all available top-level data categories (buckets) in the Keboola Storage project. Use this as a first step to understand the overall data landscape if the user's query is broad or if specific table locations are unknown.
+* **Parameters:** None.
+* **Returns:** A list of bucket objects, each containing 'id', 'name', and 'stage'.
+
+2. `list_tables_in_keboola_bucket`:
+* **Description:** Lists all specific datasets (tables) and their row counts within a chosen Keboola Storage bucket. Use this after identifying a relevant bucket to see what specific data tables it contains.
+* **Parameters:**
+    * `bucket_id` (string, required): The ID of the Keboola Storage bucket (e.g., 'in.c-mydata' or 'out.c-transformeddata') from which to list tables.
+* **Returns:** A list of table objects, each containing 'id', 'name', and 'rowsCount'.
+
+3. `get_keboola_table_detail`:
+* **Description:** Retrieves the detailed schema (column names, data types) and other metadata (like row count, primary key) for a specific Keboola Storage table. **Crucially, use this tool to understand a table's structure *before* attempting to write an SQL query for it.** This helps ensure your SQL query is accurate.
+* **Parameters:**
+    * `table_id` (string, required): The full ID of the Keboola Storage table (e.g., 'in.c-mybucket.mytable' or 'out.c-transformeddata.final_output_table').
+* **Returns:** An object containing 'id', 'name', 'columns' (a list of objects, each with 'name' and 'type'), 'rowsCount', and 'primaryKey'.
+
+4. `execute_sql_query`:
+* **Description:** Executes a BigQuery SQL SELECT query against the Keboola project's data warehouse (specifically dataset `WORKSPACE_21894820` within project `kbc-use4-839-261b`) and returns the results. Use this tool to answer specific questions about data content, perform calculations, filter data, or aggregate information once you have identified the correct table(s) and understand their schemas.
+* **Parameters:**
+    * `sql_query` (string, required): The BigQuery SQL SELECT query to execute.
+* **CRITICAL INSTRUCTIONS FOR SQL:**
+    * Table names in your SQL queries **MUST** be fully qualified: kbc-use4-839-261b.WORKSPACE_21894820.ACTUAL_TABLE_NAME_FROM_WORKSPACE. The ACTUAL_TABLE_NAME_FROM_WORKSPACE is the name of the table as it appears *after* being loaded into the BigQuery workspace via Keboola's Table Input Mapping (this might be different from its name in the Storage bucket if aliased).
+    * Use standard BigQuery SQL syntax.
+    * Quote column and table names with backticks if they contain special characters or are reserved keywords.
+* **Returns:** A list of dictionaries, where each dictionary represents a row from the query result, or an error if the query fails.
+
+5. `get_current_time`:
+* **Description:** Returns the current date, time, and timezone. Use only when explicitly asked for the time or date.
+* **Parameters:** None.
+* **Returns:** An object with 'current_time'.
+
+**Your Task and Workflow:**
+
+1. **Understand the User's Goal:** Carefully analyze the user's question to determine what information they are seeking.
+2. **Explore (If Necessary):**
+    * If the user's query is vague, or if you don't know which tables contain the relevant data, **proactively use the metadata tools first.**
+    * Start with `list_keboola_buckets` to see available data categories.
+    * If a relevant bucket is identified (e.g., if the user mentions "Kapwa Gardens data" and you see a bucket like `out.c-squarespace-kapwa-gardens`), use `list_tables_in_keboola_bucket` with that bucket's ID to find relevant tables.
+    * Before querying a table with `execute_sql_query`, **always use `get_keboola_table_detail`** to understand its columns and data types. You can share key column names with the user to confirm relevance or to help them refine their question.
+3. **Formulate SQL (When Ready):** Once you have identified the correct fully qualified table name(s) (e.g., `kbc-use4-839-261b.WORKSPACE_21894820.OUT_RESPONSE_ANSWERS_TYPEFORM`) and understand their schemas, construct a precise BigQuery SQL query to answer the user's question. This may involve `SELECT`, `WHERE`, `GROUP BY`, `SUM()`, `COUNT()`, `JOIN` (if you can infer relationships from table/column names or schema details), etc.
+4.  Execute & Respond with Data for Display:
+    * Call the appropriate tool (e.g., `execute_sql_query`, `list_keboola_buckets`, `list_tables_in_keboola_bucket`, `get_keboola_table_detail`).
+    * The tool will return a dictionary including a "status" field, and if successful, a "data" field, a "display_type" field (e.g., "table", "table_detail"), and a "display_title" field.
+    * **If the tool call is successful (status is "success" or "success_truncated") and returns a "data" payload suitable for visual display (especially from `execute_sql_query`, `list_keboola_buckets`, `list_tables_in_keboola_bucket`, or `get_keboola_table_detail` where the 'data' is tabular or a list):**
+        * **Your primary textual response to the user MUST clearly and enthusiastically announce that the data has been retrieved and will be displayed as a table (or as appropriate).** You are setting the stage for the visual component.
+        * **Examples of good textual lead-ins for displaying data:**
+            * "Okay, I've retrieved the data you asked for! Here's a look at the [display_title, e.g., 'Kapwa Gardens Orders'] in a table:"
+            * "I found [N] buckets. They will be displayed for you in a table below:"
+            * "Here is the schema for table '[table_name]', which will be shown in a table format:"
+            * "The SQL query results are ready and will be displayed as a table. Here's a brief summary: [brief summary if appropriate, e.g., 'The query returned 10 rows showing...']"
+        * **Do NOT attempt to format the full table data as text within your own reply.** Simply announce that the data is ready for display and provide a brief context or summary. The backend system is responsible for taking the raw "data" from the tool and passing it to the UI for rendering in the `CanvasDisplay` component.
+        * If the tool result indicates `status: "success_truncated"` (because the data was too large), clearly state this in your textual reply, for example: "I've retrieved a sample of the data as the full set was very large. It will be displayed for you in a table below:"
+    * If the tool does not return data suitable for a table display (e.g., `get_current_time` just returns a time string), provide the information directly in your textual reply.
+5. **Handle Tool Errors:** All tools will return a dictionary with a `"status"` field.
+    * If `status` is `"error"`, an `"error_message"` field will be present. Inform the user clearly about the error (e.g., "I tried to query the data, but encountered an error: [error_message]"). Do not try the exact same failing query again without modification or further information.
+    * If `status` is `"success_truncated"`, an additional `"message"` field will explain that the results were too large and a sample might be in the `"data"` field. Inform the user about this.
+6. **Clarify Ambiguity:** If the user's request is unclear, if you cannot find relevant tables, or if you are unsure how to construct a query, **ask clarifying questions.** Do not guess if it might lead to incorrect or costly queries. For example, ask "Which specific dataset are you interested in for 'Kapwa Gardens'?" or "To count people, which column in the table XYZ represents a unique person?"
+
+**Tone:** Be helpful, professional, data-savvy, and precise. Your goal is to act as an expert data analyst for their Keboola project.
+
+**Example Scenario (Internal Thought Process):**
+User: "How many people went to Undiscovered events versus Kapwa Garden events?"
+Your thought process might be:
+1. "Okay, I need to compare attendee counts for two event types: 'Undiscovered' and 'Kapwa Garden'."
+2. "First, I need to find tables related to these event types and attendance."
+3. Call `list_keboola_buckets`. (User sees results, maybe you find `out.c-undiscovered-events` and `out.c-kapwa-garden-events`).
+4. Call `list_tables_in_keboola_bucket` for `out.c-undiscovered-events`. (Finds `ATTENDEE_LIST_UNDISCOVERED`).
+5. Call `list_tables_in_keboola_bucket` for `out.c-kapwa-garden-events`. (Finds `ATTENDEE_LIST_KAPWA`).
+6. Call `get_keboola_table_detail` for `out.c-undiscovered-events.ATTENDEE_LIST_UNDISCOVERED` to find the person identifier column.
+7. Call `get_keboola_table_detail` for `out.c-kapwa-garden-events.ATTENDEE_LIST_KAPWA` for its person identifier.
+8. Formulate SQL Query 1: `SELECT COUNT(DISTINCT person_id_column) AS undiscovered_attendees FROM \`kbc-use4-839-261b.WORKSPACE_21894820.ATTENDEE_LIST_UNDISCOVERED\`;`
+9. Call `execute_sql_query` with Query 1. Get result (e.g., `{"undiscovered_attendees": 150}`).
+10. Formulate SQL Query 2: `SELECT COUNT(DISTINCT person_id_column) AS kapwa_attendees FROM \`kbc-use4-839-261b.WORKSPACE_21894820.ATTENDEE_LIST_KAPWA\`;`
+11. Call `execute_sql_query` with Query 2. Get result (e.g., `{"kapwa_attendees": 200}`).
+12. Synthesize answer: "There were 150 attendees for Undiscovered events and 200 for Kapwa Garden events."
+
+Strive to use the tools efficiently to answer the user's questions about their Keboola data.
+"""
+
 
 # --- Initialize Keboola and BigQuery Clients ---
 keboola_storage_client = None
@@ -65,18 +163,18 @@ except Exception as e: app.logger.error(f"Error initializing Google BigQuery Cli
 
 # --- Tool Functions (Ensure good docstrings and type hints for ADK/Gemini Automatic Function Calling) ---
 def internal_execute_sql_query(sql_query: str) -> dict:
-    """Executes a BigQuery SQL query against the Keboola project's data warehouse 
+    """Executes a BigQuery SQL query against the Keboola project's data warehouse
     (dataset: WORKSPACE_21894820, project: kbc-use4-839-261b) and returns the results.
-    Use this to answer questions about specific data, counts, aggregations, etc. 
-    The query should be a standard SQL SELECT statement. 
-    Ensure table names are fully qualified: `project_id.dataset_id.table_name` 
+    Use this to answer questions about specific data, counts, aggregations, etc.
+    The query should be a standard SQL SELECT statement.
+    Ensure table names are fully qualified: `project_id.dataset_id.table_name`
     (e.g., `kbc-use4-839-261b.WORKSPACE_21894820.YOUR_TABLE_NAME`).
 
     Args:
         sql_query (str): The BigQuery SQL SELECT query to execute.
 
     Returns:
-        dict: A dictionary containing 'status' ('success', 'success_truncated', or 'error') 
+        dict: A dictionary containing 'status' ('success', 'success_truncated', or 'error')
               and either 'data' (list of rows) or 'error_message'.
     """
     if not bigquery_client:
@@ -86,7 +184,7 @@ def internal_execute_sql_query(sql_query: str) -> dict:
     app.logger.info(f"Tool Call: execute_sql_query with query: {sql_query}")
     try:
         query_job = bigquery_client.query(sql_query)
-        results = query_job.result(timeout=60) 
+        results = query_job.result(timeout=60)
         rows_list = []
         for row in results:
             row_dict = {}
@@ -99,7 +197,7 @@ def internal_execute_sql_query(sql_query: str) -> dict:
             rows_list.append(row_dict)
         app.logger.info(f"Tool Call: query executed, returned {len(rows_list)} rows.")
         result_payload = {"status": "success", "data": rows_list}
-        return result_payload 
+        return result_payload
     except Exception as e:
         app.logger.error(f"Tool Call: Error executing BigQuery query: {e}", exc_info=True)
         return {"status": "error", "error_message": f"Error executing BigQuery query: {str(e)}"}
@@ -130,10 +228,10 @@ if GEMINI_API_KEY and GEMINI_SDK_AVAILABLE:
         gemini_generation_config_with_tools = google_genai_types.GenerateContentConfig(
             tools=gemini_tool_functions_list,
             # Optional: Add safety settings if needed directly in GenerateContentConfig
-            # safety_settings=[...] 
+            # safety_settings=[...]
             # Optional: Configure function calling mode if needed, e.g., "ANY"
             # tool_config=google_genai_types.ToolConfig(
-            #    function_calling_config=google_genai_types.FunctionCallingConfig(mode="ANY")
+            # function_calling_config=google_genai_types.FunctionCallingConfig(mode="ANY")
             # )
         )
         app.logger.info("Gemini GenerateContentConfig with tools created successfully.")
@@ -150,7 +248,6 @@ else:
 @app.route('/')
 def hello(): return "Hello from your custom Keboola API Gateway (using genai.Client)!"
 
-# (Your existing /api/list_buckets, etc. can remain for direct testing)
 @app.route('/api/list_buckets', methods=['GET'])
 def list_keboola_buckets_endpoint():
     if not keboola_storage_client: return jsonify({"error": "Keboola client not initialized."}), 500
@@ -192,277 +289,185 @@ def chat_with_gemini_client_style():
         if not user_message_data or 'message' not in user_message_data:
             return jsonify({"error": "Missing 'message' in JSON payload."}), 400
 
-        user_message = user_message_data['message']
-        app.logger.info(f"Received user message for Gemini (genai.Client): {user_message}")
+        user_message_text = user_message_data['message'] # Renamed to avoid conflict
+        app.logger.info(f"Received user message for Gemini (genai.Client): {user_message_text}")
 
-        # The documentation uses client.chats.create for multi-turn with automatic function calling.
-        # Let's try to replicate that. We'll need to manage chat history if we want multi-turn.
-        # For a single request-response with automatic function calling:
-        # response = gemini_sdk_client.models.generate_content(...) from the doc might be simpler.
-        # Let's try the chat style first.
+        # Initialize chat history with the system instruction
+        # The system instruction sets the context for the AI
+        initial_history = [
+            google_genai_types.Content(role="user", parts=[google_genai_types.Part.from_text(SYSTEM_INSTRUCTION_PROMPT)]),
+            google_genai_types.Content(role="model", parts=[google_genai_types.Part.from_text(
+                "Understood. I am ready to assist you with your Keboola project data. How can I help you?"
+            )]) # Optional: Priming model response
+        ]
 
         # For simplicity, we'll create a new chat for each request.
-        # In a real app, you would manage chat history.
         chat_session = gemini_sdk_client.chats.create(
-            model='gemini-2.0-flash', # Your preferred model
+            model='gemini-1.5-flash', # Or your preferred model like 'gemini-2.0-flash' etc.
             config=gemini_generation_config_with_tools,
-            # History would go here for multi-turn
+            history=initial_history # Pass the system instruction as initial history
         )
-        app.logger.info(f"Created Gemini chat session. Sending message: '{user_message}'")
+        app.logger.info(f"Created Gemini chat session with initial history. Sending user message: '{user_message_text}'")
 
-        # Add context to help Gemini understand it should use the tools proactively
-        enhanced_prompt = f"""You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: kbc-use4-839-261b, dataset/workspace schema: WORKSPACE_21894820) for querying data that has been loaded into the workspace.
-        
-When users ask about:
-- Tables, data, or datasets: Use the internal_execute_sql_query tool to query the database
-- "Show me tables" or "what tables do I have": Query INFORMATION_SCHEMA.TABLES to list tables
-- Specific data like "kapwa gardens" or "Undiscovered" or "Balay Kreative" or "Kulivate Labs": Search for it in the available tables
-- Data analysis requests: Write and execute appropriate SQL queries
+        # Now, send only the user's actual message.
+        # The context (system instructions, tools) is already part of the chat session.
+        response = chat_session.send_message(user_message_text)
 
-The database details:
-- Project: kbc-use4-839-261b
-- Dataset: WORKSPACE_21894820
-- Always use fully qualified table names: kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME
 
-User question: {user_message}
-
-You have the following tools at your disposal to achieve this:
-
-
-
-1. `list_keboola_buckets`:
-
-* **Description:** Lists all available top-level data categories (buckets) in the Keboola Storage project. Use this as a first step to understand the overall data landscape if the user's query is broad or if specific table locations are unknown.
-
-* **Parameters:** None.
-
-* **Returns:** A list of bucket objects, each containing 'id', 'name', and 'stage'.
-
-
-
-2. `list_tables_in_keboola_bucket`:
-
-* **Description:** Lists all specific datasets (tables) and their row counts within a chosen Keboola Storage bucket. Use this after identifying a relevant bucket to see what specific data tables it contains.
-
-* **Parameters:**
-
-* `bucket_id` (string, required): The ID of the Keboola Storage bucket (e.g., 'in.c-mydata' or 'out.c-transformeddata') from which to list tables.
-
-* **Returns:** A list of table objects, each containing 'id', 'name', and 'rowsCount'.
-
-
-
-3. `get_keboola_table_detail`:
-
-* **Description:** Retrieves the detailed schema (column names, data types) and other metadata (like row count, primary key) for a specific Keboola Storage table. **Crucially, use this tool to understand a table's structure *before* attempting to write an SQL query for it.** This helps ensure your SQL query is accurate.
-
-* **Parameters:**
-
-* `table_id` (string, required): The full ID of the Keboola Storage table (e.g., 'in.c-mybucket.mytable' or 'out.c-transformeddata.final_output_table').
-
-* **Returns:** An object containing 'id', 'name', 'columns' (a list of objects, each with 'name' and 'type'), 'rowsCount', and 'primaryKey'.
-
-
-
-4. `execute_sql_query`:
-
-* **Description:** Executes a BigQuery SQL SELECT query against the Keboola project's data warehouse (specifically dataset `WORKSPACE_21894820` within project `kbc-use4-839-261b`) and returns the results. Use this tool to answer specific questions about data content, perform calculations, filter data, or aggregate information once you have identified the correct table(s) and understand their schemas.
-
-* **Parameters:**
-
-* `sql_query` (string, required): The BigQuery SQL SELECT query to execute.
-
-* **CRITICAL INSTRUCTIONS FOR SQL:**
-
-* Table names in your SQL queries **MUST** be fully qualified: kbc-use4-839-261b.WORKSPACE_21894820.ACTUAL_TABLE_NAME_FROM_WORKSPACE. The ACTUAL_TABLE_NAME_FROM_WORKSPACE is the name of the table as it appears *after* being loaded into the BigQuery workspace via Keboola's Table Input Mapping (this might be different from its name in the Storage bucket if aliased).
-
-* Use standard BigQuery SQL syntax.
-
-* Quote column and table names with backticks if they contain special characters or are reserved keywords.
-
-* **Returns:** A list of dictionaries, where each dictionary represents a row from the query result, or an error if the query fails.
-
-
-
-5. `get_current_time`:
-
-* **Description:** Returns the current date, time, and timezone. Use only when explicitly asked for the time or date.
-
-* **Parameters:** None.
-
-* **Returns:** An object with 'current_time'.
-
-
-
-**Your Task and Workflow:**
-
-
-
-1. **Understand the User's Goal:** Carefully analyze the user's question to determine what information they are seeking.
-
-2. **Explore (If Necessary):**
-
-* If the user's query is vague, or if you don't know which tables contain the relevant data, **proactively use the metadata tools first.**
-
-* Start with `list_keboola_buckets` to see available data categories.
-
-* If a relevant bucket is identified (e.g., if the user mentions "Kapwa Gardens data" and you see a bucket like `out.c-squarespace-kapwa-gardens`), use `list_tables_in_keboola_bucket` with that bucket's ID to find relevant tables.
-
-* Before querying a table with `execute_sql_query`, **always use `get_keboola_table_detail`** to understand its columns and data types. You can share key column names with the user to confirm relevance or to help them refine their question.
-
-3. **Formulate SQL (When Ready):** Once you have identified the correct fully qualified table name(s) (e.g., `` `kbc-use4-839-261b.WORKSPACE_21894820.OUT_RESPONSE_ANSWERS_TYPEFORM` ``) and understand their schemas, construct a precise BigQuery SQL query to answer the user's question. This may involve `SELECT`, `WHERE`, `GROUP BY`, `SUM()`, `COUNT()`, `JOIN` (if you can infer relationships from table/column names or schema details), etc.
-
-4.  Execute & Respond with Data for Display:
-    * Call the appropriate tool (e.g., `execute_sql_query`, `list_keboola_buckets`, `list_tables_in_keboola_bucket`, `get_keboola_table_detail`).
-    * The tool will return a dictionary including a "status" field, and if successful, a "data" field, a "display_type" field (e.g., "table", "table_detail"), and a "display_title" field.
-    * **If the tool call is successful (status is "success" or "success_truncated") and returns a "data" payload suitable for visual display (especially from `execute_sql_query`, `list_keboola_buckets`, `list_tables_in_keboola_bucket`, or `get_keboola_table_detail` where the 'data' is tabular or a list):**
-        * **Your primary textual response to the user MUST clearly and enthusiastically announce that the data has been retrieved and will be displayed as a table (or as appropriate).** You are setting the stage for the visual component.
-        * **Examples of good textual lead-ins for displaying data:**
-            * "Okay, I've retrieved the data you asked for! Here's a look at the [display_title, e.g., 'Kapwa Gardens Orders'] in a table:"
-            * "I found [N] buckets. They will be displayed for you in a table below:"
-            * "Here is the schema for table '[table_name]', which will be shown in a table format:"
-            * "The SQL query results are ready and will be displayed as a table. Here's a brief summary: [brief summary if appropriate, e.g., 'The query returned 10 rows showing...']"
-        * **Do NOT attempt to format the full table data as text within your own reply.** Simply announce that the data is ready for display and provide a brief context or summary. The backend system is responsible for taking the raw "data" from the tool and passing it to the UI for rendering in the `CanvasDisplay` component.
-        * If the tool result indicates `status: "success_truncated"` (because the data was too large), clearly state this in your textual reply, for example: "I've retrieved a sample of the data as the full set was very large. It will be displayed for you in a table below:"
-    * If the tool does not return data suitable for a table display (e.g., `get_current_time` just returns a time string), provide the information directly in your textual reply.
-
-
-5. **Handle Tool Errors:** All tools will return a dictionary with a `"status"` field.
-
-* If `status` is `"error"`, an `"error_message"` field will be present. Inform the user clearly about the error (e.g., "I tried to query the data, but encountered an error: [error_message]"). Do not try the exact same failing query again without modification or further information.
-
-* If `status` is `"success_truncated"`, an additional `"message"` field will explain that the results were too large and a sample might be in the `"data"` field. Inform the user about this.
-
-6. **Clarify Ambiguity:** If the user's request is unclear, if you cannot find relevant tables, or if you are unsure how to construct a query, **ask clarifying questions.** Do not guess if it might lead to incorrect or costly queries. For example, ask "Which specific dataset are you interested in for 'Kapwa Gardens'?" or "To count people, which column in the table XYZ represents a unique person?"
-
-
-
-**Tone:** Be helpful, professional, data-savvy, and precise. Your goal is to act as an expert data analyst for their Keboola project.
-
-
-
-**Example Scenario (Internal Thought Process):**
-
-User: "How many people went to Undiscovered events versus Kapwa Garden events?"
-
-Your thought process might be:
-
-1. "Okay, I need to compare attendee counts for two event types: 'Undiscovered' and 'Kapwa Garden'."
-
-2. "First, I need to find tables related to these event types and attendance."
-
-3. Call `list_keboola_buckets`. (User sees results, maybe you find `out.c-undiscovered-events` and `out.c-kapwa-garden-events`).
-
-4. Call `list_tables_in_keboola_bucket` for `out.c-undiscovered-events`. (Finds `ATTENDEE_LIST_UNDISCOVERED`).
-
-5. Call `list_tables_in_keboola_bucket` for `out.c-kapwa-garden-events`. (Finds `ATTENDEE_LIST_KAPWA`).
-
-6. Call `get_keboola_table_detail` for `out.c-undiscovered-events.ATTENDEE_LIST_UNDISCOVERED` to find the person identifier column.
-
-7. Call `get_keboola_table_detail` for `out.c-kapwa-garden-events.ATTENDEE_LIST_KAPWA` for its person identifier.
-
-8. Formulate SQL Query 1: `SELECT COUNT(DISTINCT person_id_column) AS undiscovered_attendees FROM \`kbc-use4-839-261b.WORKSPACE_21894820.ATTENDEE_LIST_UNDISCOVERED\`;`
-
-9. Call `execute_sql_query` with Query 1. Get result (e.g., `{"undiscovered_attendees": 150}`).
-
-10. Formulate SQL Query 2: `SELECT COUNT(DISTINCT person_id_column) AS kapwa_attendees FROM \`kbc-use4-839-261b.WORKSPACE_21894820.ATTENDEE_LIST_KAPWA\`;`
-
-11. Call `execute_sql_query` with Query 2. Get result (e.g., `{"kapwa_attendees": 200}`).
-
-12. Synthesize answer: "There were 150 attendees for Undiscovered events and 200 for Kapwa Garden events."
-
-
-
-Strive to use the tools efficiently to answer the user's questions about their Keboola data.
-"""
-        
-        response = chat_session.send_message(enhanced_prompt)
-
-        # With automatic function calling, the SDK should handle the loop.
-        # response.text should contain the final answer.
         final_answer = ""
         try:
             final_answer = response.text
             app.logger.info(f"Gemini final answer (genai.Client/chat): {final_answer}")
         except ValueError as ve:
             app.logger.error(f"Gemini response did not directly yield text: {ve}. Parts: {response.parts if hasattr(response, 'parts') else 'N/A'}", exc_info=True)
+            # Check if the response might be a function call that wasn't automatically resolved to text
+            # or if it's genuinely missing text and has other parts.
             if response.parts:
-                final_answer = f"LLM finished with non-text parts: {str(response.parts)}"
-            else:
-                return jsonify({"error": f"LLM response error: {ve}"}), 500
+                # Attempt to construct a meaningful message if parts exist but text doesn't
+                part_summary = []
+                for part in response.parts:
+                    if hasattr(part, 'function_call') and part.function_call:
+                        part_summary.append(f"Pending function call: {part.function_call.name}")
+                    elif hasattr(part, 'text') and part.text:
+                         part_summary.append(part.text) # Should have been caught by response.text
+
+                if part_summary:
+                    final_answer = "The model's response includes non-textual parts or actions: " + "; ".join(part_summary)
+                    app.logger.warning(f"Constructed final_answer from parts: {final_answer}")
+                else:
+                    final_answer = f"LLM response processing error: The response did not contain direct text and parts were inconclusive. Details: {str(ve)}"
+                    app.logger.error(final_answer)
+                    # Depending on desired behavior, you might return an error here or use the constructed final_answer
+            else: # No parts and no text
+                app.logger.error(f"LLM response error: No text and no parts in response. Details: {ve}")
+                return jsonify({"error": f"LLM response error: {ve}. The response was empty."}), 500
+
         except Exception as e_gen:
             app.logger.error(f"Generic error accessing response.text: {e_gen}", exc_info=True)
             return jsonify({"error": f"Error processing LLM response: {str(e_gen)}"}), 500
 
+
         # Create displays for structured data visualization
         displays = []
-        
+
         # If the response contains table names, format as a structured display
-        if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower():
+        if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower() or "list of tables" in final_answer.lower():
             lines = final_answer.split('\n')
             table_names = []
+            in_table_list_context = False # Flag to identify if we are in a list of tables
+
+            # Heuristics to find table names, often listed after specific phrases or as bullet points
+            if "here are the tables" in final_answer.lower() or "following tables" in final_answer.lower():
+                in_table_list_context = True
+
             for line in lines:
-                if line.strip().startswith('- '):
-                    table_name = line.strip()[2:]
-                    if table_name:
+                stripped_line = line.strip()
+                # Check for bullet points or common table name patterns
+                if stripped_line.startswith('- ') or stripped_line.startswith('* '):
+                    table_name = stripped_line[2:].strip('`"') # Remove markdown and quotes
+                    if table_name and ('.' in table_name or KBC_WORKSPACE_SCHEMA in table_name or not any(char in table_name for char in ['(', ')', ':', '?'])): # Basic filter
                         table_names.append(table_name)
-            
+                elif in_table_list_context and stripped_line and not stripped_line.endswith(':'): # If in table list context, consider non-empty lines
+                     if KBC_WORKSPACE_SCHEMA in stripped_line or '`' in stripped_line: # If it looks like a qualified name
+                        table_names.append(stripped_line.strip('`"'))
+
+
+            # Deduplicate and ensure they look like table names
+            # This part might need more sophisticated parsing based on actual LLM output format
             if table_names:
-                displays.append({
-                    "type": "table",
-                    "title": "Your Data Tables",
-                    "content": [{"Table Name": name} for name in table_names]
-                })
-        
+                # A simple filter: assume table names might contain dots (schema.table) or are mentioned after "table"
+                # This is a heuristic and might need refinement based on observed LLM output.
+                processed_table_names = []
+                for name_candidate in table_names:
+                    # Further refine, e.g. avoid lines that are full sentences.
+                    if len(name_candidate.split()) < 5 and ('.' in name_candidate or KBC_WORKSPACE_SCHEMA in name_candidate): # Arbitrary short length and structure check
+                        processed_table_names.append(name_candidate)
+                    elif "table" in final_answer.lower() and len(name_candidate.split()) < 5: # If "table" is in general response, be more lenient
+                        processed_table_names.append(name_candidate)
+
+
+                unique_table_names = sorted(list(set(processed_table_names)))
+                if unique_table_names:
+                    app.logger.info(f"Extracted table names for display: {unique_table_names}")
+                    displays.append({
+                        "type": "table",
+                        "title": "Identified Data Tables",
+                        "content": [{"Table Name": name} for name in unique_table_names]
+                    })
         # Enhanced: Check if Gemini executed a data query and format results
+        # This logic needs to access the function call responses from the chat history.
+        # The `response` object itself might not directly hold all tool call results if automatic function calling is deep.
+        # We need to inspect chat_session.history for function responses.
+
         query_data = None
-        if hasattr(response, '_result') and hasattr(response._result, 'candidates'):
-            for candidate in response._result.candidates:
-                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                    for part in candidate.content.parts:
+        tool_display_title = "Tool Execution Result" # Default title
+
+        # Iterate through the chat history (which now includes the latest turn)
+        # The history is ordered: system_prompt (user), initial_model_response (model), user_query (user), tool_calls (model/tool), tool_results (user/tool), final_llm_answer (model)
+        if GEMINI_SDK_AVAILABLE: # Ensure google_genai_types.Part is available
+            for message_content in reversed(chat_session.history): # Check recent messages first
+                if message_content.role == "user": # Tool responses are added as 'user' role with tool_name
+                    for part in message_content.parts:
                         if hasattr(part, 'function_response') and part.function_response:
+                            app.logger.info(f"Found function_response in history part: {part.function_response.name}")
                             try:
-                                func_response = part.function_response
-                                if hasattr(func_response, 'response') and isinstance(func_response.response, dict):
-                                    func_result = func_response.response
-                                    if func_result.get('status') == 'success' and 'data' in func_result:
-                                        query_data = func_result['data']
-                                        app.logger.info(f"Found query data with {len(query_data)} rows")
-                                        break
-                            except Exception as e:
-                                app.logger.error(f"Error parsing function response: {e}")
-        
-        # Fallback: also check the original response structure
-        if not query_data and hasattr(response, 'parts'):
-            for part in response.parts:
-                if hasattr(part, 'function_response'):
-                    try:
-                        func_result = part.function_response.response if hasattr(part.function_response, 'response') else part.function_response
-                        if isinstance(func_result, dict) and func_result.get('status') == 'success' and 'data' in func_result:
-                            query_data = func_result['data']
-                            app.logger.info(f"Found query data (fallback) with {len(query_data)} rows")
-                            break
-                    except Exception as e:
-                        app.logger.error(f"Error in fallback function response parsing: {e}")
-        
-        # If we found table data, create a table display
-        if query_data and len(query_data) > 0:
-            # Extract table name from the final answer for title
-            table_title = "Query Results"
-            if "OUT_FACT_ORDERS_KAPWA_GARDENS" in final_answer:
-                table_title = "Kapwa Gardens Orders"
-            elif "OUT_DIM_CUSTOMERS" in final_answer:
-                table_title = "Customer Data"
-            elif "OUT_DIM_PRODUCTS" in final_answer:
-                table_title = "Product Data"
-            
+                                func_resp_content = part.function_response.response
+                                # The actual data is often nested under 'data'
+                                if isinstance(func_resp_content, dict) and \
+                                   func_resp_content.get('status') in ['success', 'success_truncated'] and \
+                                   'data' in func_resp_content:
+
+                                    retrieved_data = func_resp_content['data']
+                                    # For display, we typically want lists of dicts (tabular data)
+                                    if isinstance(retrieved_data, list) and all(isinstance(item, dict) for item in retrieved_data):
+                                        query_data = retrieved_data # Actual tabular data
+                                        tool_display_title = f"Results from: {part.function_response.name}"
+                                        if part.function_response.name == "internal_execute_sql_query":
+                                            # Try to find the SQL query for a better title
+                                            # This requires looking at the preceding 'model' message that made the call
+                                            # For simplicity, we'll use a generic title or refine later
+                                            tool_display_title = "SQL Query Results"
+                                        elif part.function_response.name == "list_tables_in_keboola_bucket":
+                                            tool_display_title = "Tables in Bucket"
+                                        elif part.function_response.name == "list_keboola_buckets":
+                                            tool_display_title = "Keboola Buckets"
+                                        elif part.function_response.name == "get_keboola_table_detail":
+                                            tool_display_title = "Table Schema Detail"
+
+                                        app.logger.info(f"Found query data from tool {part.function_response.name} with {len(query_data)} items/rows.")
+                                        break # Found data, exit part loop
+                                    elif isinstance(retrieved_data, dict) and part.function_response.name == "get_current_time":
+                                        # Handle get_current_time specifically if needed, though it's not tabular
+                                        app.logger.info(f"Tool {part.function_response.name} returned: {retrieved_data}")
+                                        # query_data could be set to [retrieved_data] if you want to display it as a single-row table
+                                    else:
+                                        app.logger.info(f"Tool {part.function_response.name} returned data but not in expected tabular format: {type(retrieved_data)}")
+
+                                elif isinstance(func_resp_content, dict) and func_resp_content.get('status') == 'error':
+                                    app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_resp_content.get('error_message')}")
+
+
+                            except Exception as e_parse:
+                                app.logger.error(f"Error parsing function_response content from history: {e_parse}", exc_info=True)
+                    if query_data:
+                        break # Found data, exit history loop
+
+
+        # If we found table data from a tool, create a table display
+        if query_data and isinstance(query_data, list) and len(query_data) > 0:
+            # Check if a display for this data type already exists to avoid duplicates
+            # (e.g., if LLM text also listed tables and tool also returned tables)
+            # For simplicity, we add it. Frontend can decide on deduplication if necessary.
             displays.append({
                 "type": "table",
-                "title": table_title,
+                "title": tool_display_title, # Use the title derived from tool name
                 "content": query_data
             })
-            app.logger.info(f"Created table display with {len(query_data)} rows")
-        
+            app.logger.info(f"Created table display for '{tool_display_title}' with {len(query_data)} rows")
+        elif query_data: # query_data is not None but not a list or is empty
+             app.logger.info(f"Query data found but not suitable for table display or empty: {query_data}")
+
+
         return jsonify({
             "reply": final_answer,
             "displays": displays
@@ -470,17 +475,23 @@ Strive to use the tools efficiently to answer the user's questions about their K
 
     except Exception as e:
         app.logger.error(f"Error in /api/chat endpoint (genai.Client style): {e}", exc_info=True)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 # --- Main Execution ---
 if __name__ == '__main__':
     app.logger.info(f"KBC_API_URL from env: {'SET' if KBC_API_URL else 'NOT SET'}")
-    # ... (other env var checks) ...
+    app.logger.info(f"KBC_STORAGE_TOKEN from env: {'SET' if KBC_STORAGE_TOKEN else 'NOT SET'}")
+    app.logger.info(f"GOOGLE_APPLICATION_CREDENTIALS_PATH from env: {'SET' if GOOGLE_APPLICATION_CREDENTIALS_PATH else 'NOT SET'}")
+    app.logger.info(f"KBC_WORKSPACE_SCHEMA from env: {'SET' if KBC_WORKSPACE_SCHEMA else 'NOT SET'}")
     app.logger.info(f"GEMINI_API_KEY from env: {'SET' if GEMINI_API_KEY else 'NOT SET'}")
 
     if not GEMINI_SDK_AVAILABLE:
         app.logger.critical("CRITICAL ERROR: google.genai SDK style could not be imported. Chat functionality will not work.")
     elif not all([KBC_API_URL, KBC_STORAGE_TOKEN, GOOGLE_APPLICATION_CREDENTIALS_PATH, KBC_WORKSPACE_SCHEMA, GEMINI_API_KEY]):
         app.logger.critical("CRITICAL ERROR: One or more essential environment variables are missing. Server cannot function fully.")
+    # Sanity check that dummy types are not being used if SDK was expected
+    if GEMINI_SDK_AVAILABLE and isinstance(google_genai_types.Content(), type(None.__class__)): # A bit of a hack to check if it's a dummy
+        app.logger.warning("GEMINI_SDK_AVAILABLE is True, but google_genai_types seem to be dummy classes. Imports might not have fully succeeded as expected.")
+
 
     app.run(host='0.0.0.0', port=8081, debug=False, use_reloader=False)
