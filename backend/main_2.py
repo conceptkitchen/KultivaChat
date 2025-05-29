@@ -609,11 +609,18 @@ def chat_with_gemini_client_style():
                                     app.logger.info(f"Tool '{part.function_response.name}' returned: {str(func_tool_result)[:300]}...") # Log snippet
 
                                     # Check if this tool result is what we expect for data display
-                                    if isinstance(func_tool_result, dict) and \
-                                       func_tool_result.get('status') in ['success', 'success_truncated'] and \
-                                       'data' in func_tool_result:
-
-                                        retrieved_data_from_tool = func_tool_result['data']
+                                    # Handle both direct format and nested 'result' format
+                                    tool_data = None
+                                    if isinstance(func_tool_result, dict):
+                                        if func_tool_result.get('status') in ['success', 'success_truncated'] and 'data' in func_tool_result:
+                                            tool_data = func_tool_result['data']
+                                        elif 'result' in func_tool_result and isinstance(func_tool_result['result'], dict):
+                                            result_obj = func_tool_result['result']
+                                            if result_obj.get('status') in ['success', 'success_truncated'] and 'data' in result_obj:
+                                                tool_data = result_obj['data']
+                                    
+                                    if tool_data is not None:
+                                        retrieved_data_from_tool = tool_data
                                         # Ensure data is a list of dicts for table display
                                         if isinstance(retrieved_data_from_tool, list) and \
                                            (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):

@@ -1,0 +1,26 @@
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 22:23:18] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): show me the data tables
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show me the data tables'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name
+INFO:main_2:Tool Call: query executed, returned 38 rows.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Here's a list of the tables found in your BigQuery workspace:
+
+OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED, OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS, OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS, OUT_DIM_CUSTOMERS_4_UNDISCOVERED, OUT_DIM_CUSTOMERS_5_BALAY_KREATIVE, OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS, OUT_DIM_CUSTOMERS_UNDISCOVERED, OUT_DIM_PRODUCTS_2_KULTIVATE_LABS, OUT_DIM_PRODUCTS_3_KAPWA_GARDENS, OUT_DIM_PRODUCTS_4_UNDISCOVERED_FORMS, OUT_DIM_PRODUCTS_5_KAPWA_GARDENS, OUT_DIM_PRODUCTS_6_BALAY_KREATIVE, OUT_DIM_PRODUCTS_UNDISCOVERED, OUT_FACT_FULFILLMENTS_KULTIVATE_LABS, OUT_FACT_ORDERS_2_KULTIVATE_LABS, OUT_FACT_ORDERS_3_UNDISCOVERED, OUT_FACT_ORDERS_4_BALAY_KREATIVE, OUT_FACT_ORDERS_5_KAPWA_GARDENS, OUT_FACT_ORDERS_6_UNDISCOVERED_FORMS, OUT_FACT_ORDERS_KAPWA_GARDENS, OUT_FACT_ORDER_LINES_2_KULTIVATE_LABS, OUT_FACT_ORDER_LINES_3_KAPWA_GARDENS, OUT_FACT_ORDER_LINES_4_UNDISCOVERED_FORMS, OUT_FACT_ORDER_LINES_5_KAPWA_GARDENS, OUT_FACT_ORDER_LINES_6_BALAY_KREATIVE, OUT_FACT_ORDER_LINES_UNDISCOVERED, OUT_FACT_PAYMENTS_2_KULTIVATE_LABS, OUT_FACT_PAYMENTS_3_UNDISCOVERED, OUT_FACT_PAYMENTS_4_BALAY_KREATIVE, OUT_FACT_PAYMENTS_KAPWA_GARDENS, OUT_FACT_SHIPPING_DETAILS_KULTIVATE_LABS, OUT_FORMS_TYPEFORM, OUT_QUESTIONS_TYPEFORM, OUT_QUESTION_CHOICES_TYPEFORM, OUT_RESPONSE_ANSWERS_TYPEFORM, OUT_RESPONSE_METADATA_TYPEFORM, STG_KAPWA_ORDERS_CLEANED_KAPWA_GARDENS, STG_UNDISCOVERED_ORDERS_CLEANED_UNDISCOVERED_FORMS
+
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history from tool: internal_execute_sql_query
+INFO:main_2:Tool 'internal_execute_sql_query' returned: {'result': {'status': 'success', 'data': [{'table_name': 'OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED'}, {'table_name': 'OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS'}, {'table_name': 'OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS'}, {'table_name': 'OUT_DIM_CUSTOMERS_4_UNDISCOVERED'}, {'table_name': 'OUT_DIM_CUSTOMERS_5_BAL...
+INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 22:23:37] "POST /api/chat HTTP/1.1" 200 -
