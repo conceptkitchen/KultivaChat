@@ -1,0 +1,16 @@
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): I apologize, but I encountered an error while trying to access the `OUT_DIM_CUSTOMERS` table:  `Error getting table detail for out.c-customers.OUT_DIM_CUSTOMERS: 404 Client Error: Not Found for url: https://connection.us-east4.gcp.keboola.com/v2/storage/tables/out.c-customers.OUT_DIM_CUSTOMERS`.  This suggests that the table either doesn't exist or there's an issue with the table ID or access permissions. Could you please double-check the table name or provide additional details about the bucket it belongs to?  Knowing the bucket ID (`in.c-something` or `out.c-something`) would help me locate the table.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history part: get_keboola_table_detail
+INFO:main_2:Function response content type: <class 'dict'>, content: {'result': {'status': 'error', 'error_message': 'Error getting table detail for out.c-customers.OUT_DIM_CUSTOMERS: 404 Client Error: Not Found for url: https://connection.us-east4.gcp.keboola.com/v2/s...
+INFO:main_2:Found nested result, extracted: {'status': 'error', 'error_message': 'Error getting table detail for out.c-customers.OUT_DIM_CUSTOMERS: 404 Client Error: Not Found for url: https://connection.us-east4.gcp.keboola.com/v2/storage/tabl...
+WARNING:main_2:Response doesn't match expected structure. Status: error
+INFO:main_2:Processing displays - query_data type: <class 'NoneType'>, length: N/A
+INFO:main_2:Query data content preview: None
+INFO:main_2:Final answer type: <class 'str'>, value: I apologize, but I encountered an error while trying to access the `OUT_DIM_CUSTOMERS` table:  `Error getting table detail for out.c-customers.OUT_DIM_CUSTOMERS: 404 Client Error: Not Found for url: https://connection.us-east4.gcp.keboola.com/v2/storage/tables/out.c-customers.OUT_DIM_CUSTOMERS`.  This suggests that the table either doesn't exist or there's an issue with the table ID or access permissions. Could you please double-check the table name or provide additional details about the bucket it belongs to?  Knowing the bucket ID (`in.c-something` or `out.c-something`) would help me locate the table.
+
+WARNING:main_2:No query_data extracted from tool calls, checking text response for table information
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:59:30] "POST /api/chat HTTP/1.1" 200 -
