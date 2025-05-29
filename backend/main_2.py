@@ -87,7 +87,16 @@ def internal_execute_sql_query(sql_query: str) -> dict:
     try:
         query_job = bigquery_client.query(sql_query)
         results = query_job.result(timeout=60) 
-        rows_list = [dict(row) for row in results]
+        rows_list = []
+        for row in results:
+            row_dict = {}
+            for key, value in dict(row).items():
+                # Convert Decimal objects to float to avoid JSON serialization issues
+                if hasattr(value, '__class__') and 'Decimal' in str(type(value)):
+                    row_dict[key] = float(value)
+                else:
+                    row_dict[key] = value
+            rows_list.append(row_dict)
         app.logger.info(f"Tool Call: query executed, returned {len(rows_list)} rows.")
         result_payload = {"status": "success", "data": rows_list}
         return result_payload 
@@ -256,16 +265,53 @@ User question: {user_message}"""
                 })
         
         # Enhanced: Check if Gemini executed a data query and format results
-        if hasattr(response, 'parts') and response.parts:
+        query_data = None
+        if hasattr(response, '_result') and hasattr(response._result, 'candidates'):
+            for candidate in response._result.candidates:
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'function_response') and part.function_response:
+                            try:
+                                func_response = part.function_response
+                                if hasattr(func_response, 'response') and isinstance(func_response.response, dict):
+                                    func_result = func_response.response
+                                    if func_result.get('status') == 'success' and 'data' in func_result:
+                                        query_data = func_result['data']
+                                        app.logger.info(f"Found query data with {len(query_data)} rows")
+                                        break
+                            except Exception as e:
+                                app.logger.error(f"Error parsing function response: {e}")
+        
+        # Fallback: also check the original response structure
+        if not query_data and hasattr(response, 'parts'):
             for part in response.parts:
-                if hasattr(part, 'function_call') and part.function_call:
-                    if part.function_call.name == 'internal_execute_sql_query':
-                        # This was a data query - let's check if we can enhance the display
-                        app.logger.info("Detected data query execution - checking for table data formatting")
-                        
-        # Alternative: Look for data patterns in the text response
-        if any(keyword in final_answer.lower() for keyword in ['rows returned', 'query results', 'data from']):
-            app.logger.info("Response appears to contain query results - could format as table display")
+                if hasattr(part, 'function_response'):
+                    try:
+                        func_result = part.function_response.response if hasattr(part.function_response, 'response') else part.function_response
+                        if isinstance(func_result, dict) and func_result.get('status') == 'success' and 'data' in func_result:
+                            query_data = func_result['data']
+                            app.logger.info(f"Found query data (fallback) with {len(query_data)} rows")
+                            break
+                    except Exception as e:
+                        app.logger.error(f"Error in fallback function response parsing: {e}")
+        
+        # If we found table data, create a table display
+        if query_data and len(query_data) > 0:
+            # Extract table name from the final answer for title
+            table_title = "Query Results"
+            if "OUT_FACT_ORDERS_KAPWA_GARDENS" in final_answer:
+                table_title = "Kapwa Gardens Orders"
+            elif "OUT_DIM_CUSTOMERS" in final_answer:
+                table_title = "Customer Data"
+            elif "OUT_DIM_PRODUCTS" in final_answer:
+                table_title = "Product Data"
+            
+            displays.append({
+                "type": "table",
+                "title": table_title,
+                "content": query_data
+            })
+            app.logger.info(f"Created table display with {len(query_data)} rows")
         
         return jsonify({
             "reply": final_answer,
