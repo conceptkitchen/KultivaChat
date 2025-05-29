@@ -1,0 +1,30 @@
+~/workspace/backend$ python main_2.py
+Successfully imported 'google.genai' and 'google.genai.types'
+INFO:main_2:Attempting to initialize Keboola Storage Client with URL: https://connection.us-east4.gcp.keboola.com
+INFO:main_2:Successfully initialized Keboola Storage Client.
+INFO:main_2:Attempting to initialize Google BigQuery Client using credentials from: /home/runner/workspace/backend/credentials-839-21894808.json
+INFO:main_2:Successfully initialized Google BigQuery Client. Project: kbc-use4-839-261b
+INFO:main_2:Initializing google.genai.Client with API key...
+INFO:main_2:Successfully initialized google.genai.Client.
+INFO:main_2:Defining tools for Gemini: ['internal_execute_sql_query', 'get_current_time']
+INFO:main_2:Gemini GenerateContentConfig with tools created successfully.
+INFO:main_2:KBC_API_URL from env: SET
+INFO:main_2:KBC_STORAGE_TOKEN from env: SET
+INFO:main_2:GOOGLE_APPLICATION_CREDENTIALS_PATH from env: SET
+INFO:main_2:KBC_WORKSPACE_SCHEMA from env: SET
+INFO:main_2:GEMINI_API_KEY from env: SET
+ * Serving Flask app 'main_2'
+ * Debug mode: off
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8081
+ * Running on http://172.31.128.93:8081
+INFO:werkzeug:Press CTRL+C to quit
+INFO:main_2:Received user message for Gemini (genai.Client): hihi
+ERROR:main_2:Error in /api/chat endpoint (genai.Client style): Part.from_text() takes 1 positional argument but 2 were given
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend/main_2.py", line 298, in chat_with_gemini_client_style
+    google_genai_types.Content(role="user", parts=[google_genai_types.Part.from_text(SYSTEM_INSTRUCTION_PROMPT)]),
+                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: Part.from_text() takes 1 positional argument but 2 were given
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 22:51:18] "POST /api/chat HTTP/1.1" 500 -
