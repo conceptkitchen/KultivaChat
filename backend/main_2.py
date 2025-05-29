@@ -125,10 +125,34 @@ if GEMINI_API_KEY and GEMINI_SDK_AVAILABLE:
         gemini_sdk_client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
         app.logger.info("Successfully initialized google.genai.Client.")
 
+        # Create system instruction
+        system_instruction = """You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: kbc-use4-839-261b, dataset/workspace schema: WORKSPACE_21894820) for querying data that has been loaded into the workspace.
+        
+When users ask about:
+- Tables, data, or datasets: Use the internal_execute_sql_query tool to query the database
+- "Show me tables" or "what tables do I have": Query INFORMATION_SCHEMA.TABLES to list tables
+- Specific data like "kapwa gardens" or "Undiscovered" or "Balay Kreative" or "Kulivate Labs": Search for it in the available tables
+- Data analysis requests: Write and execute appropriate SQL queries
+
+The database details:
+- Project: kbc-use4-839-261b
+- Dataset: WORKSPACE_21894820
+- Always use fully qualified table names: kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME
+
+CRITICAL INSTRUCTIONS:
+1. ALWAYS use fully qualified table names in SQL queries: kbc-use4-839-261b.WORKSPACE_21894820.ACTUAL_TABLE_NAME
+2. For table discovery, first query INFORMATION_SCHEMA.TABLES to see what tables are available
+3. Be proactive: If a user asks about data, immediately execute SQL queries to provide actual results
+4. For data exploration: If users mention specific terms like "kapwa gardens", search across available tables to find relevant data
+5. Always format results clearly and provide insights based on the actual data returned
+
+Remember: You have direct access to query the BigQuery data warehouse. Use it actively to provide real, current data insights!"""
+
         app.logger.info(f"Defining tools for Gemini: {[f.__name__ for f in gemini_tool_functions_list]}")
-        # Create GenerateContentConfig with the Python function objects as tools
+        # Create GenerateContentConfig with the Python function objects as tools and system instruction
         gemini_generation_config_with_tools = google_genai_types.GenerateContentConfig(
             tools=gemini_tool_functions_list,
+            system_instruction=system_instruction,
             # Optional: Add safety settings if needed directly in GenerateContentConfig
             # safety_settings=[...] 
             # Optional: Configure function calling mode if needed, e.g., "ANY"
@@ -210,23 +234,8 @@ def chat_with_gemini_client_style():
         )
         app.logger.info(f"Created Gemini chat session. Sending message: '{user_message}'")
 
-        # Add context to help Gemini understand it should use the tools proactively
-        enhanced_prompt = f"""You are an expert Keboola Data Analyst Assistant. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') and a Google BigQuery data warehouse (project ID: kbc-use4-839-261b, dataset/workspace schema: WORKSPACE_21894820) for querying data that has been loaded into the workspace.
-        
-When users ask about:
-- Tables, data, or datasets: Use the internal_execute_sql_query tool to query the database
-- "Show me tables" or "what tables do I have": Query INFORMATION_SCHEMA.TABLES to list tables
-- Specific data like "kapwa gardens" or "Undiscovered" or "Balay Kreative" or "Kulivate Labs": Search for it in the available tables
-- Data analysis requests: Write and execute appropriate SQL queries
-
-The database details:
-- Project: kbc-use4-839-261b
-- Dataset: WORKSPACE_21894820
-- Always use fully qualified table names: kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME
-
-User question: {user_message}
-
-You have the following tools at your disposal to achieve this:
+        # Send the user message directly since system instruction is set in config
+        response = chat_session.send_message(user_message)
 
 
 
