@@ -80,7 +80,7 @@ def internal_execute_sql_query(sql_query: str) -> dict:
               and either 'data' (list of rows) or 'error_message'.
     """
     if not bigquery_client:
-        msg = "BigQuery client not initialized."
+        msg = "BigQuery client not initialized. Please provide your Google Cloud credentials file to enable data querying."
         app.logger.error(f"Tool call execute_sql_query: {msg}")
         return {"status": "error", "error_message": msg}
     app.logger.info(f"Tool Call: execute_sql_query with query: {sql_query}")
@@ -90,9 +90,6 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         rows_list = [dict(row) for row in results]
         app.logger.info(f"Tool Call: query executed, returned {len(rows_list)} rows.")
         result_payload = {"status": "success", "data": rows_list}
-        # Gemini expects the tool function to return a dict that can be JSON serialized.
-        # If data is too large, the SDK might truncate, or we can do it here.
-        # The examples show returning the direct result, and the SDK wraps it for the model.
         return result_payload 
     except Exception as e:
         app.logger.error(f"Tool Call: Error executing BigQuery query: {e}", exc_info=True)
