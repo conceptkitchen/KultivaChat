@@ -294,12 +294,7 @@ def chat_with_gemini_client_style():
 
         # Initialize chat history with the system instruction
         # The system instruction sets the context for the AI
-        initial_history = [
-            google_genai_types.Content(role="user", parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]),
-            google_genai_types.Content(role="model", parts=[google_genai_types.Part(
-                text="Understood. I am ready to assist you with your Keboola project data. How can I help you?"
-            )]) # Optional: Priming model response
-        ]
+        initial_history = []
 
         # For simplicity, we'll create a new chat for each request.
         chat_session = gemini_sdk_client.chats.create(
@@ -311,7 +306,8 @@ def chat_with_gemini_client_style():
 
         # Now, send only the user's actual message.
         # The context (system instructions, tools) is already part of the chat session.
-        response = chat_session.send_message(user_message_text)
+        full_message = f"{SYSTEM_INSTRUCTION_PROMPT}\n\nUser: {user_message_text}"
+        response = chat_session.send_message(full_message)
 
 
         final_answer = ""
