@@ -201,7 +201,23 @@ def chat_with_gemini_client_style():
         )
         app.logger.info(f"Created Gemini chat session. Sending message: '{user_message}'")
 
-        response = chat_session.send_message(user_message)
+        # Add context to help Gemini understand it should use the tools proactively
+        enhanced_prompt = f"""You are a data analyst assistant with access to a Keboola BigQuery data warehouse. 
+        
+When users ask about:
+- Tables, data, or datasets: Use the internal_execute_sql_query tool to query the database
+- "Show me tables" or "what tables do I have": Query INFORMATION_SCHEMA.TABLES to list tables
+- Specific data like "kapwa gardens": Search for it in the available tables
+- Data analysis requests: Write and execute appropriate SQL queries
+
+The database details:
+- Project: kbc-use4-839-261b
+- Dataset: WORKSPACE_21894820
+- Always use fully qualified table names: `kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`
+
+User question: {user_message}"""
+        
+        response = chat_session.send_message(enhanced_prompt)
 
         # With automatic function calling, the SDK should handle the loop.
         # response.text should contain the final answer.
