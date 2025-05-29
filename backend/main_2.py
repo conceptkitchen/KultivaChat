@@ -354,10 +354,12 @@ def chat_with_gemini_client_style():
                                         app.logger.info(f"Extracted nested result: {func_resp_content}")
                                     
                                     app.logger.info(f"Checking for data extraction - status: {func_resp_content.get('status') if isinstance(func_resp_content, dict) else 'N/A'}")
+                                    app.logger.info(f"func_resp_content keys: {list(func_resp_content.keys()) if isinstance(func_resp_content, dict) else 'N/A'}")
                                     
                                     if isinstance(func_resp_content, dict) and \
                                        func_resp_content.get('status') in ['success', 'success_truncated'] and \
                                        'data' in func_resp_content:
+                                        app.logger.info("CONDITION MET: Starting data extraction")
                                         retrieved_data = func_resp_content['data']
                                         app.logger.info(f"Retrieved data type: {type(retrieved_data)}, length: {len(retrieved_data) if isinstance(retrieved_data, list) else 'N/A'}")
                                         if isinstance(retrieved_data, list) and len(retrieved_data) > 0:
