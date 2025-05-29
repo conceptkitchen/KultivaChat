@@ -238,14 +238,13 @@ User question: {user_message}"""
         # Create displays for structured data visualization
         displays = []
         
-        # If the response contains table names or data, format it as a structured display
+        # If the response contains table names, format as a structured display
         if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower():
-            # Extract table names from the response - handle both formats
             lines = final_answer.split('\n')
             table_names = []
             for line in lines:
                 if line.strip().startswith('- '):
-                    table_name = line.strip()[2:]  # Remove "- " prefix
+                    table_name = line.strip()[2:]
                     if table_name:
                         table_names.append(table_name)
             
@@ -255,6 +254,18 @@ User question: {user_message}"""
                     "title": "Your Data Tables",
                     "content": [{"Table Name": name} for name in table_names]
                 })
+        
+        # Enhanced: Check if Gemini executed a data query and format results
+        if hasattr(response, 'parts') and response.parts:
+            for part in response.parts:
+                if hasattr(part, 'function_call') and part.function_call:
+                    if part.function_call.name == 'internal_execute_sql_query':
+                        # This was a data query - let's check if we can enhance the display
+                        app.logger.info("Detected data query execution - checking for table data formatting")
+                        
+        # Alternative: Look for data patterns in the text response
+        if any(keyword in final_answer.lower() for keyword in ['rows returned', 'query results', 'data from']):
+            app.logger.info("Response appears to contain query results - could format as table display")
         
         return jsonify({
             "reply": final_answer,
