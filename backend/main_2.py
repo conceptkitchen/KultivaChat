@@ -419,7 +419,7 @@ def chat_with_gemini_client_style():
                 lines = final_answer.split('\n')
                 table_names = []
                 in_table_list_context = False
-                if "here are the tables" in final_answer.lower() or "following tables" in final_answer.lower():
+                if final_answer and ("here are the tables" in final_answer.lower() or "following tables" in final_answer.lower()):
                     in_table_list_context = True
 
                 for line in lines:
