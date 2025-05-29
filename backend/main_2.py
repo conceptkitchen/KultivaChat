@@ -347,6 +347,8 @@ def chat_with_gemini_client_style():
                                     func_resp_content = part.function_response.response
                                     app.logger.info(f"Function response content type: {type(func_resp_content)}, content: {func_resp_content}")
                                     
+                                    app.logger.info(f"About to check nested structure - is dict: {isinstance(func_resp_content, dict)}, has result: {'result' in func_resp_content if isinstance(func_resp_content, dict) else 'N/A'}")
+                                    
                                     # Handle nested result structure
                                     if isinstance(func_resp_content, dict) and 'result' in func_resp_content:
                                         app.logger.info(f"Found nested result structure, extracting...")
