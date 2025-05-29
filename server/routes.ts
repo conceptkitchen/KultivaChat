@@ -223,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!isSimpleGreeting) {
           try {
             // Call your Python Flask backend at port 8080
-            const response = await fetch('http://localhost:8081/api/chat', {
+            const response = await fetch('http://localhost:8080/api/chat', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
