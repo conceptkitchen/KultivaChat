@@ -219,24 +219,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                  data.content.toLowerCase().trim() === "hi" ||
                                  data.content.toLowerCase().trim() === "hey";
 
-        // MCP server handles ALL data and business questions by default
+        // Use Python Flask backend for ALL data and business questions by default
         if (!isSimpleGreeting) {
           try {
-            const mcpResponse = await getMCPResponse(data.content);
+            // Call your Python Flask backend at port 8080
+            const response = await fetch('http://localhost:8081/api/chat', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                message: data.content
+              })
+            });
+
+            if (!response.ok) {
+              throw new Error(`Python backend responded with status: ${response.status}`);
+            }
+
+            const backendResponse = await response.json();
             
             assistantMessage = {
               id: uuidv4(),
               role: "assistant" as const,
-              content: mcpResponse.content,
+              content: backendResponse.reply || backendResponse.error || "No response from backend",
               timestamp: new Date(),
-              displays: mcpResponse.displays || []
+              displays: backendResponse.displays || []
             };
-          } catch (mcpError) {
-            console.error("MCP Server error:", mcpError);
+          } catch (backendError) {
+            console.error("Python backend error:", backendError);
             assistantMessage = {
               id: uuidv4(),
               role: "assistant" as const,
-              content: "I'm having trouble accessing your Keboola data right now. This could be due to authentication issues or network connectivity. Please check your Keboola credentials and try again.",
+              content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8080 and that your Keboola and Gemini credentials are properly configured.",
               timestamp: new Date(),
               displays: []
             };

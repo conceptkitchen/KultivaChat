@@ -239,4 +239,4 @@ if __name__ == '__main__':
     elif not all([KBC_API_URL, KBC_STORAGE_TOKEN, GOOGLE_APPLICATION_CREDENTIALS_PATH, KBC_WORKSPACE_SCHEMA, GEMINI_API_KEY]):
         app.logger.critical("CRITICAL ERROR: One or more essential environment variables are missing. Server cannot function fully.")
 
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8081, debug=True)
