@@ -20,7 +20,6 @@ externalPort = 8080
 
 [[ports]]
 localPort = 8081
-externalPort = 8081
 
 [workflows]
 runButton = "Project"
