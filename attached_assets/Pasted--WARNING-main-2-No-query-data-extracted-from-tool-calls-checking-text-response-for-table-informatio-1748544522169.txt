@@ -1,0 +1,29 @@
+
+WARNING:main_2:No query_data extracted from tool calls, checking text response for table information
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:48:04] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): show ll the buckets
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show ll the buckets'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): None
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:main_2:Processing displays - query_data type: <class 'NoneType'>, length: N/A
+INFO:main_2:Query data content preview: None
+INFO:main_2:Final answer type: <class 'NoneType'>, value: None
+WARNING:main_2:No query_data extracted from tool calls, checking text response for table information
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:48:12] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): show all the buckets please
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show all the buckets please'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): None
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:main_2:Processing displays - query_data type: <class 'NoneType'>, length: N/A
+INFO:main_2:Query data content preview: None
+INFO:main_2:Final answer type: <class 'NoneType'>, value: None
+WARNING:main_2:No query_data extracted from tool calls, checking text response for table information
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:48:19] "POST /api/chat HTTP/1.1" 200 -
