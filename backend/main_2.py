@@ -200,6 +200,119 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         app.logger.error(f"Tool Call: Error executing BigQuery query: {e}", exc_info=True)
         return {"status": "error", "error_message": f"Error executing BigQuery query: {str(e)}"}
 
+def list_keboola_buckets() -> dict:
+    """Lists all available top-level data categories (buckets) in the Keboola Storage project.
+    Use this as a first step to understand the overall data landscape.
+    
+    Returns:
+        dict: A dictionary containing 'status' and either 'data' (list of bucket objects) or 'error_message'.
+    """
+    if not keboola_storage_client:
+        msg = "Keboola Storage client not initialized. Please check your Keboola API credentials."
+        app.logger.error(f"Tool call list_keboola_buckets: {msg}")
+        return {"status": "error", "error_message": msg}
+    
+    app.logger.info("Tool Call: list_keboola_buckets")
+    try:
+        buckets_data = keboola_storage_client.buckets.list()
+        bucket_info = []
+        for b in buckets_data or []:
+            bucket_info.append({
+                "id": b.get("id"), 
+                "name": b.get("name"), 
+                "stage": b.get("stage"),
+                "description": b.get("description", "")
+            })
+        app.logger.info(f"Tool Call: list_keboola_buckets returned {len(bucket_info)} buckets.")
+        return {
+            "status": "success", 
+            "data": bucket_info,
+            "display_type": "table",
+            "display_title": "Keboola Storage Buckets"
+        }
+    except Exception as e:
+        app.logger.error(f"Tool Call: Error listing Keboola buckets: {e}", exc_info=True)
+        return {"status": "error", "error_message": f"Error listing buckets: {str(e)}"}
+
+def list_tables_in_keboola_bucket(bucket_id: str) -> dict:
+    """Lists all specific datasets (tables) and their row counts within a chosen Keboola Storage bucket.
+    
+    Args:
+        bucket_id (str): The ID of the Keboola Storage bucket (e.g., 'in.c-mydata' or 'out.c-transformeddata').
+        
+    Returns:
+        dict: A dictionary containing 'status' and either 'data' (list of table objects) or 'error_message'.
+    """
+    if not keboola_storage_client:
+        msg = "Keboola Storage client not initialized. Please check your Keboola API credentials."
+        app.logger.error(f"Tool call list_tables_in_keboola_bucket: {msg}")
+        return {"status": "error", "error_message": msg}
+    
+    app.logger.info(f"Tool Call: list_tables_in_keboola_bucket with bucket_id: {bucket_id}")
+    try:
+        tables_data = keboola_storage_client.buckets.list_tables(bucket_id=bucket_id)
+        table_info = []
+        for t in tables_data or []:
+            table_info.append({
+                "id": t.get("id"), 
+                "name": t.get("name"), 
+                "rowsCount": t.get("rowsCount", 0),
+                "primaryKey": t.get("primaryKey", [])
+            })
+        app.logger.info(f"Tool Call: list_tables_in_keboola_bucket returned {len(table_info)} tables.")
+        return {
+            "status": "success", 
+            "data": table_info,
+            "display_type": "table",
+            "display_title": f"Tables in Bucket: {bucket_id}"
+        }
+    except Exception as e:
+        app.logger.error(f"Tool Call: Error listing tables in bucket {bucket_id}: {e}", exc_info=True)
+        return {"status": "error", "error_message": f"Error listing tables in bucket {bucket_id}: {str(e)}"}
+
+def get_keboola_table_detail(table_id: str) -> dict:
+    """Retrieves the detailed schema (column names, data types) and metadata for a specific Keboola Storage table.
+    
+    Args:
+        table_id (str): The full ID of the Keboola Storage table (e.g., 'in.c-mybucket.mytable').
+        
+    Returns:
+        dict: A dictionary containing 'status' and either 'data' (table detail object) or 'error_message'.
+    """
+    if not keboola_storage_client:
+        msg = "Keboola Storage client not initialized. Please check your Keboola API credentials."
+        app.logger.error(f"Tool call get_keboola_table_detail: {msg}")
+        return {"status": "error", "error_message": msg}
+    
+    app.logger.info(f"Tool Call: get_keboola_table_detail with table_id: {table_id}")
+    try:
+        table_detail = keboola_storage_client.tables.detail(table_id)
+        columns_info = []
+        for col in table_detail.get("columns", []):
+            columns_info.append({
+                "name": col.get("name"),
+                "type": col.get("type", "string")
+            })
+        
+        detail_info = {
+            "id": table_detail.get("id"),
+            "name": table_detail.get("name"),
+            "rowsCount": table_detail.get("rowsCount", 0),
+            "columns": columns_info,
+            "primaryKey": table_detail.get("primaryKey", [])
+        }
+        
+        app.logger.info(f"Tool Call: get_keboola_table_detail returned details for table {table_id}.")
+        return {
+            "status": "success", 
+            "data": [detail_info],  # Wrap in array for table display
+            "display_type": "table_detail",
+            "display_title": f"Table Schema: {table_id}"
+        }
+    except Exception as e:
+        app.logger.error(f"Tool Call: Error getting table detail for {table_id}: {e}", exc_info=True)
+        return {"status": "error", "error_message": f"Error getting table detail for {table_id}: {str(e)}"}
+
 def get_current_time() -> dict:
     """Returns the current date, time, and timezone.
     Returns:
@@ -209,7 +322,7 @@ def get_current_time() -> dict:
     current_time_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
     return {"status": "success", "current_time": current_time_str}
 
-gemini_tool_functions_list = [internal_execute_sql_query, get_current_time]
+gemini_tool_functions_list = [internal_execute_sql_query, list_keboola_buckets, list_tables_in_keboola_bucket, get_keboola_table_detail, get_current_time]
 
 # --- Initialize Gemini Client (using genai.Client and GenerateContentConfig) ---
 gemini_sdk_client = None
