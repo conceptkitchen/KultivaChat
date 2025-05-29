@@ -389,6 +389,7 @@ def chat_with_gemini_client_style():
         # Enhanced debugging for query_data
         app.logger.info(f"Processing displays - query_data type: {type(query_data)}, length: {len(query_data) if query_data and isinstance(query_data, list) else 'N/A'}")
         app.logger.info(f"Query data content preview: {query_data[:2] if query_data and isinstance(query_data, list) and len(query_data) > 0 else query_data}")
+        app.logger.info(f"Final answer type: {type(final_answer)}, value: {final_answer}")
 
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
@@ -402,7 +403,7 @@ def chat_with_gemini_client_style():
         else: 
             app.logger.warning("No query_data extracted from tool calls, checking text response for table information")
             # Check if the AI is trying to show tables but the data wasn't captured
-            if final_answer and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below"]):
+            if final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below"]):
                 # Try to directly query for tables as fallback
                 app.logger.info("AI mentioned retrieving tables but no data was extracted. Attempting direct table query as fallback.")
                 try:
@@ -421,11 +422,11 @@ def chat_with_gemini_client_style():
                     app.logger.error(f"Fallback table query error: {e}")
             
             # Original text parsing logic as additional fallback
-            if final_answer and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
+            if final_answer and isinstance(final_answer, str) and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
                 lines = final_answer.split('\n')
                 table_names = []
                 in_table_list_context = False
-                if final_answer and ("here are the tables" in final_answer.lower() or "following tables" in final_answer.lower()):
+                if final_answer and isinstance(final_answer, str) and ("here are the tables" in final_answer.lower() or "following tables" in final_answer.lower()):
                     in_table_list_context = True
 
                 for line in lines:
