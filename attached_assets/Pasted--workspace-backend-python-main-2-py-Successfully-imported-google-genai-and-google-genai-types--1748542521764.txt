@@ -1,0 +1,130 @@
+~/workspace/backend$ python main_2.py
+Successfully imported 'google.genai' and 'google.genai.types'
+INFO:main_2:Attempting to initialize Keboola Storage Client with URL: https://connection.us-east4.gcp.keboola.com
+INFO:main_2:Successfully initialized Keboola Storage Client.
+INFO:main_2:Attempting to initialize Google BigQuery Client using credentials from: /home/runner/workspace/backend/credentials-839-21894808.json
+INFO:main_2:Successfully initialized Google BigQuery Client. Project: kbc-use4-839-261b
+INFO:main_2:Initializing google.genai.Client with API key...
+INFO:main_2:Successfully initialized google.genai.Client.
+INFO:main_2:Defining tools for Gemini: ['internal_execute_sql_query', 'get_current_time']
+INFO:main_2:Gemini GenerateContentConfig with tools created successfully.
+INFO:main_2:KBC_API_URL from env: SET
+INFO:main_2:KBC_STORAGE_TOKEN from env: SET
+INFO:main_2:GOOGLE_APPLICATION_CREDENTIALS_PATH from env: SET
+INFO:main_2:KBC_WORKSPACE_SCHEMA from env: SET
+INFO:main_2:GEMINI_API_KEY from env: SET
+ * Serving Flask app 'main_2'
+ * Debug mode: off
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8081
+ * Running on http://172.31.128.34:8081
+INFO:werkzeug:Press CTRL+C to quit
+INFO:main_2:Received user message for Gemini (genai.Client): hi again
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'hi again'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Hello again!  How can I help you with your Keboola data today?
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:09:15] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): can you show me a data table of my kapwagardens orders
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'can you show me a data table of my kapwagardens orders'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Certainly!  To show you your Kapwa Gardens orders, I first need to identify the relevant table in your Keboola project.  Could you please tell me the name of the bucket (data category) where you expect this data to be located?  For example, it might be a bucket like `out.c-kapwa-gardens-orders` or something similar.  Knowing the bucket name will allow me to efficiently locate the correct table and show you the data.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:09:34] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): can you list the names
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'can you list the names'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Please clarify your request.  "List the names" of what exactly?  Do you want a list of table names, bucket names, or something else?  Providing more context will help me give you the most accurate answer.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:09:42] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): tables
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'tables'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`
+INFO:main_2:Tool Call: query executed, returned 38 rows.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Great! I've retrieved all the tables available in your Keboola project's BigQuery workspace.  They will be displayed for you in a table below.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history part: internal_execute_sql_query
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:10:00] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): where are the tables?
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'where are the tables?'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`
+INFO:main_2:Tool Call: query executed, returned 38 rows.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Fantastic! I've successfully retrieved a list of tables from your Keboola project's BigQuery data warehouse.  The list of tables is shown below.  Please note that this is a complete list of tables available in the dataset.
+
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history part: internal_execute_sql_query
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:10:18] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Tool Call: execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` LIMIT 10
+INFO:main_2:Tool Call: query executed, returned 10 rows.
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:11:56] "POST /api/query_data HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): can you show me a list of my data as a table
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'can you show me a list of my data as a table'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Certainly! To show you a list of your data, I first need to understand what kind of data you're interested in.  Do you have a specific data category or bucket in mind?  Or would you like me to show you a list of all the available data buckets in your Keboola project to help you choose?
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:14:19] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): all
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'all'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): To provide you with all the information, I need some guidance.  "All" is quite broad.  Do you want to see all the buckets in your Keboola project, all the tables within those buckets, or something else?  Please clarify your request.  For example, are you interested in:
+
+* **All buckets and their contents:** This would list all the buckets and then the tables within each bucket.
+* **All tables across all buckets:** This would give a comprehensive list of all tables regardless of bucket.
+* **A specific type of data:**  If you have a particular type of data in mind (e.g., sales data, customer data), letting me know would help me narrow down the search significantly.
+
+Please provide more details so I can assist you effectively.
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:14:31] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): just the buckets and their contents
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'just the buckets and their contents'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): None
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 4
+ERROR:main_2:Error in /api/chat endpoint (genai.Client style): 'NoneType' object has no attribute 'lower'
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend/main_2.py", line 394, in chat_with_gemini_client_style
+    app.logger.info(f"Query data found but not suitable for table display or empty: {query_data}")
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/backend/main_2.py", line 394, in <genexpr>
+    app.logger.info(f"Query data found but not suitable for table display or empty: {query_data}")
+                    ^^^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'lower'
+INFO:werkzeug:127.0.0.1 - - [29/May/2025 18:14:55] "POST /api/chat HTTP/1.1" 500 -

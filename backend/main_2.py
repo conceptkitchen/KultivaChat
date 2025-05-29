@@ -345,6 +345,7 @@ def chat_with_gemini_client_style():
                                 app.logger.info(f"Found function_response in history part: {part.function_response.name}")
                                 try:
                                     func_resp_content = part.function_response.response
+                                    app.logger.info(f"Function response content type: {type(func_resp_content)}, content: {func_resp_content}")
                                     if isinstance(func_resp_content, dict) and \
                                        func_resp_content.get('status') in ['success', 'success_truncated'] and \
                                        'data' in func_resp_content:
@@ -395,7 +396,7 @@ def chat_with_gemini_client_style():
         else: 
             app.logger.warning("No query_data extracted from tool calls, checking text response for table information")
             # Check if the AI is trying to show tables but the data wasn't captured
-            if any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below"]):
+            if final_answer and any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below"]):
                 # Try to directly query for tables as fallback
                 app.logger.info("AI mentioned retrieving tables but no data was extracted. Attempting direct table query as fallback.")
                 try:
