@@ -345,56 +345,31 @@ def chat_with_gemini_client_style():
                                 app.logger.info(f"Found function_response in history part: {part.function_response.name}")
                                 try:
                                     func_resp_content = part.function_response.response
-                                    app.logger.info(f"Function response content type: {type(func_resp_content)}, content: {func_resp_content}")
+                                    app.logger.info(f"Function response content type: {type(func_resp_content)}, content: {str(func_resp_content)[:200]}...")
                                     
-                                    app.logger.info(f"About to check nested structure - is dict: {isinstance(func_resp_content, dict)}, has result: {'result' in func_resp_content if isinstance(func_resp_content, dict) else 'N/A'}")
-                                    
-                                    # Handle nested result structure
+                                    # Direct extraction - check for nested result structure first
+                                    actual_response = func_resp_content
                                     if isinstance(func_resp_content, dict) and 'result' in func_resp_content:
-                                        app.logger.info(f"Found nested result structure, extracting...")
-                                        func_resp_content = func_resp_content['result']
-                                        app.logger.info(f"Extracted nested result: {func_resp_content}")
+                                        actual_response = func_resp_content['result']
+                                        app.logger.info(f"Found nested result, extracted: {str(actual_response)[:200]}...")
                                     
-                                    app.logger.info(f"Checking for data extraction - status: {func_resp_content.get('status') if isinstance(func_resp_content, dict) else 'N/A'}")
-                                    app.logger.info(f"func_resp_content keys: {list(func_resp_content.keys()) if isinstance(func_resp_content, dict) else 'N/A'}")
-                                    
-                                    if isinstance(func_resp_content, dict) and \
-                                       func_resp_content.get('status') in ['success', 'success_truncated'] and \
-                                       'data' in func_resp_content:
-                                        app.logger.info("CONDITION MET: Starting data extraction")
-                                        retrieved_data = func_resp_content['data']
-                                        app.logger.info(f"Retrieved data type: {type(retrieved_data)}, length: {len(retrieved_data) if isinstance(retrieved_data, list) else 'N/A'}")
-                                        if isinstance(retrieved_data, list) and len(retrieved_data) > 0:
-                                            # Check if at least some items are dictionaries (allowing for mixed types)
-                                            if any(isinstance(item, dict) for item in retrieved_data):
-                                                query_data = retrieved_data
-                                                app.logger.info(f"Successfully extracted query data with {len(query_data)} items")
-                                            else:
-                                                app.logger.warning(f"Retrieved data list contains no dictionary items: {[type(item) for item in retrieved_data[:3]]}")
-                                        elif isinstance(retrieved_data, list) and len(retrieved_data) == 0:
-                                            app.logger.warning("Retrieved data is an empty list")
-                                        else:
-                                            app.logger.warning(f"Retrieved data is not a list: {type(retrieved_data)}")
+                                    # Extract data if this is a successful query response
+                                    if (isinstance(actual_response, dict) and 
+                                        actual_response.get('status') in ['success', 'success_truncated'] and 
+                                        'data' in actual_response):
                                         
-                                        if query_data:
-                                            tool_display_title = f"Results from: {part.function_response.name}"
-                                            # Specific titles for known functions
-                                            if part.function_response.name == "internal_execute_sql_query":
-                                                tool_display_title = "SQL Query Results"
-                                            elif part.function_response.name == "list_tables_in_keboola_bucket":
-                                                tool_display_title = "Tables in Bucket"
-                                            elif part.function_response.name == "list_keboola_buckets":
-                                                tool_display_title = "Keboola Buckets"
-                                            elif part.function_response.name == "get_keboola_table_detail":
-                                                tool_display_title = "Table Schema Detail"
-                                            app.logger.info(f"Found query data from tool {part.function_response.name} with {len(query_data)} items/rows.")
+                                        retrieved_data = actual_response['data']
+                                        app.logger.info(f"Successfully found data array with {len(retrieved_data) if isinstance(retrieved_data, list) else 'non-list'} items")
+                                        
+                                        if isinstance(retrieved_data, list) and len(retrieved_data) > 0:
+                                            query_data = retrieved_data
+                                            tool_display_title = "SQL Query Results"
+                                            app.logger.info(f"SUCCESSFULLY EXTRACTED: {len(query_data)} rows of data from {part.function_response.name}")
                                             break
-                                        elif isinstance(retrieved_data, dict) and part.function_response.name == "get_current_time":
-                                            app.logger.info(f"Tool {part.function_response.name} returned: {retrieved_data}")
                                         else:
-                                            app.logger.info(f"Tool {part.function_response.name} returned data but not in expected tabular format: {type(retrieved_data)}")
-                                    elif isinstance(func_resp_content, dict) and func_resp_content.get('status') == 'error':
-                                        app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_resp_content.get('error_message')}")
+                                            app.logger.warning(f"Data array is empty or not a list: {type(retrieved_data)}")
+                                    else:
+                                        app.logger.warning(f"Response doesn't match expected structure. Status: {actual_response.get('status') if isinstance(actual_response, dict) else 'N/A'}")
                                 except Exception as e_parse:
                                     app.logger.error(f"Error parsing function_response content from history: {e_parse}", exc_info=True)
                         if query_data:
