@@ -414,7 +414,7 @@ def get_current_time() -> dict:
     current_time_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
     return {"status": "success", "current_time": current_time_str}
 
-def get_zip_codes_for_city(city_name: str, state_code: str = None) -> dict:
+def get_zip_codes_for_city(city_name: str, state_code: str | None = None) -> dict:
     """
     Retrieves a list of common zip codes for a given city and optional state.
     This is a placeholder and should be replaced with a real API call in production.
