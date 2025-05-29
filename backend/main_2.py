@@ -379,6 +379,10 @@ def chat_with_gemini_client_style():
                  app.logger.error(f"An error occurred while trying to get or process chat history: {e_hist}", exc_info=True)
 
 
+        # Enhanced debugging for query_data
+        app.logger.info(f"Processing displays - query_data type: {type(query_data)}, length: {len(query_data) if query_data and isinstance(query_data, list) else 'N/A'}")
+        app.logger.info(f"Query data content preview: {query_data[:2] if query_data and isinstance(query_data, list) and len(query_data) > 0 else query_data}")
+
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
                 "type": "table",
@@ -388,9 +392,28 @@ def chat_with_gemini_client_style():
             app.logger.info(f"Created table display for '{tool_display_title}' with {len(query_data)} rows")
         elif query_data:
              app.logger.info(f"Query data found but not suitable for table display or empty: {query_data}")
-        else: # This block handles case where no query_data was extracted from tool calls
-            # but we might still want to parse the LLM's textual response for table names
-            # if "tables in your" in final_answer.lower() or "bigquery dataset" in final_answer.lower() or "list of tables" in final_answer.lower(): # Copied from original code
+        else: 
+            app.logger.warning("No query_data extracted from tool calls, checking text response for table information")
+            # Check if the AI is trying to show tables but the data wasn't captured
+            if any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables", "retrieved all the tables", "table below"]):
+                # Try to directly query for tables as fallback
+                app.logger.info("AI mentioned retrieving tables but no data was extracted. Attempting direct table query as fallback.")
+                try:
+                    fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+                    fallback_result = internal_execute_sql_query(fallback_query)
+                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                        displays.append({
+                            "type": "table",
+                            "title": "Available Tables",
+                            "content": fallback_result['data']
+                        })
+                        app.logger.info(f"Fallback table query successful, created display with {len(fallback_result['data'])} tables")
+                    else:
+                        app.logger.warning(f"Fallback table query failed: {fallback_result}")
+                except Exception as e:
+                    app.logger.error(f"Fallback table query error: {e}")
+            
+            # Original text parsing logic as additional fallback
             if any(phrase in final_answer.lower() for phrase in ["tables in your", "bigquery dataset", "list of tables", "here are the tables"]):
                 lines = final_answer.split('\n')
                 table_names = []
