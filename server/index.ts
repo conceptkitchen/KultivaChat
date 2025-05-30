@@ -4,6 +4,7 @@ import { registerUnauthedRoutes } from "./routes-unauthed";
 import { setupVite, serveStatic } from "./vite";
 import { setupAuth } from "./replitAuth";
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { createServer } from "http";
 
 const app = express();
 app.use(express.json());
@@ -18,6 +19,10 @@ app.use('/api', createProxyMiddleware({
   changeOrigin: true,
   pathRewrite: {
     '^/api': '/api'
+  },
+  onError: (err, req, res) => {
+    console.log('Proxy error:', err.message);
+    res.status(500).json({ error: 'Backend service unavailable' });
   }
 }));
 
@@ -25,10 +30,14 @@ app.use('/api', createProxyMiddleware({
 registerRoutes(app);
 registerUnauthedRoutes(app);
 
-// Setup Vite middleware last
-setupVite(app);
+// Create HTTP server for Vite setup
+const server = createServer(app);
+
+// Setup Vite middleware last - this will handle serving the React frontend
+setupVite(app, server);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`serving on port ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`React frontend serving on port ${PORT}`);
+  console.log(`Python backend running on port 8081`);
 });
