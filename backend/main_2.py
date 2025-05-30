@@ -586,45 +586,54 @@ def chat_with_gemini_client_style():
                 app.logger.info(f"Successfully called get_history(). Number of messages: {len(retrieved_history) if retrieved_history else 0}")
 
                 for message_content in reversed(retrieved_history):
-                    if message_content.role == "user": 
-                        for part in message_content.parts:
-                            if hasattr(part, 'function_response') and part.function_response:
-                                app.logger.info(f"Found function_response in history from tool: {part.function_response.name}")
-                                try:
-                                    func_tool_result = part.function_response.response
-                                    app.logger.info(f"Tool '{part.function_response.name}' raw returned dict: {str(func_tool_result)[:300]}...")
+                    # Check both user and model messages for function responses
+                    for part in message_content.parts:
+                        if hasattr(part, 'function_response') and part.function_response:
+                            app.logger.info(f"Found function_response in history from tool: {part.function_response.name}")
+                            try:
+                                func_tool_result = part.function_response.response
+                                app.logger.info(f"Tool '{part.function_response.name}' raw returned dict: {str(func_tool_result)[:300]}...")
 
-                                    if isinstance(func_tool_result, dict) and \
-                                       func_tool_result.get('status') in ['success', 'success_truncated'] and \
-                                       'data' in func_tool_result: 
+                                # Check if this is a nested result structure
+                                if isinstance(func_tool_result, dict) and 'result' in func_tool_result:
+                                    func_tool_result = func_tool_result['result']
+                                    app.logger.info(f"Found nested result structure, extracting: {str(func_tool_result)[:300]}...")
 
-                                        retrieved_data_from_tool = func_tool_result['data']
+                                if isinstance(func_tool_result, dict) and \
+                                   func_tool_result.get('status') in ['success', 'success_truncated'] and \
+                                   'data' in func_tool_result: 
 
-                                        if isinstance(retrieved_data_from_tool, list) and \
-                                           (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):
-                                            query_data = retrieved_data_from_tool 
+                                    retrieved_data_from_tool = func_tool_result['data']
 
-                                            tool_display_title = func_tool_result.get("display_title") 
-                                            if not tool_display_title: 
-                                                if part.function_response.name == "internal_execute_sql_query":
-                                                    tool_display_title = "SQL Query Results"
+                                    if isinstance(retrieved_data_from_tool, list) and \
+                                       (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):
+                                        query_data = retrieved_data_from_tool 
+
+                                        tool_display_title = func_tool_result.get("display_title") 
+                                        if not tool_display_title: 
+                                            if part.function_response.name == "internal_execute_sql_query":
+                                                # Check if this looks like a table list query
+                                                if any(item.get('table_name') for item in retrieved_data_from_tool if isinstance(item, dict)):
+                                                    tool_display_title = "Available Data Tables"
                                                 else:
-                                                    tool_display_title = f"Results from {part.function_response.name}"
-                                            app.logger.info(f"Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}")
-                                            break 
-                                        else:
-                                            app.logger.warning(f"Tool '{part.function_response.name}' provided 'data' but it's not a list of dicts: {type(retrieved_data_from_tool)}")
+                                                    tool_display_title = "SQL Query Results"
+                                            else:
+                                                tool_display_title = f"Results from {part.function_response.name}"
+                                        app.logger.info(f"Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}")
+                                        break 
+                                    else:
+                                        app.logger.warning(f"Tool '{part.function_response.name}' provided 'data' but it's not a list of dicts: {type(retrieved_data_from_tool)}")
 
-                                    elif isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
-                                        app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_tool_result.get('error_message')}")
+                                elif isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
+                                    app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_tool_result.get('error_message')}")
 
-                                    elif part.function_response.name == "get_zip_codes_for_city" and isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'success':
-                                        app.logger.info(f"Tool 'get_zip_codes_for_city' succeeded with zip codes: {func_tool_result.get('zip_codes')}. This data isn't typically displayed as a table itself but used by the LLM for subsequent queries.")
+                                elif part.function_response.name == "get_zip_codes_for_city" and isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'success':
+                                    app.logger.info(f"Tool 'get_zip_codes_for_city' succeeded with zip codes: {func_tool_result.get('zip_codes')}. This data isn't typically displayed as a table itself but used by the LLM for subsequent queries.")
 
-                                except Exception as e_parse_hist:
-                                    app.logger.error(f"Error parsing function_response from history for tool {part.function_response.name}: {e_parse_hist}", exc_info=True)
-                        if query_data: 
-                            break 
+                            except Exception as e_parse_hist:
+                                app.logger.error(f"Error parsing function_response from history for tool {part.function_response.name}: {e_parse_hist}", exc_info=True)
+                    if query_data: 
+                        break 
             except AttributeError as e_attr:
                  app.logger.error(f"'ChatSession' object (type: {type(chat_session)}) might not have 'get_history' or it failed: {e_attr}. This indicates an API mismatch or an unexpected object type for chat_session.")
             except Exception as e_hist:
