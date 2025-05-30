@@ -19,16 +19,20 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: Express, server?: Server) {
-  if (process.env.NODE_ENV === "development") {
+export async function setupVite(app: express.Express, server?: Server) {
+  if (process.env.NODE_ENV === "production") {
+    console.log("Production mode: serving static React build");
+    serveStatic(app);
+  } else {
+    console.log("Development mode: setting up Vite dev server");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { 
         middlewareMode: true,
-        hmr: {
-          port: 24678,
-          host: "0.0.0.0"
-        }
+        hmr: server ? {
+          server: server,
+          port: 24678
+        } : false
       },
       appType: "spa",
       clearScreen: false,
@@ -36,10 +40,35 @@ export async function setupVite(app: Express, server?: Server) {
         include: ["wouter", "@tanstack/react-query"]
       }
     });
+
     app.use(vite.ssrFixStacktrace);
     app.use(vite.middlewares);
-  } else {
-    serveStatic(app);
+
+    // Catch-all handler for SPA routing
+    app.use("*", async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        let template = await vite.transformIndexHtml(url, `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kultivate AI</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+        `);
+        res.status(200).set({ "Content-Type": "text/html" }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
   }
 }
 
