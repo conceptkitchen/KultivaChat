@@ -7,12 +7,16 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["sh", "-c", "npm run build && cd backend && uvm install"]
-run = ["sh", "-c", "npm run serve"]
+build = ["sh", "-c", "npm run build && cd backend && upm install"]
+run = ["sh", "-c", "cd backend && python main_2.py & npm run start"]
 
 [[ports]]
 localPort = 8081
 externalPort = 80
+
+[[ports]]
+localPort = 24678
+externalPort = 3000
 
 [workflows]
 runButton = "Full Stack App"
