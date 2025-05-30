@@ -81,10 +81,24 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  // Serve static files with proper headers
+  app.use(express.static(distPath, {
+    setHeaders: (res, path) => {
+      if (path.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html');
+      }
+    }
+  }));
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+  // Catch-all handler for SPA routing - serve React app for all non-API routes
+  app.get("*", (req, res) => {
+    // Don't serve React app for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API endpoint not found' });
+    }
+    
+    const indexPath = path.resolve(distPath, "index.html");
+    res.setHeader('Content-Type', 'text/html');
+    res.sendFile(indexPath);
   });
 }
