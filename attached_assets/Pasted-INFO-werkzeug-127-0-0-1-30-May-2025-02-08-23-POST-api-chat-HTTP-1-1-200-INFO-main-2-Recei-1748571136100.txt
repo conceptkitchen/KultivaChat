@@ -1,0 +1,21 @@
+INFO:werkzeug:127.0.0.1 - - [30/May/2025 02:08:23] "POST /api/chat HTTP/1.1" 200 -
+INFO:main_2:Received user message for Gemini (genai.Client): show me my data tables"
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show me my data tables"'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: internal_execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name;
+INFO:main_2:Tool Call: internal_execute_sql_query executed, returned 38 rows.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Okay, I've retrieved a list of all the tables in your BigQuery workspace.  They will be displayed for you in a table below:
+
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history from tool: internal_execute_sql_query
+INFO:main_2:Tool 'internal_execute_sql_query' raw returned dict: {'result': {'status': 'success', 'data': [{'table_name': 'OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED'}, {'table_name': 'OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS'}, {'table_name': 'OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS'}, {'table_name': 'OUT_DIM_CUSTOMERS_4_UNDISCOVERED'}, {'table_name': 'OUT_DIM_CUSTOMERS_5_BAL...
+INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+INFO:main_2:AI text suggests data/tables were retrieved; attempting fallback display generation.
+INFO:werkzeug:127.0.0.1 - - [30/May/2025 02:11:14] "POST /api/chat HTTP/1.1" 200 -

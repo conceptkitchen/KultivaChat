@@ -596,33 +596,40 @@ def chat_with_gemini_client_style():
 
                                 # Check if this is a nested result structure
                                 if isinstance(func_tool_result, dict) and 'result' in func_tool_result:
+                                    app.logger.info(f"Found nested result structure, extracting: {str(func_tool_result['result'])[:300]}...")
                                     func_tool_result = func_tool_result['result']
-                                    app.logger.info(f"Found nested result structure, extracting: {str(func_tool_result)[:300]}...")
 
                                 if isinstance(func_tool_result, dict) and \
                                    func_tool_result.get('status') in ['success', 'success_truncated'] and \
                                    'data' in func_tool_result: 
 
                                     retrieved_data_from_tool = func_tool_result['data']
+                                    app.logger.info(f"Found data in tool result, type: {type(retrieved_data_from_tool)}, length: {len(retrieved_data_from_tool) if isinstance(retrieved_data_from_tool, list) else 'N/A'}")
 
-                                    if isinstance(retrieved_data_from_tool, list) and \
-                                       (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):
-                                        query_data = retrieved_data_from_tool 
+                                    if isinstance(retrieved_data_from_tool, list):
+                                        # Log first few items for debugging
+                                        if retrieved_data_from_tool:
+                                            app.logger.info(f"Sample data items: {retrieved_data_from_tool[:2]}")
+                                        
+                                        if not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool):
+                                            query_data = retrieved_data_from_tool 
 
-                                        tool_display_title = func_tool_result.get("display_title") 
-                                        if not tool_display_title: 
-                                            if part.function_response.name == "internal_execute_sql_query":
-                                                # Check if this looks like a table list query
-                                                if any(item.get('table_name') for item in retrieved_data_from_tool if isinstance(item, dict)):
-                                                    tool_display_title = "Available Data Tables"
+                                            tool_display_title = func_tool_result.get("display_title") 
+                                            if not tool_display_title: 
+                                                if part.function_response.name == "internal_execute_sql_query":
+                                                    # Check if this looks like a table list query
+                                                    if any(item.get('table_name') for item in retrieved_data_from_tool if isinstance(item, dict)):
+                                                        tool_display_title = "Available Data Tables"
+                                                    else:
+                                                        tool_display_title = "SQL Query Results"
                                                 else:
-                                                    tool_display_title = "SQL Query Results"
-                                            else:
-                                                tool_display_title = f"Results from {part.function_response.name}"
-                                        app.logger.info(f"Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}")
-                                        break 
+                                                    tool_display_title = f"Results from {part.function_response.name}"
+                                            app.logger.info(f"SUCCESS: Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}")
+                                            break 
+                                        else:
+                                            app.logger.warning(f"Tool '{part.function_response.name}' provided data but some items are not dicts")
                                     else:
-                                        app.logger.warning(f"Tool '{part.function_response.name}' provided 'data' but it's not a list of dicts: {type(retrieved_data_from_tool)}")
+                                        app.logger.warning(f"Tool '{part.function_response.name}' provided 'data' but it's not a list: {type(retrieved_data_from_tool)}")
 
                                 elif isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
                                     app.logger.warning(f"Tool {part.function_response.name} executed with error: {func_tool_result.get('error_message')}")
