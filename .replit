@@ -8,19 +8,11 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "autoscale"
 build = ["sh", "-c", "pip install -r backend/requirements.txt && npm run build"]
-run = ["sh", "-c", "python backend/main_2.py"]
-
-[[ports]]
-localPort = 5000
-externalPort = 80
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
+run = ["sh", "-c", "PORT=8081 python backend/main_2.py"]
 
 [[ports]]
 localPort = 8081
-externalPort = 8081
+externalPort = 80
 
 [workflows]
 runButton = "Full Stack App"
