@@ -22,7 +22,9 @@ app.use('/api', createProxyMiddleware({
   },
   onError: (err, req, res) => {
     console.log('Proxy error:', err.message);
-    res.status(500).json({ error: 'Backend service unavailable' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Backend service unavailable' });
+    }
   }
 }));
 
