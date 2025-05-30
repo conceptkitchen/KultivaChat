@@ -159,9 +159,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Call your Python Flask backend for ALL messages
         try {
-          console.log("Calling Python backend at http://localhost:8081/api/chat");
+          const backendUrl = process.env.NODE_ENV === 'production' 
+            ? 'http://localhost:8081/api/chat' 
+            : 'http://localhost:8081/api/chat';
+          console.log(`Calling Python backend at ${backendUrl}`);
           // Forward to Python backend with conversation history
-          const pythonResponse = await fetch("http://localhost:8081/api/chat", {
+          const pythonResponse = await fetch(backendUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
