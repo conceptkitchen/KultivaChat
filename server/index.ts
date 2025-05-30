@@ -13,24 +13,26 @@ app.use(express.urlencoded({ extended: false }));
 // Setup authentication first
 setupAuth(app);
 
-// Proxy API calls to Python backend
-app.use('/api', createProxyMiddleware({
+// Register routes before Vite middleware
+registerRoutes(app);
+registerUnauthedRoutes(app);
+
+// Proxy API calls to Python backend - only for /api/chat route
+app.use('/api/chat', createProxyMiddleware({
   target: 'http://127.0.0.1:8081',
   changeOrigin: true,
-  pathRewrite: {
-    '^/api': '/api'
-  },
+  timeout: 5000,
+  proxyTimeout: 5000,
   onError: (err, req, res) => {
     console.log('Proxy error:', err.message);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Backend service unavailable' });
     }
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`Proxying ${req.method} ${req.url} to backend`);
   }
 }));
-
-// Register routes before Vite middleware
-registerRoutes(app);
-registerUnauthedRoutes(app);
 
 // Create HTTP server for Vite setup
 const server = createServer(app);
