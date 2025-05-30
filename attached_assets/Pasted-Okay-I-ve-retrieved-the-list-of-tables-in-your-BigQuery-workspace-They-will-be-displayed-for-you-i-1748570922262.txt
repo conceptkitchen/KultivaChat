@@ -1,0 +1,43 @@
+Okay, I've retrieved the list of tables in your BigQuery workspace. They will be displayed for you in a table below:
+
+
+| Table Name                                      |
+|-------------------------------------------------|
+| OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED       |
+| OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS              |
+| OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS             |
+| OUT_DIM_CUSTOMERS_4_UNDISCOVERED               |
+| OUT_DIM_CUSTOMERS_5_BALAY_KREATIVE             |
+| OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS              |
+| OUT_DIM_CUSTOMERS_UNDISCOVERED                 |
+| OUT_DIM_PRODUCTS_2_KULTIVATE_LABS              |
+| OUT_DIM_PRODUCTS_3_KAPWA_GARDENS               |
+| OUT_DIM_PRODUCTS_4_UNDISCOVERED_FORMS          |
+| OUT_DIM_PRODUCTS_5_KAPWA_GARDENS               |
+| OUT_DIM_PRODUCTS_6_BALAY_KREATIVE              |
+| OUT_DIM_PRODUCTS_UNDISCOVERED                  |
+| OUT_FACT_FULFILLMENTS_KULTIVATE_LABS           |
+| OUT_FACT_ORDERS_2_KULTIVATE_LABS               |
+| OUT_FACT_ORDERS_3_UNDISCOVERED                 |
+| OUT_FACT_ORDERS_4_BALAY_KREATIVE               |
+| OUT_FACT_ORDERS_5_KAPWA_GARDENS                |
+| OUT_FACT_ORDERS_6_UNDISCOVERED_FORMS           |
+| OUT_FACT_ORDERS_KAPWA_GARDENS                  |
+| OUT_FACT_ORDER_LINES_2_KULTIVATE_LABS           |
+| OUT_FACT_ORDER_LINES_3_KAPWA_GARDENS            |
+| OUT_FACT_ORDER_LINES_4_UNDISCOVERED_FORMS       |
+| OUT_FACT_ORDER_LINES_5_KAPWA_GARDENS            |
+| OUT_FACT_ORDER_LINES_6_BALAY_KREATIVE           |
+| OUT_FACT_ORDER_LINES_UNDISCOVERED               |
+| OUT_FACT_PAYMENTS_2_KULTIVATE_LABS             |
+| OUT_FACT_PAYMENTS_3_UNDISCOVERED               |
+| OUT_FACT_PAYMENTS_4_BALAY_KREATIVE              |
+| OUT_FACT_PAYMENTS_KAPWA_GARDENS                |
+| OUT_FACT_SHIPPING_DETAILS_KULTIVATE_LABS       |
+| OUT_FORMS_TYPEFORM                             |
+| OUT_QUESTIONS_TYPEFORM                          |
+| OUT_QUESTION_CHOICES_TYPEFORM                   |
+| OUT_RESPONSE_ANSWERS_TYPEFORM                   |
+| OUT_RESPONSE_METADATA_TYPEFORM                  |
+| STG_KAPWA_ORDERS_CLEANED_KAPWA_GARDENS          |
+| STG_UNDISCOVERED_ORDERS_CLEANED_UNDISCOVERED_FORMS |
