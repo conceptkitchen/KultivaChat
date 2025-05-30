@@ -8,7 +8,7 @@ channel = "stable-24_05"
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+run = ["sh", "-c", "python backend/main_2.py"]
 
 [[ports]]
 localPort = 5000
@@ -23,7 +23,7 @@ localPort = 8081
 externalPort = 8081
 
 [workflows]
-runButton = "Project"
+runButton = "Full Stack App"
 
 [[workflows.workflow]]
 name = "Project"
@@ -42,3 +42,16 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Full Stack App"
+author = 22046976
+mode = "parallel"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python backend/main_2.py"
