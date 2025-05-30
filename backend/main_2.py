@@ -527,25 +527,40 @@ def chat_with_gemini_client_style():
             return jsonify({"error": "Missing 'message' in JSON payload."}), 400
 
         user_message_text = user_message_data['message'] 
+        conversation_history = user_message_data.get('conversation_history', [])
         app.logger.info(f"Received user message for Gemini (genai.Client): {user_message_text}")
+        app.logger.info(f"Conversation history length: {len(conversation_history)}")
 
-        initial_history = []
+        # Build full history including system instruction and conversation context
+        full_history = []
         if GEMINI_SDK_AVAILABLE: 
-            initial_history = [
+            # Add system instruction
+            full_history = [
                 google_genai_types.Content(role="user", parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]), 
                 google_genai_types.Content(role="model", parts=[google_genai_types.Part(text= 
                     "Understood. I am ready to assist you with your Keboola project data. How can I help you?"
                 )])
             ]
+            
+            # Add conversation history (excluding the current message which will be sent separately)
+            for msg in conversation_history:
+                if msg['role'] in ['user', 'assistant']:
+                    role = 'model' if msg['role'] == 'assistant' else 'user'
+                    full_history.append(
+                        google_genai_types.Content(
+                            role=role, 
+                            parts=[google_genai_types.Part(text=msg['content'])]
+                        )
+                    )
         else: 
-            app.logger.error("Gemini SDK types not available to create initial history.")
+            app.logger.error("Gemini SDK types not available to create history.")
 
         chat_session = gemini_sdk_client.chats.create(
             model='gemini-1.5-flash', 
             config=gemini_generation_config_with_tools,
-            history=initial_history 
+            history=full_history 
         )
-        app.logger.info(f"Created Gemini chat session with initial history. Sending user message: '{user_message_text}'")
+        app.logger.info(f"Created Gemini chat session with full history ({len(full_history)} messages). Sending user message: '{user_message_text}'")
 
         response = chat_session.send_message(user_message_text)
 

@@ -18,7 +18,7 @@ const conversationSchema = z.object({
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
   await setupAuth(app);
-  
+
 
 
   // User auth route
@@ -32,7 +32,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
-  
+
   // API routes - protected by authentication
   app.get("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
@@ -49,11 +49,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const conversation = await storage.getConversation(req.params.id, userId);
-      
+
       if (!conversation) {
         return res.status(404).json({ message: "Conversation not found" });
       }
-      
+
       res.json(conversation);
     } catch (error) {
       console.error("Error fetching conversation:", error);
@@ -65,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const data = conversationSchema.parse(req.body);
-      
+
       const conversation = await storage.createConversation({
         id: uuidv4(),
         userId: userId,
@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: new Date(),
         updatedAt: new Date()
       });
-      
+
       res.status(201).json(conversation);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -102,12 +102,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.user || !req.user.claims || !req.user.claims.sub) {
         return res.status(401).json({ message: "User not properly authenticated" });
       }
-      
+
       const userId = req.user.claims.sub;
-      
+
       // Debug request body
       console.log("Message request body:", JSON.stringify(req.body));
-      
+
       // Strict duplicate detection - check for exact same message
       const existingConversation = await storage.getConversation(req.body.conversationId, userId);
       if (existingConversation && existingConversation.messages) {
@@ -115,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lastUserMessage = existingConversation.messages
           .filter(msg => msg.role === "user")
           .pop();
-        
+
         // If the last user message is identical, it's a definite duplicate
         if (lastUserMessage && lastUserMessage.content === req.body.content) {
           console.log("Exact duplicate message detected, returning existing conversation");
@@ -125,7 +125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-      
+
       // Validate the message data
       let data;
       try {
@@ -137,7 +137,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         throw err;
       }
-      
+
       // Verify the conversation exists and belongs to the current user
       const conversation = await storage.getConversation(data.conversationId, userId);
       if (!conversation) {
@@ -160,23 +160,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Call your Python Flask backend for ALL messages
         try {
           console.log("Calling Python backend at http://localhost:8081/api/chat");
-          const response = await fetch('http://localhost:8081/api/chat', {
-            method: 'POST',
+          // Forward to Python backend with conversation history
+          const pythonResponse = await fetch("http://localhost:8081/api/chat", {
+            method: "POST",
             headers: {
-              'Content-Type': 'application/json',
+              "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              message: data.content
-            })
+              message: data.content,
+              conversation_history: conversation.messages.map(msg => ({
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.timestamp
+              }))
+            }),
           });
 
-          if (!response.ok) {
-            throw new Error(`Python backend responded with status: ${response.status}`);
+          if (!pythonResponse.ok) {
+            throw new Error(`Python backend responded with ${pythonResponse.status}`);
           }
 
-          const backendResponse = await response.json();
-          console.log("Python backend response:", backendResponse);
-          
+          const pythonResult = await pythonResponse.json();
+          console.log("Python backend response:", pythonResult);
+
           assistantMessage = {
             id: uuidv4(),
             role: "assistant" as const,
@@ -209,16 +215,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       conversation.messages.push(userMessage);
       conversation.messages.push(assistantMessage);
       conversation.updatedAt = new Date();
-      
+
       // Update conversation title if it's the first user message
       if (conversation.messages.filter((msg: {role: string}) => msg.role === "user").length === 1) {
         conversation.title = data.content.length > 30 
           ? data.content.substring(0, 30) + "..." 
           : data.content;
       }
-      
+
       await storage.updateConversation(conversation);
-      
+
       res.status(200).json({ 
         userMessage, 
         assistantMessage 
