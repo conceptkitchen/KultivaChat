@@ -1,0 +1,97 @@
+INFO:main_2:Received user message for Gemini (genai.Client): show me my data tables
+INFO:main_2:Created Gemini chat session with initial history. Sending user message: 'show me my data tables'
+INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 1 is done.
+INFO:main_2:Tool Call: internal_execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name;
+INFO:main_2:Tool Call: internal_execute_sql_query executed, returned 38 rows.
+INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent "HTTP/1.1 200 OK"
+INFO:google_genai.models:AFC remote call 2 is done.
+INFO:main_2:Gemini final answer (genai.Client/chat): Okay, I've retrieved a list of the tables in your BigQuery workspace.  They will be displayed for you in a table below:
+
+
+| Table Name                                      |
+|-------------------------------------------------|
+| OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED       |
+| OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS              |
+| OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS             |
+| OUT_DIM_CUSTOMERS_4_UNDISCOVERED               |
+| OUT_DIM_CUSTOMERS_5_BALAY_KREATIVE             |
+| OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS              |
+| OUT_DIM_CUSTOMERS_UNDISCOVERED                 |
+| OUT_DIM_PRODUCTS_2_KULTIVATE_LABS              |
+| OUT_DIM_PRODUCTS_3_KAPWA_GARDENS               |
+| OUT_DIM_PRODUCTS_4_UNDISCOVERED_FORMS          |
+| OUT_DIM_PRODUCTS_5_KAPWA_GARDENS               |
+| OUT_DIM_PRODUCTS_6_BALAY_KREATIVE              |
+| OUT_DIM_PRODUCTS_UNDISCOVERED                  |
+| OUT_FACT_FULFILLMENTS_KULTIVATE_LABS           |
+| OUT_FACT_ORDERS_2_KULTIVATE_LABS               |
+| OUT_FACT_ORDERS_3_UNDISCOVERED                 |
+| OUT_FACT_ORDERS_4_BALAY_KREATIVE               |
+| OUT_FACT_ORDERS_5_KAPWA_GARDENS                |
+| OUT_FACT_ORDERS_6_UNDISCOVERED_FORMS           |
+| OUT_FACT_ORDERS_KAPWA_GARDENS                  |
+| OUT_FACT_ORDER_LINES_2_KULTIVATE_LABS           |
+| OUT_FACT_ORDER_LINES_3_KAPWA_GARDENS            |
+| OUT_FACT_ORDER_LINES_4_UNDISCOVERED_FORMS       |
+| OUT_FACT_ORDER_LINES_5_KAPWA_GARDENS            |
+| OUT_FACT_ORDER_LINES_6_BALAY_KREATIVE           |
+| OUT_FACT_ORDER_LINES_UNDISCOVERED              |
+| OUT_FACT_PAYMENTS_2_KULTIVATE_LABS             |
+| OUT_FACT_PAYMENTS_3_UNDISCOVERED               |
+| OUT_FACT_PAYMENTS_4_BALAY_KREATIVE              |
+| OUT_FACT_PAYMENTS_KAPWA_GARDENS                |
+| OUT_FACT_SHIPPING_DETAILS_KULTIVATE_LABS       |
+| OUT_FORMS_TYPEFORM                             |
+| OUT_QUESTIONS_TYPEFORM                          |
+| OUT_QUESTION_CHOICES_TYPEFORM                   |
+| OUT_RESPONSE_ANSWERS_TYPEFORM                   |
+| OUT_RESPONSE_METADATA_TYPEFORM                  |
+| STG_KAPWA_ORDERS_CLEANED_KAPWA_GARDENS         |
+| STG_UNDISCOVERED_ORDERS_CLEANED_UNDISCOVERED_FORMS |
+
+
+INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 6
+INFO:main_2:Found function_response in history from tool: internal_execute_sql_query
+INFO:main_2:Tool 'internal_execute_sql_query' raw returned dict: {'result': {'status': 'success', 'data': [{'table_name': 'OUT_DIM_CHECKOUT_ATTRIBUTES_UNDISCOVERED'}, {'table_name': 'OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS'}, {'table_name': 'OUT_DIM_CUSTOMERS_3_KULTIVATE_LABS'}, {'table_name': 'OUT_DIM_CUSTOMERS_4_UNDISCOVERED'}, {'table_name': 'OUT_DIM_CUSTOMERS_5_BAL...
+INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+INFO:main_2:AI text suggests data/tables were retrieved; attempting fallback display generation.
+INFO:main_2:Fallback: Found table name 'OUT' in AI text, will query.
+INFO:main_2:Tool Call: internal_execute_sql_query with query: SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT` LIMIT 10
+ERROR:main_2:Tool Call: Error executing BigQuery query for internal_execute_sql_query: 404 Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT was not found in location us-east4; reason: notFound, message: Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT was not found in location us-east4
+
+Location: us-east4
+Job ID: 3dd47a77-0308-4ad0-b598-a9f97991c9ec
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend/main_2.py", line 251, in internal_execute_sql_query
+    results = query_job.result(timeout=60)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/cloud/bigquery/job/query.py", line 1703, in result
+    while not is_job_done():
+              ^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_unary.py", line 293, in retry_wrapped_func
+    return retry_target(
+           ^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_unary.py", line 153, in retry_target
+    _retry_error_helper(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_base.py", line 212, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_unary.py", line 144, in retry_target
+    result = target()
+             ^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/cloud/bigquery/job/query.py", line 1645, in is_job_done
+    raise job_failed_exception
+google.api_core.exceptions.NotFound: 404 Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT was not found in location us-east4; reason: notFound, message: Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT was not found in location us-east4
+
+Location: us-east4
+Job ID: 3dd47a77-0308-4ad0-b598-a9f97991c9ec
+
+WARNING:main_2:Fallback query failed or returned no data: Error executing BigQuery query: 404 Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT was not found in location us-east4; reason: notFound, message: Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT was not found in location us-east4
+
+Location: us-east4
+Job ID: 3dd47a77-0308-4ad0-b598-a9f97991c9ec
+
+INFO:werkzeug:127.0.0.1 - - [30/May/2025 02:13:33] "POST /api/chat HTTP/1.1" 200 -
