@@ -22,16 +22,7 @@ app.use('/api/chat', createProxyMiddleware({
   target: 'http://127.0.0.1:8081',
   changeOrigin: true,
   timeout: 5000,
-  proxyTimeout: 5000,
-  onError: (err, req, res) => {
-    console.log('Proxy error:', err.message);
-    if (!res.headersSent) {
-      res.status(500).json({ error: 'Backend service unavailable' });
-    }
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`Proxying ${req.method} ${req.url} to backend`);
-  }
+  proxyTimeout: 5000
 }));
 
 // Create HTTP server for Vite setup
@@ -40,8 +31,8 @@ const server = createServer(app);
 // Setup Vite middleware last - this will handle serving the React frontend
 setupVite(app, server);
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, "0.0.0.0", () => {
+const PORT = Number(process.env.PORT) || 5000;
+server.listen(PORT, () => {
   console.log(`React frontend serving on port ${PORT}`);
   console.log(`Python backend running on port 8081`);
 });
