@@ -7,7 +7,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["npm", "run", "build"]
+build = ["sh", "-c", "pip install -r backend/requirements.txt && npm run build"]
 run = ["sh", "-c", "python backend/main_2.py"]
 
 [[ports]]
