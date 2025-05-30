@@ -1,0 +1,6 @@
+
+flask
+kbcstorage
+google-cloud-bigquery
+google-generativeai
+google-cloud-aiplatform
