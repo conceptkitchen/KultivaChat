@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "serve": "NODE_ENV=production node dist/index.js",
-    "start": "concurrently \"npm run serve\" \"cd backend && python main_2.py\"",
+    "serve": "concurrently \"NODE_ENV=production node dist/index.js\" \"cd backend && python main_2.py\"",
+    "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
