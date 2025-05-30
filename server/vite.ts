@@ -19,8 +19,8 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-export async function setupVite(app: express.Express, server?: Server) {
-  if (app.get("env") === "development") {
+export async function setupVite(app: Express, server?: Server) {
+  if (process.env.NODE_ENV === "development") {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { 
@@ -44,7 +44,7 @@ export async function setupVite(app: express.Express, server?: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  const distPath = path.resolve(import.meta.dirname, "..", "dist");
 
   if (!fs.existsSync(distPath)) {
     throw new Error(
