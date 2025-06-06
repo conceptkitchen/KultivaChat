@@ -386,7 +386,13 @@ app.get('/app', (req, res) => {
                         fetch('/api/chat', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ message: userMessage })
+                          body: JSON.stringify({ 
+                            message: userMessage,
+                            conversation_history: messages.map(msg => ({
+                              role: msg.role === 'assistant' ? 'assistant' : 'user',
+                              content: msg.content
+                            }))
+                          })
                         })
                         .then(response => response.json())
                         .then(data => {
@@ -422,7 +428,13 @@ app.get('/app', (req, res) => {
                           const response = await fetch('/api/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ message: userMessage })
+                            body: JSON.stringify({ 
+                              message: userMessage,
+                              conversation_history: messages.map(msg => ({
+                                role: msg.role === 'assistant' ? 'assistant' : 'user',
+                                content: msg.content
+                              }))
+                            })
                           });
                           const data = await response.json();
                           
@@ -467,19 +479,22 @@ app.get('/app', (req, res) => {
 // Chat API endpoint that connects to Python backend
 app.post('/api/chat', async (req: any, res) => {
   try {
-    const { message } = req.body;
+    const { message, conversation_history } = req.body;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Forward request to Python Flask backend
+    // Forward request to Python Flask backend with conversation history
     const response = await fetch('http://127.0.0.1:8081/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ 
+        message,
+        conversation_history: conversation_history || []
+      })
     });
 
     if (!response.ok) {
