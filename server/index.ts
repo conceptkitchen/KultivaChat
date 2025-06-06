@@ -1,6 +1,9 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
+import { setupAuth } from "./replitAuth";
+import { registerRoutes } from "./routes";
+import { registerUnauthedRoutes } from "./routes-unauthed";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -8,8 +11,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
-// Remove static file serving that overrides routes
 
 // Health check
 app.get('/health', (req, res) => {
@@ -117,6 +118,24 @@ app.get('/api/login', (req, res) => {
 });
 
 const PORT = Number(process.env.PORT) || 5000;
-app.listen(PORT, "0.0.0.0", () => {
+
+// Setup authentication and routes
+async function initializeServer() {
+  try {
+    // Setup authentication system
+    await setupAuth(app);
+    
+    // Register API routes
+    await registerRoutes(app);
+    await registerUnauthedRoutes(app);
+    
+    console.log("Authentication and routes configured");
+  } catch (error) {
+    console.error("Error setting up auth:", error);
+  }
+}
+
+app.listen(PORT, "0.0.0.0", async () => {
   console.log(`Kultivate AI serving on port ${PORT}`);
+  await initializeServer();
 });
