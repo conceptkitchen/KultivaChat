@@ -379,6 +379,11 @@ app.get('/app', (req, res) => {
                       if (e.key === 'Enter' && message.trim() && !isLoading) {
                         e.preventDefault();
                         const userMessage = message.trim();
+                        const currentHistory = messages.map(msg => ({
+                          role: msg.role === 'assistant' ? 'assistant' : 'user',
+                          content: msg.content
+                        }));
+                        
                         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
                         setMessage('');
                         setIsLoading(true);
@@ -388,10 +393,7 @@ app.get('/app', (req, res) => {
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ 
                             message: userMessage,
-                            conversation_history: messages.map(msg => ({
-                              role: msg.role === 'assistant' ? 'assistant' : 'user',
-                              content: msg.content
-                            }))
+                            conversation_history: currentHistory
                           })
                         })
                         .then(response => response.json())
@@ -420,6 +422,11 @@ app.get('/app', (req, res) => {
                     onClick: async () => {
                       if (message.trim() && !isLoading) {
                         const userMessage = message.trim();
+                        const currentHistory = messages.map(msg => ({
+                          role: msg.role === 'assistant' ? 'assistant' : 'user',
+                          content: msg.content
+                        }));
+                        
                         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
                         setMessage('');
                         setIsLoading(true);
@@ -430,10 +437,7 @@ app.get('/app', (req, res) => {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ 
                               message: userMessage,
-                              conversation_history: messages.map(msg => ({
-                                role: msg.role === 'assistant' ? 'assistant' : 'user',
-                                content: msg.content
-                              }))
+                              conversation_history: currentHistory
                             })
                           });
                           const data = await response.json();
