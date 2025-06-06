@@ -10,10 +10,13 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Create HTTP server first for proper setup
+const server = createServer(app);
+
 // Setup authentication first
 setupAuth(app);
 
-// Register routes before Vite middleware
+// Register API routes before Vite middleware
 registerRoutes(app);
 registerUnauthedRoutes(app);
 
@@ -25,14 +28,11 @@ app.use('/api/chat', createProxyMiddleware({
   proxyTimeout: 5000
 }));
 
-// Create HTTP server for Vite setup
-const server = createServer(app);
-
 // Setup Vite middleware last - this will handle serving the React frontend
 setupVite(app, server);
 
 const PORT = Number(process.env.PORT) || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`React frontend serving on port ${PORT}`);
   console.log(`Python backend running on port 8081`);
 });
