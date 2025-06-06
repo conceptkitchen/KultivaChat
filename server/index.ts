@@ -255,7 +255,9 @@ app.get('/app', (req, res) => {
                         key: idx,
                         style: { 
                           display: 'flex', 
-                          justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' 
+                          justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                          flexDirection: 'column',
+                          alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start'
                         } 
                       },
                         React.createElement('div', {
@@ -264,9 +266,90 @@ app.get('/app', (req, res) => {
                             padding: '0.75rem',
                             borderRadius: '8px',
                             backgroundColor: msg.role === 'user' ? '#eab308' : '#f3f4f6',
-                            color: msg.role === 'user' ? 'white' : '#374151'
+                            color: msg.role === 'user' ? 'white' : '#374151',
+                            whiteSpace: 'pre-wrap'
                           }
-                        }, msg.content)
+                        }, msg.content),
+                        
+                        // Render data displays if available
+                        msg.displays && msg.displays.length > 0 && React.createElement('div', {
+                          style: {
+                            maxWidth: '90%',
+                            marginTop: '0.5rem',
+                            padding: '1rem',
+                            backgroundColor: 'white',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '8px'
+                          }
+                        },
+                          ...msg.displays.map((display, displayIdx) => 
+                            React.createElement('div', { key: displayIdx },
+                              React.createElement('h4', { 
+                                style: { marginBottom: '0.5rem', color: '#374151', fontSize: '1rem', fontWeight: '600' } 
+                              }, display.title || 'Data Table'),
+                              
+                              display.type === 'table' && display.content && React.createElement('div', {
+                                style: { 
+                                  maxHeight: '300px', 
+                                  overflowY: 'auto',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px'
+                                }
+                              },
+                                React.createElement('table', {
+                                  style: { 
+                                    width: '100%', 
+                                    borderCollapse: 'collapse',
+                                    fontSize: '0.875rem'
+                                  }
+                                },
+                                  React.createElement('thead', {},
+                                    React.createElement('tr', { 
+                                      style: { backgroundColor: '#f9fafb' } 
+                                    },
+                                      React.createElement('th', {
+                                        style: { 
+                                          padding: '0.5rem', 
+                                          textAlign: 'left',
+                                          borderBottom: '1px solid #d1d5db',
+                                          fontWeight: '600'
+                                        }
+                                      }, 'Table Name')
+                                    )
+                                  ),
+                                  React.createElement('tbody', {},
+                                    ...display.content.slice(0, 20).map((row, rowIdx) =>
+                                      React.createElement('tr', { 
+                                        key: rowIdx,
+                                        style: { 
+                                          borderBottom: '1px solid #e5e7eb',
+                                          '&:hover': { backgroundColor: '#f9fafb' }
+                                        }
+                                      },
+                                        React.createElement('td', {
+                                          style: { 
+                                            padding: '0.5rem',
+                                            fontFamily: 'monospace',
+                                            fontSize: '0.8rem'
+                                          }
+                                        }, row.table_name || JSON.stringify(row))
+                                      )
+                                    )
+                                  )
+                                )
+                              ),
+                              
+                              display.content && display.content.length > 20 && React.createElement('p', {
+                                style: { 
+                                  marginTop: '0.5rem', 
+                                  fontSize: '0.875rem', 
+                                  color: '#6b7280',
+                                  fontStyle: 'italic'
+                                }
+                              }, 'Showing first 20 of ' + display.content.length + ' tables')
+                            )
+                          )
+                        )
                       )
                     ),
                     isLoading && React.createElement('div', { 
@@ -315,9 +398,22 @@ app.get('/app', (req, res) => {
                             throw new Error(data.error);
                           }
                           
+                          // Handle both simple responses and structured data
+                          let content = '';
+                          if (data.reply) {
+                            content = data.reply;
+                          } else if (data.response) {
+                            content = data.response;
+                          } else if (data.message) {
+                            content = data.message;
+                          } else {
+                            content = 'Response received';
+                          }
+                          
                           setMessages(prev => [...prev, { 
                             role: 'assistant', 
-                            content: data.response || data.message || 'Response received'
+                            content: content,
+                            displays: data.displays || []
                           }]);
                         } catch (error) {
                           setMessages(prev => [...prev, { 
