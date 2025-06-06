@@ -9,64 +9,124 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Configure proper MIME types for JavaScript modules
+app.use(express.static(path.join(__dirname, '..', 'client'), {
+  setHeaders: (res, path) => {
+    if (path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.ts') || path.endsWith('.tsx')) {
+      res.setHeader('Content-Type', 'application/javascript');
+    }
+    if (path.endsWith('.css')) {
+      res.setHeader('Content-Type', 'text/css');
+    }
+  }
+}));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Serve the React frontend directly
+// Serve the login page
 app.get('/', (req, res) => {
-  res.send(`
-<!DOCTYPE html>
+  res.send(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kultivate AI</title>
-    <script type="module">
-      import { createRoot } from "https://esm.sh/react-dom@18/client";
-      import React from "https://esm.sh/react@18";
-      
-      function App() {
-        return React.createElement('div', {
-          style: {
-            fontFamily: 'Arial, sans-serif',
-            padding: '40px',
-            maxWidth: '800px',
-            margin: '0 auto',
-            background: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
-          }
-        }, [
-          React.createElement('h1', { key: 'title', style: { color: '#333' } }, '🚀 Kultivate AI'),
-          React.createElement('p', { key: 'status', style: { color: '#10b981', fontWeight: 'bold' } }, '✓ Frontend is now visible and working!'),
-          React.createElement('p', { key: 'desc' }, 'React application is running on port 5000'),
-          React.createElement('p', { key: 'next' }, 'Ready to load full application features')
-        ]);
-      }
-      
-      const root = createRoot(document.getElementById('root'));
-      root.render(React.createElement(App));
-    </script>
+    <title>Kultivate AI Assistant</title>
     <style>
-      body { 
-        margin: 0; 
-        padding: 20px; 
-        background: #f5f5f5; 
-        font-family: Arial, sans-serif; 
-      }
+        body {
+            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f9fafb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .login-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        .logo {
+            width: 48px;
+            height: 48px;
+            background: #eab308;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+        }
+        .title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 0 0.5rem;
+            color: #1f2937;
+        }
+        .subtitle {
+            color: #6b7280;
+            margin: 0 0 2rem;
+            line-height: 1.5;
+        }
+        .login-btn {
+            background: #eab308;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-block;
+            cursor: pointer;
+            transition: background-color 0.15s;
+        }
+        .login-btn:hover {
+            background: #ca8a04;
+        }
+        .highlight {
+            color: #eab308;
+        }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div class="login-card">
+        <div class="logo">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 8V4H8"></path>
+                <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+                <path d="M2 14h2"></path>
+                <path d="M20 14h2"></path>
+                <path d="M15 13v2"></path>
+                <path d="M9 13v2"></path>
+            </svg>
+        </div>
+        <h1 class="title">
+            Kultivate <span class="highlight">AI</span>
+        </h1>
+        <p class="subtitle">
+            Your AI-powered data integration platform for intelligent exploration and visualization
+        </p>
+        <a href="/api/login" class="login-btn">
+            Log In to Continue
+        </a>
+    </div>
 </body>
-</html>
-  `);
+</html>`);
+});
+
+// Basic authentication routes
+app.get('/api/login', (req, res) => {
+  res.redirect('/?auth=required');
 });
 
 const PORT = Number(process.env.PORT) || 5000;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Frontend visible on port ${PORT}`);
-  console.log(`Server successfully bound to 0.0.0.0:${PORT}`);
+  console.log(`Kultivate AI serving on port ${PORT}`);
 });
