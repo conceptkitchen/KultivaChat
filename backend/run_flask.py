@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import subprocess
-import time
 import sys
+import time
+import signal
 import os
 
 def run_flask():
@@ -9,19 +10,12 @@ def run_flask():
     while True:
         try:
             print("Starting Flask server...")
-            # Change to backend directory
-            os.chdir('/home/runner/workspace/backend')
+            # Start the Flask process
+            process = subprocess.Popen([
+                sys.executable, 'main_2.py'
+            ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
             
-            # Run the Flask app
-            process = subprocess.Popen(
-                [sys.executable, 'main_2.py'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                bufsize=1
-            )
-            
-            # Monitor the process and print output
+            # Monitor the process
             while True:
                 output = process.stdout.readline()
                 if output == '' and process.poll() is not None:
@@ -29,16 +23,15 @@ def run_flask():
                 if output:
                     print(output.strip())
                     
-            # Process has ended
+            # Process has terminated
             return_code = process.poll()
-            print(f"Flask server stopped with return code: {return_code}")
+            print(f"Flask server exited with code {return_code}")
             
-            if return_code == 0:
-                print("Flask server stopped normally.")
-                break
+            if return_code != 0:
+                print("Restarting in 5 seconds...")
+                time.sleep(5)
             else:
-                print("Flask server crashed. Restarting in 3 seconds...")
-                time.sleep(3)
+                break
                 
         except KeyboardInterrupt:
             print("Shutting down Flask server...")
@@ -47,7 +40,7 @@ def run_flask():
             break
         except Exception as e:
             print(f"Error running Flask server: {e}")
-            time.sleep(3)
+            time.sleep(5)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run_flask()
