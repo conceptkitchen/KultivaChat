@@ -384,6 +384,9 @@ app.get('/app', (req, res) => {
                           content: msg.content
                         }));
                         
+                        console.log('Sending conversation history:', currentHistory);
+                        console.log('User message:', userMessage);
+                        
                         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
                         setMessage('');
                         setIsLoading(true);
@@ -426,6 +429,9 @@ app.get('/app', (req, res) => {
                           role: msg.role === 'assistant' ? 'assistant' : 'user',
                           content: msg.content
                         }));
+                        
+                        console.log('Button - Sending conversation history:', currentHistory);
+                        console.log('Button - User message:', userMessage);
                         
                         setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
                         setMessage('');
