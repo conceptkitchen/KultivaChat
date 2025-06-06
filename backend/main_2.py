@@ -744,6 +744,29 @@ def chat_with_gemini_client_style():
                 f"History message {i}: role='{msg.get('role')}', content='{msg.get('content')[:100]}...'"
             )
 
+        # Smart table name resolution before sending to Gemini
+        original_message = user_message_text
+        available_tables = []
+        for msg in conversation_history:
+            if msg.get('role') == 'assistant':
+                content = msg.get('content', '')
+                table_matches = re.findall(r'(OUT_[A-Z_0-9]+|DIM_[A-Z_0-9]+|FACT_[A-Z_0-9]+|STG_[A-Z_0-9]+)', content)
+                available_tables.extend(table_matches)
+        
+        available_tables = list(set(available_tables))
+        message_lower = user_message_text.lower()
+        
+        # Handle "kapwa gardens customers" specifically
+        if 'kapwa' in message_lower and 'customer' in message_lower:
+            kapwa_customer_tables = [t for t in available_tables if 'KAPWA_GARDENS' in t and 'CUSTOMERS' in t]
+            if kapwa_customer_tables:
+                def extract_number(table_name):
+                    numbers = re.findall(r'_(\d+)_', table_name)
+                    return int(numbers[0]) if numbers else 0
+                best_table = max(kapwa_customer_tables, key=extract_number)
+                user_message_text = f"Execute this SQL query: SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{best_table}` LIMIT 10"
+                app.logger.info(f"Auto-resolved: '{original_message}' → '{user_message_text}'")
+
         # Build full history including system instruction and conversation context
         full_history = []
         if GEMINI_SDK_AVAILABLE:
