@@ -530,6 +530,10 @@ def chat_with_gemini_client_style():
         conversation_history = user_message_data.get('conversation_history', [])
         app.logger.info(f"Received user message for Gemini (genai.Client): {user_message_text}")
         app.logger.info(f"Conversation history length: {len(conversation_history)}")
+        
+        # Log each message in conversation history for debugging
+        for i, msg in enumerate(conversation_history):
+            app.logger.info(f"History message {i}: role='{msg.get('role')}', content='{msg.get('content')[:100]}...'")
 
         # Build full history including system instruction and conversation context
         full_history = []
