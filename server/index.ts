@@ -318,7 +318,7 @@ app.get('/app', (req, res) => {
                                     )
                                   ),
                                   React.createElement('tbody', {},
-                                    ...display.content.slice(0, 20).map((row, rowIdx) =>
+                                    ...display.content.map((row, rowIdx) =>
                                       React.createElement('tr', { 
                                         key: rowIdx,
                                         style: { 
@@ -339,14 +339,14 @@ app.get('/app', (req, res) => {
                                 )
                               ),
                               
-                              display.content && display.content.length > 20 && React.createElement('p', {
+                              display.content && display.content.length > 0 && React.createElement('p', {
                                 style: { 
                                   marginTop: '0.5rem', 
                                   fontSize: '0.875rem', 
                                   color: '#6b7280',
                                   fontStyle: 'italic'
                                 }
-                              }, 'Showing first 20 of ' + display.content.length + ' tables')
+                              }, 'Showing all ' + display.content.length + ' tables')
                             )
                           )
                         )
