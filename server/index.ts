@@ -246,10 +246,20 @@ app.get('/app', (req, res) => {
                   }),
                   React.createElement('button', {
                     className: 'send-button',
-                    onClick: () => {
+                    onClick: async () => {
                       if (message.trim()) {
-                        alert('Chat functionality will be connected to backend');
-                        setMessage('');
+                        try {
+                          const response = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ message: message.trim() })
+                          });
+                          const data = await response.json();
+                          console.log('Response:', data);
+                          setMessage('');
+                        } catch (error) {
+                          console.error('Chat error:', error);
+                        }
                       }
                     }
                   }, 'Send')
@@ -265,6 +275,40 @@ app.get('/app', (req, res) => {
     </script>
   </body>
 </html>`);
+});
+
+// Chat API endpoint that connects to Python backend
+app.post('/api/chat', async (req: any, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Forward request to Python Flask backend
+    const response = await fetch('http://127.0.0.1:8081/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ message })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Backend responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+    
+  } catch (error) {
+    console.error('Chat API error:', error);
+    res.status(500).json({ 
+      error: 'Failed to connect to AI backend',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 const PORT = Number(process.env.PORT) || 5000;
