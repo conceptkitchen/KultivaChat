@@ -9,17 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Configure proper MIME types for JavaScript modules
-app.use(express.static(path.join(__dirname, '..', 'client'), {
-  setHeaders: (res, path) => {
-    if (path.endsWith('.js') || path.endsWith('.mjs') || path.endsWith('.ts') || path.endsWith('.tsx')) {
-      res.setHeader('Content-Type', 'application/javascript');
-    }
-    if (path.endsWith('.css')) {
-      res.setHeader('Content-Type', 'text/css');
-    }
-  }
-}));
+// Remove static file serving that overrides routes
 
 // Health check
 app.get('/health', (req, res) => {
