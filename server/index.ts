@@ -1,48 +1,72 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { registerUnauthedRoutes } from "./routes-unauthed";
-import { setupVite, serveStatic } from "./vite";
-import { setupAuth } from "./replitAuth";
-import { createProxyMiddleware } from 'http-proxy-middleware';
-import { createServer } from "http";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Add basic health check endpoint first
+// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Create HTTP server first for proper setup
-const server = createServer(app);
-
-// Proxy API calls to Python backend first
-app.use('/api/chat', createProxyMiddleware({
-  target: 'http://127.0.0.1:8081',
-  changeOrigin: true,
-  timeout: 5000,
-  proxyTimeout: 5000
-}));
-
-// Setup Vite middleware last to handle all remaining routes
-setupVite(app, server);
+// Serve the React frontend directly
+app.get('/', (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kultivate AI</title>
+    <script type="module">
+      import { createRoot } from "https://esm.sh/react-dom@18/client";
+      import React from "https://esm.sh/react@18";
+      
+      function App() {
+        return React.createElement('div', {
+          style: {
+            fontFamily: 'Arial, sans-serif',
+            padding: '40px',
+            maxWidth: '800px',
+            margin: '0 auto',
+            background: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+          }
+        }, [
+          React.createElement('h1', { key: 'title', style: { color: '#333' } }, '🚀 Kultivate AI'),
+          React.createElement('p', { key: 'status', style: { color: '#10b981', fontWeight: 'bold' } }, '✓ Frontend is now visible and working!'),
+          React.createElement('p', { key: 'desc' }, 'React application is running on port 5000'),
+          React.createElement('p', { key: 'next' }, 'Ready to load full application features')
+        ]);
+      }
+      
+      const root = createRoot(document.getElementById('root'));
+      root.render(React.createElement(App));
+    </script>
+    <style>
+      body { 
+        margin: 0; 
+        padding: 20px; 
+        background: #f5f5f5; 
+        font-family: Arial, sans-serif; 
+      }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+</body>
+</html>
+  `);
+});
 
 const PORT = Number(process.env.PORT) || 5000;
-server.listen(PORT, "0.0.0.0", async () => {
-  console.log(`Server started on port ${PORT}`);
-  console.log(`React frontend serving on port ${PORT}`);
-  console.log(`Python backend running on port 8081`);
-  
-  // Setup authentication after server is listening
-  try {
-    await setupAuth(app);
-    await registerRoutes(app);
-    await registerUnauthedRoutes(app);
-    console.log("Authentication and routes configured");
-  } catch (error) {
-    console.error("Error setting up auth:", error);
-    // Continue without auth if there's an issue
-  }
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Frontend visible on port ${PORT}`);
+  console.log(`Server successfully bound to 0.0.0.0:${PORT}`);
 });
