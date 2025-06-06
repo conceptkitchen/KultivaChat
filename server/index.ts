@@ -374,7 +374,39 @@ app.get('/app', (req, res) => {
                     className: 'input-field',
                     placeholder: 'Ask me about your data...',
                     value: message,
-                    onChange: (e) => setMessage(e.target.value)
+                    onChange: (e) => setMessage(e.target.value),
+                    onKeyDown: (e) => {
+                      if (e.key === 'Enter' && message.trim() && !isLoading) {
+                        e.preventDefault();
+                        const userMessage = message.trim();
+                        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+                        setMessage('');
+                        setIsLoading(true);
+                        
+                        fetch('/api/chat', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ message: userMessage })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                          if (data.error) throw new Error(data.error);
+                          let content = data.reply || data.response || data.message || 'AI response received';
+                          setMessages(prev => [...prev, { 
+                            role: 'assistant', 
+                            content: content,
+                            displays: data.displays || []
+                          }]);
+                        })
+                        .catch(error => {
+                          setMessages(prev => [...prev, { 
+                            role: 'assistant', 
+                            content: 'Sorry, I had trouble connecting to the data backend. Please try again.'
+                          }]);
+                        })
+                        .finally(() => setIsLoading(false));
+                      }
+                    }
                   }),
                   React.createElement('button', {
                     className: 'send-button',
