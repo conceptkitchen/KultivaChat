@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { setupAuth } from "./replitAuth";
 import { registerRoutes } from "./routes";
 import { registerUnauthedRoutes } from "./routes-unauthed";
+import fetch from 'node-fetch';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -212,6 +213,8 @@ app.get('/app', (req, res) => {
       
       function App() {
         const [message, setMessage] = React.useState('');
+        const [messages, setMessages] = React.useState([]);
+        const [isLoading, setIsLoading] = React.useState(false);
         
         return React.createElement('div', { className: 'app-container' },
           React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column' } },
@@ -232,10 +235,56 @@ app.get('/app', (req, res) => {
               )
             ),
             React.createElement('div', { className: 'chat-area' },
-              React.createElement('div', { className: 'welcome-message' },
-                React.createElement('h2', { style: { marginBottom: '0.5rem' } }, 'Welcome to Kultivate AI'),
-                React.createElement('p', null, 'Start a conversation with your data assistant')
-              ),
+              messages.length === 0 
+                ? React.createElement('div', { className: 'welcome-message' },
+                    React.createElement('h2', { style: { marginBottom: '0.5rem' } }, 'Welcome to Kultivate AI'),
+                    React.createElement('p', null, 'Start a conversation with your data assistant')
+                  )
+                : React.createElement('div', { 
+                    style: { 
+                      flex: 1, 
+                      padding: '1rem', 
+                      overflowY: 'auto',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '1rem'
+                    } 
+                  },
+                    ...messages.map((msg, idx) => 
+                      React.createElement('div', { 
+                        key: idx,
+                        style: { 
+                          display: 'flex', 
+                          justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' 
+                        } 
+                      },
+                        React.createElement('div', {
+                          style: {
+                            maxWidth: '70%',
+                            padding: '0.75rem',
+                            borderRadius: '8px',
+                            backgroundColor: msg.role === 'user' ? '#eab308' : '#f3f4f6',
+                            color: msg.role === 'user' ? 'white' : '#374151'
+                          }
+                        }, msg.content)
+                      )
+                    ),
+                    isLoading && React.createElement('div', { 
+                      style: { 
+                        display: 'flex', 
+                        justifyContent: 'flex-start' 
+                      } 
+                    },
+                      React.createElement('div', {
+                        style: {
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          backgroundColor: '#f3f4f6',
+                          color: '#6b7280'
+                        }
+                      }, 'AI is thinking...')
+                    )
+                  ),
               React.createElement('div', { className: 'chat-input' },
                 React.createElement('div', { style: { display: 'flex' } },
                   React.createElement('input', {
@@ -246,23 +295,42 @@ app.get('/app', (req, res) => {
                   }),
                   React.createElement('button', {
                     className: 'send-button',
+                    disabled: isLoading,
                     onClick: async () => {
-                      if (message.trim()) {
+                      if (message.trim() && !isLoading) {
+                        const userMessage = message.trim();
+                        setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+                        setMessage('');
+                        setIsLoading(true);
+                        
                         try {
                           const response = await fetch('/api/chat', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ message: message.trim() })
+                            body: JSON.stringify({ message: userMessage })
                           });
                           const data = await response.json();
-                          console.log('Response:', data);
-                          setMessage('');
+                          
+                          if (data.error) {
+                            throw new Error(data.error);
+                          }
+                          
+                          setMessages(prev => [...prev, { 
+                            role: 'assistant', 
+                            content: data.response || data.message || 'Response received'
+                          }]);
                         } catch (error) {
+                          setMessages(prev => [...prev, { 
+                            role: 'assistant', 
+                            content: 'Sorry, I had trouble connecting to the data backend. Please try again.'
+                          }]);
                           console.error('Chat error:', error);
+                        } finally {
+                          setIsLoading(false);
                         }
                       }
                     }
-                  }, 'Send')
+                  }, isLoading ? 'Sending...' : 'Send')
                 )
               )
             )
