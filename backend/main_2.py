@@ -6,6 +6,7 @@ import logging
 import json
 import time
 import re # For fallback logic
+from difflib import SequenceMatcher
 
 # typing.Optional is crucial for parameters with a default value of None
 from typing import Optional # <<<<<<<<<<<< MAKE ABSOLUTELY SURE THIS LINE IS PRESENT AND AT THE TOP
@@ -224,6 +225,41 @@ try:
         app.logger.info(f"Successfully initialized Google BigQuery Client. Project: {bigquery_client.project}")
     else: app.logger.error("CRITICAL (BigQuery Client): GOOGLE_APPLICATION_CREDENTIALS path not set.")
 except Exception as e: app.logger.error(f"Error initializing Google BigQuery Client: {e}", exc_info=True)
+
+# --- Helper Functions ---
+def find_best_table_match(user_input: str, available_tables: list) -> str:
+    """Find the best matching table name from available tables based on user input.
+    
+    Args:
+        user_input (str): The user's table name input (e.g., "outformstypeform")
+        available_tables (list): List of available table names
+        
+    Returns:
+        str: The best matching table name or original input if no good match
+    """
+    user_input_clean = user_input.lower().replace('_', '').replace('-', '').replace(' ', '')
+    
+    best_match = user_input
+    best_score = 0
+    
+    for table in available_tables:
+        table_clean = table.lower().replace('_', '').replace('-', '').replace(' ', '')
+        
+        # Check if user input is contained in table name
+        if user_input_clean in table_clean:
+            score = len(user_input_clean) / len(table_clean)
+            if score > best_score:
+                best_score = score
+                best_match = table
+        
+        # Check similarity ratio
+        similarity = SequenceMatcher(None, user_input_clean, table_clean).ratio()
+        if similarity > 0.7 and similarity > best_score:
+            best_score = similarity
+            best_match = table
+    
+    app.logger.info(f"Table matching: '{user_input}' -> '{best_match}' (score: {best_score})")
+    return best_match
 
 # --- Tool Functions (Ensure good docstrings and type hints for ADK/Gemini Automatic Function Calling) ---
 def internal_execute_sql_query(sql_query: str) -> dict:
