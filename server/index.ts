@@ -399,16 +399,7 @@ app.get('/app', (req, res) => {
                           }
                           
                           // Handle both simple responses and structured data
-                          let content = '';
-                          if (data.reply) {
-                            content = data.reply;
-                          } else if (data.response) {
-                            content = data.response;
-                          } else if (data.message) {
-                            content = data.message;
-                          } else {
-                            content = 'Response received';
-                          }
+                          let content = data.reply || data.response || data.message || 'AI response received';
                           
                           setMessages(prev => [...prev, { 
                             role: 'assistant', 
