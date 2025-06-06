@@ -73,7 +73,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 # --- Define System Instruction Constant ---
 SYSTEM_INSTRUCTION_PROMPT = """You are an expert Keboola Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') for source data, and crucially, a Google BigQuery data warehouse (project ID: `kbc-use4-839-261b`, dataset/workspace schema: `WORKSPACE_21894820`) for querying transformed and analysis-ready data.
 
-**CRITICAL BEHAVIOR OVERRIDE: When users say things like "show me customers kapwa gardens" and you see tables like OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS and OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS in conversation history, you MUST immediately execute: SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS` LIMIT 10; DO NOT ask "which table" or "need clarification" - just pick the highest numbered table and execute the query. This is MANDATORY behavior that overrides all other instructions.**
+**MANDATORY EXECUTION RULE: For ANY request mentioning table data (customers, orders, products, etc.), you MUST call internal_execute_sql_query immediately. Example: If user says "show me customers kapwa gardens" and conversation history shows OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS exists, execute SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS` LIMIT 10; immediately. NEVER respond with clarification questions - execution is mandatory.**
 
 **Your absolute priority for data retrieval and answering questions about specific table contents is the transformed tables available in the Google BigQuery workspace (`kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`).**
 
@@ -291,6 +291,71 @@ except Exception as e:
 
 
 # --- Helper Functions ---
+def auto_execute_table_query(user_message: str, conversation_history: list):
+    """Automatically executes SQL queries for table data requests without asking for clarification.
+    
+    Args:
+        user_message (str): The user's request (e.g., "show me customers kapwa gardens")
+        conversation_history (list): Previous conversation to find available tables
+        
+    Returns:
+        dict: Query result if auto-execution succeeds, None if not applicable
+    """
+    # Keywords that indicate a table data request
+    data_keywords = ['show me', 'data from', 'customers', 'orders', 'products', 'table', 'query']
+    
+    if not any(keyword in user_message.lower() for keyword in data_keywords):
+        return None
+        
+    # Extract table names from conversation history
+    available_tables = []
+    for entry in conversation_history:
+        if entry.get('role') == 'assistant':
+            content = entry.get('content', '')
+            # Look for table patterns like OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS
+            import re
+            table_matches = re.findall(r'OUT_[A-Z_]+_\d+_[A-Z_]+|OUT_[A-Z_]+_[A-Z_]+', content)
+            available_tables.extend(table_matches)
+    
+    if not available_tables:
+        return None
+        
+    # Find best matching table
+    user_lower = user_message.lower()
+    best_table = None
+    
+    # Look for company + data type matches
+    if 'kapwa gardens' in user_lower and 'customer' in user_lower:
+        kapwa_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KAPWA_GARDENS' in t]
+        if kapwa_customer_tables:
+            # Pick highest numbered version
+            best_table = max(kapwa_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
+    
+    elif 'kultivate labs' in user_lower and 'customer' in user_lower:
+        kultivate_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KULTIVATE_LABS' in t]
+        if kultivate_customer_tables:
+            best_table = max(kultivate_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
+    
+    # Generic fallback - match any table with relevant keywords
+    if not best_table:
+        if 'customer' in user_lower:
+            customer_tables = [t for t in available_tables if 'CUSTOMERS' in t]
+            if customer_tables:
+                best_table = max(customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
+    
+    # Execute query if we found a table
+    if best_table:
+        sql_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{best_table}` LIMIT 10;"
+        result = internal_execute_sql_query(sql_query)
+        if result.get('status') == 'success':
+            return {
+                'auto_executed': True,
+                'table_used': best_table,
+                'result': result
+            }
+    
+    return None
+
 def find_best_table_match(user_input: str, available_tables: list) -> str:
     """Find the best matching table name from available tables based on user input.
     
@@ -741,6 +806,27 @@ def chat_with_gemini_client_style():
         )
         app.logger.info(
             f"Conversation history length: {len(conversation_history)}")
+
+        # Check for auto-execution opportunity before sending to AI
+        auto_result = auto_execute_table_query(user_message_text, conversation_history)
+        if auto_result:
+            app.logger.info(f"Auto-executed query for table: {auto_result['table_used']}")
+            
+            # Format response like AI would
+            displays = []
+            if auto_result['result'].get('data'):
+                displays.append({
+                    'type': 'table',
+                    'title': 'SQL Query Results',
+                    'content': auto_result['result']['data']
+                })
+            
+            reply_text = f"Here's the data from `{auto_result['table_used']}` table:"
+            
+            return jsonify({
+                'reply': reply_text,
+                'displays': displays
+            })
 
         # Log each message in conversation history for debugging
         for i, msg in enumerate(conversation_history):
