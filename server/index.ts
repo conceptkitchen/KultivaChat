@@ -35,7 +35,7 @@ async function initializeServer() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f8fafc;
+            background: white;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -397,8 +397,8 @@ async function initializeServer() {
                     <div class="chat-main">
                         <div class="chat-header">
                             <div style="display: flex; align-items: center;">
-                                <div style="width: 32px; height: 32px; background: #10b981; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 0.5rem;">KA</div>
-                                <h1 style="font-size: 1.25rem; font-weight: 600;">Kultivate <span style="color: #10b981;">AI</span></h1>
+                                <div style="width: 32px; height: 32px; background: #eab308; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 0.5rem;">KA</div>
+                                <h1 style="font-size: 1.25rem; font-weight: 600;">Kultivate <span style="color: #eab308;">AI</span></h1>
                             </div>
                             <div style="display: flex; align-items: center; gap: 1rem;">
                                 <span style="color: #6b7280;">Welcome, \${user.username}</span>
