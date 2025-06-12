@@ -108,11 +108,11 @@ export function Chat({ conversation }: ChatProps) {
       
       // Manually update messages with the response
       const aiMessage: Message = {
-        id: data.aiMessage.id,
+        id: data.assistantMessage.id,
         role: "assistant",
-        content: data.aiMessage.content,
-        displays: data.aiMessage.displays || [],
-        timestamp: new Date(data.aiMessage.timestamp),
+        content: data.assistantMessage.content,
+        displays: data.assistantMessage.displays || [],
+        timestamp: new Date(data.assistantMessage.timestamp),
       };
       
       // Replace loading message with actual response
