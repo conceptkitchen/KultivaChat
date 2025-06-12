@@ -1213,6 +1213,10 @@ if __name__ == '__main__':
             "GEMINI_SDK_AVAILABLE is True, but google_genai_types seem to be dummy classes. Imports might not have fully succeeded as expected."
         )
 
+    # Force remove any PORT environment variable that might interfere
+    if 'PORT' in os.environ:
+        del os.environ['PORT']
+    
     # Always use port 8081 for Flask backend (ignore Node.js PORT env var)
     port = 8081
     app.logger.info(f"Starting Flask server on host='0.0.0.0', port={port}")
