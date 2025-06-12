@@ -54,7 +54,7 @@ async function initializeServer() {
         .logo {
             width: 60px;
             height: 60px;
-            background: #10b981;
+            background: #eab308;
             border-radius: 12px;
             margin: 0 auto 1rem;
             display: flex;
@@ -69,7 +69,7 @@ async function initializeServer() {
             margin-bottom: 0.5rem; 
             color: #1f2937;
         }
-        .highlight { color: #10b981; }
+        .highlight { color: #eab308; }
         p { 
             color: #6b7280; 
             margin-bottom: 2rem; 
@@ -95,7 +95,7 @@ async function initializeServer() {
         .tab.active {
             background: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            color: #10b981;
+            color: #eab308;
         }
         .form {
             display: none;
@@ -123,12 +123,12 @@ async function initializeServer() {
         }
         input:focus {
             outline: none;
-            border-color: #10b981;
+            border-color: #eab308;
         }
         .btn {
             width: 100%;
             padding: 0.875rem;
-            background: #10b981;
+            background: #eab308;
             color: white;
             border: none;
             border-radius: 8px;
@@ -139,7 +139,7 @@ async function initializeServer() {
             margin-top: 1rem;
         }
         .btn:hover {
-            background: #059669;
+            background: #ca8a04;
             transform: translateY(-1px);
         }
         .btn:disabled {
