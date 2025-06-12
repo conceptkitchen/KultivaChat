@@ -29,22 +29,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
-  // User auth route
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
-
   // API routes - protected by authentication
   app.get("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const conversations = await storage.getConversations(userId);
       res.json(conversations);
     } catch (error) {
@@ -55,7 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/conversations/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const conversation = await storage.getConversation(req.params.id, userId);
 
       if (!conversation) {
@@ -71,7 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const data = conversationSchema.parse(req.body);
 
       const conversation = await storage.createConversation({
@@ -95,7 +83,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/conversations", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       await storage.clearConversations(userId);
       res.status(200).json({ message: "All conversations cleared" });
     } catch (error) {
@@ -106,12 +94,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/messages", isAuthenticated, async (req: any, res) => {
     try {
-      // Ensure user is authenticated and has valid claims
-      if (!req.user || !req.user.claims || !req.user.claims.sub) {
+      // Ensure user is authenticated
+      if (!req.user || !req.user.id) {
         return res.status(401).json({ message: "User not properly authenticated" });
       }
 
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
 
       // Debug request body
       console.log("Message request body:", JSON.stringify(req.body));
@@ -166,51 +154,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Call your Python Flask backend for ALL messages
-        try {
-          const backendUrl = process.env.NODE_ENV === 'production' 
-            ? 'http://localhost:8081/api/chat' 
-            : 'http://localhost:8081/api/chat';
-          console.log(`Calling Python backend at ${backendUrl}`);
-          // Forward to Python backend with conversation history
-          const pythonResponse = await fetch(backendUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              message: data.content,
-              conversation_history: conversation.messages.map(msg => ({
-                role: msg.role,
-                content: msg.content,
-                timestamp: msg.timestamp
-              }))
-            }),
-          });
-
-          if (!pythonResponse.ok) {
-            throw new Error(`Python backend responded with ${pythonResponse.status}`);
-          }
-
-          const pythonResult = await pythonResponse.json();
-          console.log("Python backend response:", pythonResult);
-
-          assistantMessage = {
-            id: uuidv4(),
-            role: "assistant" as const,
-            content: pythonResult.reply || pythonResult.error || "No response from backend",
-            timestamp: new Date(),
-            displays: pythonResult.displays || []
-          };
-        } catch (backendError) {
-          console.error("Python backend error:", backendError);
-          assistantMessage = {
-            id: uuidv4(),
-            role: "assistant" as const,
-            content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8081.",
-            timestamp: new Date(),
-            displays: []
-          };
-        }
+        // Simple AI response for now
+        assistantMessage = {
+          id: uuidv4(),
+          role: "assistant" as const,
+          content: `I received your message: "${data.content}". I'm ready to help you with data analysis and insights.`,
+          timestamp: new Date(),
+          displays: []
+        };
       } catch (error) {
         console.error("Error processing message:", error);
         // General fallback response
