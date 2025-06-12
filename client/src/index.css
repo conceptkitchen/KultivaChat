@@ -4,8 +4,9 @@
 
 /* Chat Bubble Styles */
 .chat-bubble-user {
-  background-color: #eab308; /* yellow-500 - Kultivate gold */
-  color: white;
+  background-color: #eab308 !important; /* yellow-500 - Kultivate gold */
+  color: white !important;
+  border-radius: 1.5rem 1.5rem 0 1.5rem;
 }
 
 .chat-bubble-ai {
@@ -132,14 +133,6 @@
 .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #d4d4d4;
   border-radius: 20px;
-}
-
-.chat-bubble-user {
-  border-radius: 1.5rem 1.5rem 0 1.5rem;
-}
-
-.chat-bubble-ai {
-  border-radius: 1.5rem 1.5rem 1.5rem 0;
 }
 
 .canvas-content {
