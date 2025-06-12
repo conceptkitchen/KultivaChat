@@ -154,14 +154,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         // Call your Python Flask backend for ALL messages
-        // Simple AI response for now
-        assistantMessage = {
-          id: uuidv4(),
-          role: "assistant" as const,
-          content: `I received your message: "${data.content}". I'm ready to help you with data analysis and insights.`,
-          timestamp: new Date(),
-          displays: []
-        };
+        try {
+          const backendUrl = process.env.NODE_ENV === 'production' 
+            ? 'http://localhost:8081/api/chat' 
+            : 'http://localhost:8081/api/chat';
+          console.log(`Calling Python backend at ${backendUrl}`);
+          
+          const pythonResponse = await fetch(backendUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              message: data.content,
+              conversation_history: conversation.messages.map(msg => ({
+                role: msg.role,
+                content: msg.content,
+                timestamp: msg.timestamp
+              }))
+            }),
+          });
+
+          if (!pythonResponse.ok) {
+            throw new Error(`Python backend responded with ${pythonResponse.status}`);
+          }
+
+          const pythonResult = await pythonResponse.json();
+          console.log("Python backend response:", pythonResult);
+
+          assistantMessage = {
+            id: uuidv4(),
+            role: "assistant" as const,
+            content: pythonResult.reply || pythonResult.error || "No response from backend",
+            timestamp: new Date(),
+            displays: pythonResult.displays || []
+          };
+        } catch (backendError) {
+          console.error("Python backend error:", backendError);
+          assistantMessage = {
+            id: uuidv4(),
+            role: "assistant" as const,
+            content: "I'm having trouble connecting to your Python backend. Please make sure your Flask server (main_2.py) is running on port 8081.",
+            timestamp: new Date(),
+            displays: []
+          };
+        }
       } catch (error) {
         console.error("Error processing message:", error);
         // General fallback response
