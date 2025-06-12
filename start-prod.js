@@ -36,14 +36,20 @@ const startFrontend = () => {
 
 const startBackend = () => {
   console.log('Starting backend on port 8081...');
-  backendProcess = spawn('python', ['run_flask.py'], {
+  backendProcess = spawn('python', ['main_2.py'], {
     cwd: path.join(__dirname, 'backend'),
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
-    stdio: ['inherit', 'pipe', 'pipe']
+    env: { ...process.env, PYTHONUNBUFFERED: '1', FLASK_ENV: 'production' },
+    stdio: ['inherit', 'pipe', 'pipe'],
+    detached: false
   });
 
   backendProcess.stdout.on('data', (data) => {
-    console.log(`[Backend] ${data.toString().trim()}`);
+    const output = data.toString().trim();
+    console.log(`[Backend] ${output}`);
+    if (output.includes('Running on') && output.includes('8081')) {
+      console.log('[Backend] Server ready - testing connection...');
+      setTimeout(testBackendConnection, 2000);
+    }
   });
 
   backendProcess.stderr.on('data', (data) => {
@@ -51,11 +57,37 @@ const startBackend = () => {
   });
 
   backendProcess.on('exit', (code) => {
-    console.log(`Backend exited with code ${code}, restarting...`);
-    setTimeout(startBackend, 2000);
+    console.log(`Backend exited with code ${code}, restarting in 3 seconds...`);
+    setTimeout(startBackend, 3000);
   });
 
   return backendProcess.pid;
+};
+
+const testBackendConnection = () => {
+  const http = require('http');
+  const options = {
+    hostname: 'localhost',
+    port: 8081,
+    path: '/api/health',
+    method: 'GET',
+    timeout: 5000
+  };
+
+  const req = http.request(options, (res) => {
+    console.log(`[Backend Test] Health check: ${res.statusCode}`);
+  });
+
+  req.on('error', (err) => {
+    console.log(`[Backend Test] Connection test failed: ${err.message}`);
+  });
+
+  req.on('timeout', () => {
+    console.log('[Backend Test] Connection timeout');
+    req.destroy();
+  });
+
+  req.end();
 };
 
 // Start both servers
