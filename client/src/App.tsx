@@ -12,6 +12,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import AuthPage from "@/pages/auth-page";
+import { LogoutButton } from "@/components/logout-button";
 
 function Router() {
   return (
@@ -167,18 +168,7 @@ function AuthContent() {
                 </svg>
               </div>
             )}
-            <button
-              onClick={() => {
-                const { logoutMutation } = useAuth();
-                logoutMutation.mutate();
-              }}
-              className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-md transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Logout
-            </button>
+            <LogoutButton />
           </div>
         </div>
       </header>
