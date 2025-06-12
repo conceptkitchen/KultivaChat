@@ -21,6 +21,14 @@ export default function AuthPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Login form submitted with data:", loginData);
+    
+    // Check if fields are empty
+    if (!loginData.username || !loginData.password) {
+      console.error("Username or password is empty");
+      return;
+    }
+    
+    console.log("Calling loginMutation.mutate");
     loginMutation.mutate(loginData);
   };
 
@@ -69,6 +77,10 @@ export default function AuthPage() {
                   type="submit" 
                   className="w-full" 
                   disabled={loginMutation.isPending}
+                  onClick={(e) => {
+                    console.log("Button clicked!");
+                    // Don't prevent default here, let the form handle it
+                  }}
                 >
                   {loginMutation.isPending ? (
                     <>
@@ -76,7 +88,7 @@ export default function AuthPage() {
                       Signing in...
                     </>
                   ) : (
-                    "Sign In"
+                    "Log In"
                   )}
                 </Button>
               </form>
