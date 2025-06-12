@@ -1,34 +1,42 @@
 #!/usr/bin/env python3
-import subprocess
+"""
+Robust Flask server runner with auto-restart capability
+"""
+import os
 import sys
 import time
 import signal
-import os
+import subprocess
+from pathlib import Path
 
 def run_flask():
     """Run Flask server with automatic restart on crash"""
+    script_dir = Path(__file__).parent
+    main_script = script_dir / "main_2.py"
+    
     while True:
         try:
-            print("Starting Flask server...")
-            # Start the Flask process
-            process = subprocess.Popen([
-                sys.executable, 'main_2.py'
-            ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            print(f"Starting Flask server from {main_script}")
+            process = subprocess.Popen(
+                [sys.executable, str(main_script)],
+                cwd=script_dir,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True,
+                bufsize=1
+            )
             
-            # Monitor the process
-            while True:
-                output = process.stdout.readline()
-                if output == '' and process.poll() is not None:
-                    break
-                if output:
-                    print(output.strip())
+            # Stream output in real-time
+            for line in process.stdout:
+                print(line.strip())
+                if "Running on" in line:
+                    print("Backend server is ready!")
                     
-            # Process has terminated
-            return_code = process.poll()
-            print(f"Flask server exited with code {return_code}")
+            process.wait()
+            print(f"Flask process exited with code {process.returncode}")
             
-            if return_code != 0:
-                print("Restarting in 5 seconds...")
+            if process.returncode != 0:
+                print("Restarting Flask server in 5 seconds...")
                 time.sleep(5)
             else:
                 break
@@ -42,5 +50,5 @@ def run_flask():
             print(f"Error running Flask server: {e}")
             time.sleep(5)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_flask()
