@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
 // This script replaces the default npm start behavior to ensure both servers start
-const { exec, spawn } = require('child_process');
-const path = require('path');
+import { exec, spawn } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('Starting Kultivate AI production environment...');
 
