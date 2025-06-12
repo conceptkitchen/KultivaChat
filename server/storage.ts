@@ -1,4 +1,5 @@
-import { type Conversation, type IStorage, type User, type UpsertUser } from "@shared/schema";
+import { type Conversation, type IStorage, type User, type InsertUser } from "@shared/schema";
+import { DatabaseStorage } from "./database-storage";
 
 export class MemStorage implements IStorage {
   private conversations: Map<string, Conversation>;

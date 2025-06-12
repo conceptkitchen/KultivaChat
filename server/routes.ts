@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth } from "./auth";
 
 const messageSchema = z.object({
   conversationId: z.string(),
@@ -15,9 +15,17 @@ const conversationSchema = z.object({
   title: z.string()
 });
 
+// Authentication middleware
+const isAuthenticated = (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  next();
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
-  await setupAuth(app);
+  setupAuth(app);
 
 
 
