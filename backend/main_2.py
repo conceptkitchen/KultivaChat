@@ -749,6 +749,10 @@ else:
 def hello():
     return "Hello from your custom Keboola API Gateway (using genai.Client)!"
 
+@app.route('/api/health')
+def health():
+    return jsonify({"status": "healthy", "backend": "running"})
+
 
 @app.route('/api/list_buckets', methods=['GET'])
 def list_keboola_buckets_endpoint_direct():
