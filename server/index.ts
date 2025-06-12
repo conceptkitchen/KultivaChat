@@ -15,31 +15,62 @@ const PORT = parseInt(process.env.PORT ?? "5000", 10);
 
 let flaskProcess: any = null;
 
-// Start Flask backend server
-function startFlaskServer() {
-  const backendPath = path.join(__dirname, '../backend');
-  flaskProcess = spawn('python', ['main_2.py'], {
-    cwd: backendPath,
-    stdio: ['ignore', 'pipe', 'pipe']
+// Start Flask backend server and wait for it to be ready
+function startFlaskServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const backendPath = path.join(__dirname, '../backend');
+    flaskProcess = spawn('python', ['main_2.py'], {
+      cwd: backendPath,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    
+    let flaskReady = false;
+    
+    flaskProcess.stdout?.on('data', (data: Buffer) => {
+      const output = data.toString().trim();
+      console.log(`Flask: ${output}`);
+      
+      // Flask is ready when it shows the server running message
+      if (output.includes('Running on http://127.0.0.1:8081') && !flaskReady) {
+        flaskReady = true;
+        console.log('Flask server is ready');
+        resolve();
+      }
+    });
+    
+    flaskProcess.stderr?.on('data', (data: Buffer) => {
+      const output = data.toString().trim();
+      console.log(`Flask Error: ${output}`);
+      
+      // Also check stderr for the running message
+      if (output.includes('Running on http://127.0.0.1:8081') && !flaskReady) {
+        flaskReady = true;
+        console.log('Flask server is ready');
+        resolve();
+      }
+    });
+    
+    flaskProcess.on('close', (code: number) => {
+      console.log(`Flask process exited with code ${code}`);
+      if (!flaskReady) {
+        reject(new Error(`Flask server failed to start (exit code: ${code})`));
+      }
+    });
+    
+    flaskProcess.on('error', (error: Error) => {
+      console.error('Flask server error:', error);
+      reject(error);
+    });
+    
+    console.log('Starting Flask backend server...');
+    
+    // Timeout in case Flask never signals ready
+    setTimeout(() => {
+      if (!flaskReady) {
+        reject(new Error('Flask server startup timeout'));
+      }
+    }, 30000);
   });
-  
-  flaskProcess.stdout?.on('data', (data: Buffer) => {
-    console.log(`Flask: ${data.toString().trim()}`);
-  });
-  
-  flaskProcess.stderr?.on('data', (data: Buffer) => {
-    console.log(`Flask Error: ${data.toString().trim()}`);
-  });
-  
-  flaskProcess.on('close', (code: number) => {
-    console.log(`Flask process exited with code ${code}`);
-    if (code !== 0) {
-      console.log('Restarting Flask server in 5 seconds...');
-      setTimeout(() => startFlaskServer(), 5000);
-    }
-  });
-  
-  console.log('Flask backend server starting...');
 }
 
 // Health check
@@ -50,9 +81,6 @@ app.get('/health', (req, res) => {
 // Setup authentication and routes
 async function initializeServer() {
   try {
-    // Start Flask backend
-    startFlaskServer();
-    
     // Register API routes with authentication
     await registerRoutes(app);
     
@@ -65,6 +93,10 @@ async function initializeServer() {
     });
     
     console.log("Authentication and routes configured");
+    
+    // Start Flask backend AFTER Node.js is ready
+    await startFlaskServer();
+    
   } catch (error) {
     console.error("Error setting up server:", error);
   }
