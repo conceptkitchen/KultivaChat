@@ -35,7 +35,7 @@ async function initializeServer() {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #f8fafc;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -45,15 +45,16 @@ async function initializeServer() {
             background: white;
             padding: 2rem;
             border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             width: 100%;
             max-width: 400px;
             text-align: center;
+            border: 1px solid #e2e8f0;
         }
         .logo {
             width: 60px;
             height: 60px;
-            background: #eab308;
+            background: #10b981;
             border-radius: 12px;
             margin: 0 auto 1rem;
             display: flex;
@@ -68,7 +69,7 @@ async function initializeServer() {
             margin-bottom: 0.5rem; 
             color: #1f2937;
         }
-        .highlight { color: #eab308; }
+        .highlight { color: #10b981; }
         p { 
             color: #6b7280; 
             margin-bottom: 2rem; 
@@ -94,7 +95,7 @@ async function initializeServer() {
         .tab.active {
             background: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            color: #eab308;
+            color: #10b981;
         }
         .form {
             display: none;
@@ -122,12 +123,12 @@ async function initializeServer() {
         }
         input:focus {
             outline: none;
-            border-color: #eab308;
+            border-color: #10b981;
         }
         .btn {
             width: 100%;
             padding: 0.875rem;
-            background: #eab308;
+            background: #10b981;
             color: white;
             border: none;
             border-radius: 8px;
@@ -138,7 +139,7 @@ async function initializeServer() {
             margin-top: 1rem;
         }
         .btn:hover {
-            background: #ca8a04;
+            background: #059669;
             transform: translateY(-1px);
         }
         .btn:disabled {
@@ -213,7 +214,7 @@ async function initializeServer() {
         }
         .send-btn {
             padding: 0.75rem 1rem;
-            background: #eab308;
+            background: #10b981;
             color: white;
             border: none;
             border-radius: 6px;
@@ -226,7 +227,7 @@ async function initializeServer() {
         }
         .user-bubble {
             display: inline-block;
-            background: #eab308;
+            background: #10b981;
             color: white;
             padding: 0.75rem;
             border-radius: 8px;
@@ -396,8 +397,8 @@ async function initializeServer() {
                     <div class="chat-main">
                         <div class="chat-header">
                             <div style="display: flex; align-items: center;">
-                                <div style="width: 32px; height: 32px; background: #eab308; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 0.5rem;">KA</div>
-                                <h1 style="font-size: 1.25rem; font-weight: 600;">Kultivate <span style="color: #eab308;">AI</span></h1>
+                                <div style="width: 32px; height: 32px; background: #10b981; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin-right: 0.5rem;">KA</div>
+                                <h1 style="font-size: 1.25rem; font-weight: 600;">Kultivate <span style="color: #10b981;">AI</span></h1>
                             </div>
                             <div style="display: flex; align-items: center; gap: 1rem;">
                                 <span style="color: #6b7280;">Welcome, \${user.username}</span>
