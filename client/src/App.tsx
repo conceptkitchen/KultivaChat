@@ -9,21 +9,24 @@ import ChatPage from "@/pages/chat";
 import { Sidebar, SidebarButton } from "@/components/sidebar";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { AuthProvider, useAuthContext, LogInButton, LogOutButton } from "@/components/auth-provider";
+import { AuthProvider, useAuth } from "@/hooks/use-auth";
+import { ProtectedRoute } from "@/lib/protected-route";
+import AuthPage from "@/pages/auth-page";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/settings" component={Home} />
-      <Route path="/chat/:id" component={ChatPage} />
-      <Route path="/" component={ChatPage} />
+      <ProtectedRoute path="/settings" component={Home} />
+      <ProtectedRoute path="/chat/:id" component={ChatPage} />
+      <ProtectedRoute path="/" component={ChatPage} />
+      <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
 function AuthContent() {
-  const { isAuthenticated, user } = useAuthContext();
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [, navigate] = useLocation();
 
@@ -45,7 +48,7 @@ function AuthContent() {
   };
 
   // If not authenticated, show login page
-  if (!isAuthenticated) {
+  if (!user) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-neutral-50">
         <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
@@ -79,7 +82,7 @@ function AuthContent() {
             </p>
           </div>
           <div className="flex justify-center">
-            <LogInButton />
+            <p className="text-sm text-neutral-500">Authentication is handled by the system</p>
           </div>
         </div>
       </div>
@@ -164,7 +167,18 @@ function AuthContent() {
                 </svg>
               </div>
             )}
-            <LogOutButton />
+            <button
+              onClick={() => {
+                const { logoutMutation } = useAuth();
+                logoutMutation.mutate();
+              }}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100 rounded-md transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Logout
+            </button>
           </div>
         </div>
       </header>
