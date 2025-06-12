@@ -27,31 +27,78 @@ setTimeout(() => {
     stdio: 'inherit'
   });
 
-  // Test backend connection after startup
-  setTimeout(() => {
+  // Monitor backend startup and test connection
+  let backendReady = false;
+  const checkBackend = () => {
+    if (backendReady) return;
+    
     const req = http.request({
       hostname: 'localhost',
       port: 8081,
       path: '/api/health',
-      method: 'GET'
+      method: 'GET',
+      timeout: 2000
     }, (res) => {
-      console.log(`Backend health check: ${res.statusCode}`);
       if (res.statusCode === 200) {
+        backendReady = true;
+        console.log('✓ Backend health check passed');
         console.log('✓ Both servers are running successfully');
         console.log('✓ Frontend: http://localhost:5000 (mapped to port 80)');
         console.log('✓ Backend: http://localhost:8081');
         console.log('✓ Chat functionality enabled with Gemini AI');
+        
+        // Test chat endpoint
+        testChatEndpoint();
       }
     });
 
-    req.on('error', (err) => {
-      console.log(`Backend connection test: ${err.message}`);
+    req.on('error', () => {
+      // Backend not ready yet, try again
+      setTimeout(checkBackend, 2000);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      setTimeout(checkBackend, 2000);
     });
 
     req.end();
-  }, 8000);
+  };
+
+  // Start checking backend after initial delay
+  setTimeout(checkBackend, 5000);
 
 }, 3000);
+
+const testChatEndpoint = () => {
+  const postData = JSON.stringify({
+    message: "hello, test the connection"
+  });
+
+  const req = http.request({
+    hostname: 'localhost',
+    port: 8081,
+    path: '/api/chat',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData)
+    },
+    timeout: 10000
+  }, (res) => {
+    console.log(`✓ Chat endpoint responding: ${res.statusCode}`);
+    if (res.statusCode === 200) {
+      console.log('✓ Backend chat functionality verified');
+    }
+  });
+
+  req.on('error', (err) => {
+    console.log(`Chat test failed: ${err.message}`);
+  });
+
+  req.write(postData);
+  req.end();
+};
 
 // Keep process alive
 process.on('SIGTERM', () => {
