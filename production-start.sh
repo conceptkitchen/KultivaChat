@@ -49,21 +49,37 @@ echo "SUCCESS: Both servers are running"
 echo "Frontend: http://localhost:5000 (external: port 80)"
 echo "Backend: http://localhost:8081"
 
-# Monitor and keep both processes alive
+# Keep the main process alive to prevent deployment termination
+cleanup() {
+    echo "Received termination signal, cleaning up..."
+    kill $FRONTEND_PID 2>/dev/null || true
+    kill $BACKEND_PID 2>/dev/null || true
+    exit 0
+}
+
+# Set signal handlers
+trap cleanup SIGINT SIGTERM
+
+# Monitor and keep both processes alive indefinitely
 while true; do
+    # Check if frontend is still running
     if ! kill -0 $FRONTEND_PID 2>/dev/null; then
-        echo "Frontend died, restarting..."
+        echo "Frontend process died, restarting..."
         NODE_ENV=production nohup node dist/index.js > frontend.log 2>&1 &
         FRONTEND_PID=$!
+        echo "Frontend restarted with PID: $FRONTEND_PID"
     fi
     
+    # Check if backend is still running
     if ! kill -0 $BACKEND_PID 2>/dev/null; then
-        echo "Backend died, restarting..."
+        echo "Backend process died, restarting..."
         cd backend
         nohup python main_2.py > ../backend.log 2>&1 &
         BACKEND_PID=$!
+        echo "Backend restarted with PID: $BACKEND_PID"
         cd ..
     fi
     
-    sleep 10
+    # Sleep before next check
+    sleep 15
 done

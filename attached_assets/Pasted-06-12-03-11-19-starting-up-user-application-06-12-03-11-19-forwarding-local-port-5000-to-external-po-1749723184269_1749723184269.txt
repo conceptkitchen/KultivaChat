@@ -1,0 +1,62 @@
+06-12 03:11:19
+starting up user application
+06-12 03:11:19
+forwarding local port 5000 to external port 80 (mapped as 1104)
+06-12 03:11:19
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:19
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:19
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:19
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:20
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:20
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:20
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:20
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:21
+> rest-express@1.0.0 start
+06-12 03:11:21
+> ./production-start.sh
+06-12 03:11:21
+Starting Kultivate AI production deployment...
+06-12 03:11:22
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:23
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:24
+Starting frontend server (port 5000 -> external port 80)...
+06-12 03:11:24
+Frontend PID: 52
+06-12 03:11:24
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:25
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:25
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:11:33
+Starting backend server (port 8081)...
+06-12 03:11:36
+Backend PID: 99
+06-12 03:11:42
+SUCCESS: Both servers are running
+06-12 03:11:42
+Frontend: http://localhost:5000 (external: port 80)
+06-12 03:11:42
+Backend: http://localhost:8081
+06-12 03:12:36
+system: received signal terminated
+
+Wrap
+
+Colors
+Remote Updates
+origin/main•upstream
+last fetched 25 min ago
+12 commits to push
+Commit
+There are no changes to commit.
