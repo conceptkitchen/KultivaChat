@@ -23,7 +23,11 @@ setTimeout(() => {
   // Start backend server
   const backend = spawn('python', ['main_2.py'], {
     cwd: path.join(__dirname, 'backend'),
-    env: { ...process.env, PYTHONUNBUFFERED: '1' },
+    env: { 
+      ...process.env, 
+      PYTHONUNBUFFERED: '1',
+      PORT: undefined  // Remove PORT env var so Flask uses 8081
+    },
     stdio: 'inherit'
   });
 
