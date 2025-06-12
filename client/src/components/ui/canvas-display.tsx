@@ -73,9 +73,40 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
       
       case "table":
         const tableData = display.content as Record<string, any>[];
-        if (!tableData.length) return <div>No data to display</div>;
         
-        const columns = Object.keys(tableData[0]);
+        // Handle empty or invalid table data
+        if (!tableData || !Array.isArray(tableData)) {
+          return (
+            <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
+              No valid table data available
+            </div>
+          );
+        }
+        
+        if (tableData.length === 0) {
+          return (
+            <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
+              Table is empty - no records found
+            </div>
+          );
+        }
+        
+        // Get columns from first row, handle case where first row might be empty
+        let columns: string[] = [];
+        for (const row of tableData) {
+          if (row && typeof row === 'object' && Object.keys(row).length > 0) {
+            columns = Object.keys(row);
+            break;
+          }
+        }
+        
+        if (columns.length === 0) {
+          return (
+            <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
+              Table data structure is invalid
+            </div>
+          );
+        }
         
         return (
           <div className="border rounded-md w-full overflow-hidden">
