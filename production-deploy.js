@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
-const { spawn } = require('child_process');
-const path = require('path');
-const http = require('http');
+import { spawn } from 'child_process';
+import path from 'path';
+import http from 'http';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('Kultivate AI Production Deployment Starting...');
 
