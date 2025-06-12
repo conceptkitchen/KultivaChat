@@ -1,0 +1,146 @@
+2025-06-12 15:13:09.49
+22e11e1c
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-12 15:13:09.57
+22e11e1c
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-12 15:13:09.60
+22e11e1c
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-12 15:13:09.77
+22e11e1c
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-12 15:13:10.27
+22e11e1c
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-12 15:13:11.04
+22e11e1c
+User
+> rest-express@1.0.0 start
+2025-06-12 15:13:11.04
+22e11e1c
+User
+> node production-deploy.js
+2025-06-12 15:13:11.10
+22e11e1c
+User
+Kultivate AI Production Deployment Starting...
+2025-06-12 15:13:11.10
+22e11e1c
+User
+Starting frontend server on port 5000...
+2025-06-12 15:13:11.51
+22e11e1c
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-12 15:13:11.79
+22e11e1c
+User
+Kultivate AI serving on port 5000
+2025-06-12 15:13:11.80
+22e11e1c
+User
+Authentication and routes configured
+2025-06-12 15:13:11.81
+22e11e1c
+User
+Starting Flask backend server...
+2025-06-12 15:13:14.26
+22e11e1c
+User
+Starting backend server on port 8081...
+2025-06-12 15:13:42.66
+22e11e1c
+User
+Error setting up server: Error: Flask server startup timeout
+2025-06-12 15:13:42.66
+22e11e1c
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:624:16)
+2025-06-12 15:13:42.66
+22e11e1c
+User
+at listOnTimeout (node:internal/timers:581:17)
+2025-06-12 15:13:42.66
+22e11e1c
+User
+at process.processTimers (node:internal/timers:519:7)
+2025-06-12 15:14:15.67
+22e11e1c
+User
+Message request body: {"conversationId":"ddce0dc3-b18f-452a-bac9-0b5fae19589b","content":"hi"}
+2025-06-12 15:14:15.85
+22e11e1c
+User
+Calling Python backend at http://localhost:8081/api/chat
+2025-06-12 15:14:15.89
+22e11e1c
+User
+Python backend error: TypeError: fetch failed
+2025-06-12 15:14:15.89
+22e11e1c
+User
+at node:internal/deps/undici/undici:13392:13
+2025-06-12 15:14:15.89
+22e11e1c
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-06-12 15:14:15.89
+22e11e1c
+User
+at async file:///home/runner/workspace/dist/index.js:509:34 {
+2025-06-12 15:14:15.89
+22e11e1c
+User
+[cause]: Error: connect ECONNREFUSED 127.0.0.1:8081
+2025-06-12 15:14:15.89
+22e11e1c
+User
+at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+2025-06-12 15:14:15.89
+22e11e1c
+User
+errno: -111,
+2025-06-12 15:14:15.89
+22e11e1c
+User
+code: 'ECONNREFUSED',
+2025-06-12 15:14:15.89
+22e11e1c
+User
+syscall: 'connect',
+2025-06-12 15:14:15.89
+22e11e1c
+User
+address: '127.0.0.1',
+2025-06-12 15:14:15.89
+22e11e1c
+User
+port: 8081
+2025-06-12 15:14:15.89
+22e11e1c
+User
+}
+2025-06-12 15:14:15.89
+22e11e1c
+User
+}
+
+Wrap
+
+Colors
+Remote Updates
+origin/main•upstream
+last fetched 6 min ago
+4 commits to push
+Commit
+Summary of your commit...
+1 changed file
+targeted_element_1749766445806.png
+Added
+Committing will automatically stage your changes.
