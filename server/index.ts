@@ -214,7 +214,7 @@ async function initializeServer() {
         }
         .send-btn {
             padding: 0.75rem 1rem;
-            background: #10b981;
+            background: #eab308;
             color: white;
             border: none;
             border-radius: 6px;
@@ -227,7 +227,7 @@ async function initializeServer() {
         }
         .user-bubble {
             display: inline-block;
-            background: #10b981;
+            background: #eab308;
             color: white;
             padding: 0.75rem;
             border-radius: 8px;
