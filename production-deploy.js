@@ -20,16 +20,33 @@ const frontend = spawn('node', ['dist/index.js'], {
 setTimeout(() => {
   console.log('Starting backend server on port 8081...');
   
-  // Start backend server - create clean environment without PORT variable
+  // Start backend server - ensure all required environment variables are passed
   const cleanEnv = { ...process.env };
   delete cleanEnv.PORT;  // Remove PORT completely so Flask uses hardcoded 8081
   
+  // Ensure critical environment variables are passed to Flask
+  const flaskEnv = {
+    ...cleanEnv,
+    PYTHONUNBUFFERED: '1',
+    FLASK_ENV: 'production',
+    KBC_API_URL: process.env.KBC_API_URL,
+    KBC_STORAGE_TOKEN: process.env.KBC_STORAGE_TOKEN,
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    KBC_WORKSPACE_SCHEMA: process.env.KBC_WORKSPACE_SCHEMA,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY
+  };
+  
+  console.log('Starting Flask with environment variables:', {
+    KBC_API_URL: !!flaskEnv.KBC_API_URL,
+    KBC_STORAGE_TOKEN: !!flaskEnv.KBC_STORAGE_TOKEN,
+    GOOGLE_APPLICATION_CREDENTIALS: !!flaskEnv.GOOGLE_APPLICATION_CREDENTIALS,
+    KBC_WORKSPACE_SCHEMA: !!flaskEnv.KBC_WORKSPACE_SCHEMA,
+    GEMINI_API_KEY: !!flaskEnv.GEMINI_API_KEY
+  });
+  
   const backend = spawn('python', ['main_2.py'], {
     cwd: path.join(__dirname, 'backend'),
-    env: { 
-      ...cleanEnv, 
-      PYTHONUNBUFFERED: '1'
-    },
+    env: flaskEnv,
     stdio: 'inherit'
   });
 
