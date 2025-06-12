@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import { registerRoutes } from "./routes";
 
 const __filename = fileURLToPath(import.meta.url);
