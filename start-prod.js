@@ -36,7 +36,7 @@ const startFrontend = () => {
 
 const startBackend = () => {
   console.log('Starting backend on port 8081...');
-  backendProcess = spawn('python', ['main_2.py'], {
+  backendProcess = spawn('python', ['run_flask.py'], {
     cwd: path.join(__dirname, 'backend'),
     env: { ...process.env, PYTHONUNBUFFERED: '1' },
     stdio: ['inherit', 'pipe', 'pipe']
