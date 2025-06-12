@@ -71,8 +71,8 @@ setTimeout(() => {
     req.end();
   };
 
-  // Start checking backend after initial delay
-  setTimeout(checkBackend, 5000);
+  // Start checking backend after initial delay - increased for production
+  setTimeout(checkBackend, 15000);
 
 }, 3000);
 
