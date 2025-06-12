@@ -1,0 +1,66 @@
+06-12 10:17:33
+INFO:main_2:Starting Flask server on host='0.0.0.0', port=5000
+06-12 10:17:33
+INFO:main_2:KBC_API_URL from env: SET
+06-12 10:17:33
+INFO:main_2:KBC_STORAGE_TOKEN from env: SET
+06-12 10:17:33
+INFO:main_2:GOOGLE_APPLICATION_CREDENTIALS_PATH from env: SET
+06-12 10:17:33
+INFO:main_2:KBC_WORKSPACE_SCHEMA from env: SET
+06-12 10:17:33
+INFO:main_2:GEMINI_API_KEY from env: SET
+06-12 10:17:33
+Flask: Successfully imported 'google.genai' and 'google.genai.types'
+06-12 10:17:33
+* Serving Flask app 'main_2'
+06-12 10:17:33
+* Debug mode: off
+06-12 10:17:33
+Flask Error: Address already in use
+06-12 10:17:33
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.
+06-12 10:17:33
+INFO:main_2:Starting Flask server on host='0.0.0.0', port=5000
+06-12 10:17:33
+Address already in use
+06-12 10:17:33
+Port 5000 is in use by another program. Either identify and stop that program, or start the server with a different port.
+06-12 10:17:33
+* Serving Flask app 'main_2'
+06-12 10:17:33
+* Debug mode: off
+06-12 10:17:34
+Flask process exited with code 1
+06-12 10:26:59
+Message request body: {"conversationId":"b1616579-36b0-4a5b-9fab-1b183534c21e","content":"hi"}
+06-12 10:26:59
+Successfully imported 'google.genai' and 'google.genai.types'
+06-12 10:26:59
+Calling Python backend at http://localhost:8081/api/chat
+06-12 10:26:59
+Python backend error: TypeError: fetch failed
+06-12 10:26:59
+at node:internal/deps/undici/undici:13392:13
+06-12 10:26:59
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+06-12 10:26:59
+at async file:///home/runner/workspace/dist/index.js:509:34 {
+06-12 10:26:59
+[cause]: Error: connect ECONNREFUSED 127.0.0.1:8081
+06-12 10:26:59
+at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+06-12 10:26:59
+errno: -111,
+06-12 10:26:59
+code: 'ECONNREFUSED',
+06-12 10:26:59
+syscall: 'connect',
+06-12 10:26:59
+address: '127.0.0.1',
+06-12 10:26:59
+port: 8081
+06-12 10:26:59
+}
+06-12 10:26:59
+}
