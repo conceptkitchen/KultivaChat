@@ -1,0 +1,66 @@
+06-12 03:00:22
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:00:23
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+06-12 03:00:23
+Kultivate AI serving on port 5000
+06-12 03:00:23
+Authentication and routes configured
+06-12 03:02:16
+Chat API error: FetchError: request to http://127.0.0.1:8081/api/chat failed, reason: connect ECONNREFUSED 127.0.0.1:8081
+06-12 03:02:16
+at ClientRequest. (file:///home/runner/workspace/node_modules/node-fetch/src/index.js:108:11)
+06-12 03:02:16
+at ClientRequest.emit (node:events:530:35)
+06-12 03:02:16
+at emitErrorEvent (node:_http_client:101:11)
+06-12 03:02:16
+at Socket.socketErrorListener (node:_http_client:504:5)
+06-12 03:02:16
+at Socket.emit (node:events:518:28)
+06-12 03:02:16
+at emitErrorNT (node:internal/streams/destroy:169:8)
+06-12 03:02:16
+at emitErrorCloseNT (node:internal/streams/destroy:128:3)
+06-12 03:02:16
+at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+06-12 03:02:16
+type: 'system',
+06-12 03:02:16
+errno: 'ECONNREFUSED',
+06-12 03:02:16
+code: 'ECONNREFUSED',
+06-12 03:02:16
+erroredSysCall: 'connect'
+06-12 03:02:16
+}
+06-12 03:02:26
+Thu, 12 Jun 2025 10:02:26 GMT express deprecated req.host: Use req.hostname instead at file:/home/runner/workspace/node_modules/openid-client/build/passport.js:165:49
+06-12 03:02:43
+Chat API error: FetchError: request to http://127.0.0.1:8081/api/chat failed, reason: connect ECONNREFUSED 127.0.0.1:8081
+06-12 03:02:43
+at ClientRequest. (file:///home/runner/workspace/node_modules/node-fetch/src/index.js:108:11)
+06-12 03:02:43
+at ClientRequest.emit (node:events:530:35)
+06-12 03:02:43
+at emitErrorEvent (node:_http_client:101:11)
+06-12 03:02:43
+at Socket.socketErrorListener (node:_http_client:504:5)
+06-12 03:02:43
+at Socket.emit (node:events:518:28)
+06-12 03:02:43
+at emitErrorNT (node:internal/streams/destroy:169:8)
+06-12 03:02:43
+at emitErrorCloseNT (node:internal/streams/destroy:128:3)
+06-12 03:02:43
+at process.processTicksAndRejections (node:internal/process/task_queues:82:21) {
+06-12 03:02:43
+type: 'system',
+06-12 03:02:43
+errno: 'ECONNREFUSED',
+06-12 03:02:43
+code: 'ECONNREFUSED',
+06-12 03:02:43
+erroredSysCall: 'connect'
+06-12 03:02:43
+}
