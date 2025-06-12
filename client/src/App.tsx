@@ -27,7 +27,7 @@ function Router() {
 }
 
 function AuthContent() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [, navigate] = useLocation();
 
@@ -48,46 +48,21 @@ function AuthContent() {
     createConversationMutation.mutate();
   };
 
-  // If not authenticated, show login page
-  if (!user) {
+  // Show loading state while checking authentication
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-neutral-50">
-        <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-lg">
-          <div className="flex flex-col items-center">
-            <div className="h-12 w-12 bg-primary rounded-md flex items-center justify-center">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="24" 
-                height="24" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="text-white"
-              >
-                <path d="M12 8V4H8"></path>
-                <rect width="16" height="12" x="4" y="8" rx="2"></rect>
-                <path d="M2 14h2"></path>
-                <path d="M20 14h2"></path>
-                <path d="M15 13v2"></path>
-                <path d="M9 13v2"></path>
-              </svg>
-            </div>
-            <h1 className="mt-4 text-2xl font-bold text-neutral-800">
-              Kultivate <span className="text-primary">AI</span>
-            </h1>
-            <p className="mt-2 text-center text-neutral-600">
-              Please log in to access your personalized chat experience
-            </p>
-          </div>
-          <div className="flex justify-center">
-            <p className="text-sm text-neutral-500">Authentication is handled by the system</p>
-          </div>
+      <div className="flex items-center justify-center h-screen bg-neutral-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-neutral-600">Loading...</p>
         </div>
       </div>
     );
+  }
+
+  // If not authenticated, redirect to auth page instead of showing static content
+  if (!user) {
+    return <AuthPage />;
   }
 
   return (

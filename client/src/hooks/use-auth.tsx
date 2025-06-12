@@ -39,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      // Force a page refresh to trigger the routing properly
+      window.location.href = '/';
     },
     onError: (error: Error) => {
       toast({
@@ -56,6 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
+      // Force a page refresh to trigger the routing properly
+      window.location.href = '/';
     },
     onError: (error: Error) => {
       toast({
