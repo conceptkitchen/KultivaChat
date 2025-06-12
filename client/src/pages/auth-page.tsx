@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 
 export default function AuthPage() {
+  console.log("AuthPage component rendered!");
   const { loginMutation, registerMutation } = useAuth();
   const [loginData, setLoginData] = useState({ username: "", password: "" });
   const [registerData, setRegisterData] = useState({
@@ -19,6 +20,7 @@ export default function AuthPage() {
   });
 
   const handleLogin = (e: React.FormEvent) => {
+    console.log("handleLogin called - form submitted!");
     e.preventDefault();
     console.log("Login form submitted with data:", loginData);
     
@@ -77,10 +79,7 @@ export default function AuthPage() {
                   type="submit" 
                   className="w-full" 
                   disabled={loginMutation.isPending}
-                  onClick={(e) => {
-                    console.log("Button clicked!");
-                    // Don't prevent default here, let the form handle it
-                  }}
+                  onClick={() => console.log("Button clicked directly!")}
                 >
                   {loginMutation.isPending ? (
                     <>
