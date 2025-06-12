@@ -70,6 +70,14 @@ GOOGLE_APPLICATION_CREDENTIALS_PATH = os.environ.get(
 KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
+# Log configuration status for debugging
+app.logger.info("=== Configuration Check ===")
+app.logger.info(f"KBC_API_URL: {'SET' if KBC_API_URL else 'MISSING'}")
+app.logger.info(f"KBC_STORAGE_TOKEN: {'SET' if KBC_STORAGE_TOKEN else 'MISSING'}")
+app.logger.info(f"GOOGLE_APPLICATION_CREDENTIALS: {'SET' if GOOGLE_APPLICATION_CREDENTIALS_PATH else 'MISSING'}")
+app.logger.info(f"KBC_WORKSPACE_SCHEMA: {'SET' if KBC_WORKSPACE_SCHEMA else 'MISSING'}")
+app.logger.info(f"GEMINI_API_KEY: {'SET' if GEMINI_API_KEY else 'MISSING'}")
+
 # --- Define System Instruction Constant ---
 SYSTEM_INSTRUCTION_PROMPT = """You are an expert Keboola Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') for source data, and crucially, a Google BigQuery data warehouse (project ID: `kbc-use4-839-261b`, dataset/workspace schema: `WORKSPACE_21894820`) for querying transformed and analysis-ready data.
 
@@ -252,20 +260,39 @@ Strive to use the tools efficiently, prioritizing direct BigQuery access for dat
 DO NOT BE RIGID WITH THE QUERIES. If the user asks for a specific form, you should understand what they're trying to ask for with their context clues. Don't make them say or type the exact form name ever. you should confirm with them if you're unsure.
 """
 
-# --- Initialize Keboola and BigQuery Clients ---
+# --- Initialize Keboola and BigQuery Clients with Timeout Protection ---
+import signal
+from contextlib import contextmanager
+
+@contextmanager
+def timeout_context(seconds):
+    def timeout_handler(signum, frame):
+        raise TimeoutError(f"Operation timed out after {seconds} seconds")
+    
+    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, old_handler)
+
 keboola_storage_client = None
 try:
     if KBC_API_URL and KBC_STORAGE_TOKEN:
         app.logger.info(
             f"Attempting to initialize Keboola Storage Client with URL: {KBC_API_URL}"
         )
-        keboola_storage_client = KeboolaStorageClient(KBC_API_URL,
-                                                      KBC_STORAGE_TOKEN)
+        with timeout_context(30):  # 30 second timeout
+            keboola_storage_client = KeboolaStorageClient(KBC_API_URL,
+                                                          KBC_STORAGE_TOKEN)
         app.logger.info("Successfully initialized Keboola Storage Client.")
     else:
         app.logger.error(
             "CRITICAL (Keboola Client): KBC_API_URL or KBC_STORAGE_TOKEN not set."
         )
+except TimeoutError:
+    app.logger.error("Keboola Storage Client initialization timed out - continuing without it")
 except Exception as e:
     app.logger.error(f"Error initializing Keboola Storage Client: {e}",
                      exc_info=True)
@@ -276,8 +303,9 @@ try:
         app.logger.info(
             f"Attempting to initialize Google BigQuery Client using credentials from: {GOOGLE_APPLICATION_CREDENTIALS_PATH}"
         )
-        bigquery_client = bigquery.Client.from_service_account_json(
-            GOOGLE_APPLICATION_CREDENTIALS_PATH)
+        with timeout_context(30):  # 30 second timeout
+            bigquery_client = bigquery.Client.from_service_account_json(
+                GOOGLE_APPLICATION_CREDENTIALS_PATH)
         app.logger.info(
             f"Successfully initialized Google BigQuery Client. Project: {bigquery_client.project}"
         )
@@ -285,6 +313,8 @@ try:
         app.logger.error(
             "CRITICAL (BigQuery Client): GOOGLE_APPLICATION_CREDENTIALS path not set."
         )
+except TimeoutError:
+    app.logger.error("BigQuery Client initialization timed out - continuing without it")
 except Exception as e:
     app.logger.error(f"Error initializing Google BigQuery Client: {e}",
                      exc_info=True)

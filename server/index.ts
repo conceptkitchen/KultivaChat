@@ -36,6 +36,18 @@ function startFlaskServer(): Promise<void> {
         console.log('Flask server is ready');
         resolve();
       }
+      
+      // Also check for alternative Flask ready signals
+      if ((output.includes('Starting Flask server') || output.includes('Serving Flask app')) && !flaskReady) {
+        // Give Flask a few seconds to fully initialize
+        setTimeout(() => {
+          if (!flaskReady) {
+            flaskReady = true;
+            console.log('Flask server ready (alternative detection)');
+            resolve();
+          }
+        }, 10000);
+      }
     });
     
     flaskProcess.stderr?.on('data', (data: Buffer) => {
@@ -47,6 +59,17 @@ function startFlaskServer(): Promise<void> {
         flaskReady = true;
         console.log('Flask server is ready');
         resolve();
+      }
+      
+      // Check for Flask app startup in stderr
+      if ((output.includes('Starting Flask server') || output.includes('Serving Flask app')) && !flaskReady) {
+        setTimeout(() => {
+          if (!flaskReady) {
+            flaskReady = true;
+            console.log('Flask server ready (stderr detection)');
+            resolve();
+          }
+        }, 10000);
       }
     });
     
@@ -64,12 +87,12 @@ function startFlaskServer(): Promise<void> {
     
     console.log('Starting Flask backend server...');
     
-    // Timeout in case Flask never signals ready
+    // Timeout in case Flask never signals ready (increased for production)
     setTimeout(() => {
       if (!flaskReady) {
         reject(new Error('Flask server startup timeout'));
       }
-    }, 30000);
+    }, 120000); // 2 minutes for production initialization
   });
 }
 
