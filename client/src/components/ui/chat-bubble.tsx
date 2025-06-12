@@ -29,7 +29,7 @@ export function ChatBubble({ message, className }: ChatBubbleProps) {
         className={cn(
           "shadow-sm p-4 rounded-2xl max-w-3xl",
           isUser
-            ? "bg-blue-600 text-white chat-bubble-user mr-4"
+            ? "chat-bubble-user mr-4"
             : "bg-white text-neutral-800 chat-bubble-ai ml-4"
         )}
       >
