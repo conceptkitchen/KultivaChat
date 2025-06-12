@@ -17,10 +17,10 @@ import { LogoutButton } from "@/components/logout-button";
 function Router() {
   return (
     <Switch>
+      <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/settings" component={Home} />
       <ProtectedRoute path="/chat/:id" component={ChatPage} />
       <ProtectedRoute path="/" component={ChatPage} />
-      <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -60,9 +60,16 @@ function AuthContent() {
     );
   }
 
-  // If not authenticated, redirect to auth page instead of showing static content
+  // If not authenticated, use proper routing to auth page
   if (!user) {
-    return <AuthPage />;
+    return (
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <Route>
+          <AuthPage />
+        </Route>
+      </Switch>
+    );
   }
 
   return (
