@@ -20,13 +20,15 @@ const frontend = spawn('node', ['dist/index.js'], {
 setTimeout(() => {
   console.log('Starting backend server on port 8081...');
   
-  // Start backend server
+  // Start backend server - create clean environment without PORT variable
+  const cleanEnv = { ...process.env };
+  delete cleanEnv.PORT;  // Remove PORT completely so Flask uses hardcoded 8081
+  
   const backend = spawn('python', ['main_2.py'], {
     cwd: path.join(__dirname, 'backend'),
     env: { 
-      ...process.env, 
-      PYTHONUNBUFFERED: '1',
-      PORT: undefined  // Remove PORT env var so Flask uses 8081
+      ...cleanEnv, 
+      PYTHONUNBUFFERED: '1'
     },
     stdio: 'inherit'
   });
