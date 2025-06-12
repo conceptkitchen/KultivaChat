@@ -197,9 +197,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           assistantMessage = {
             id: uuidv4(),
             role: "assistant" as const,
-            content: backendResponse.reply || backendResponse.error || "No response from backend",
+            content: pythonResult.reply || pythonResult.error || "No response from backend",
             timestamp: new Date(),
-            displays: backendResponse.displays || []
+            displays: pythonResult.displays || []
           };
         } catch (backendError) {
           console.error("Python backend error:", backendError);
