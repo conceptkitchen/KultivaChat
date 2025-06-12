@@ -20,6 +20,7 @@ export default function AuthPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Login form submitted with data:", loginData);
     loginMutation.mutate(loginData);
   };
 
