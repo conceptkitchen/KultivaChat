@@ -9,17 +9,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('Starting Kultivate AI production environment...');
 
-// Kill any existing processes
+// Kill any existing processes more effectively
 const cleanup = () => {
-  try {
-    exec('pkill -f "node dist/index.js"');
-    exec('pkill -f "python main_2.py"');
-  } catch (e) {
-    // Ignore cleanup errors
-  }
+  return new Promise((resolve) => {
+    exec('pkill -f "node dist/index.js" || true', () => {
+      exec('pkill -f "python main_2.py" || true', () => {
+        exec('pkill -f "tsx server/index.ts" || true', () => {
+          resolve();
+        });
+      });
+    });
+  });
 };
 
-cleanup();
+await cleanup();
 
 // Wait a moment for cleanup
 setTimeout(() => {
