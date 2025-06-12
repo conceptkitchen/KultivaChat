@@ -7,7 +7,7 @@ import connectPg from "connect-pg-simple";
 const PostgresSessionStore = connectPg(session);
 
 export class DatabaseStorage implements IStorage {
-  sessionStore: session.SessionStore;
+  sessionStore: any;
 
   constructor() {
     this.sessionStore = new PostgresSessionStore({ 
@@ -51,7 +51,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get all conversations for a specific user, or all conversations if userId is not provided
-  async getConversations(userId?: string): Promise<Conversation[]> {
+  async getConversations(userId?: number): Promise<Conversation[]> {
     try {
       const query = userId 
         ? db.select().from(conversations).where(eq(conversations.userId, userId)).orderBy(desc(conversations.updatedAt))
