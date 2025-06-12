@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { z } from "zod";
 import { v4 as uuidv4 } from "uuid";
 // Old MCP services removed - now using Python backend
-import { setupAuth } from "./replitAuth";
+// Replit auth removed
 
 const messageSchema = z.object({
   conversationId: z.string(),
