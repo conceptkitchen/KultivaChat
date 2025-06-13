@@ -321,57 +321,6 @@ except Exception as e:
 
 
 # --- Helper Functions ---
-def extract_recent_table_name(conversation_history: list):
-    """Extract the most recent table name from conversation history.
-    
-    Args:
-        conversation_history (list): Previous conversation messages
-        
-    Returns:
-        str: Most recent table name, or None if not found
-    """
-    import re
-    
-    # Look through conversation history in reverse order (most recent first)
-    for entry in reversed(conversation_history):
-        if entry.get('role') == 'assistant':
-            content = entry.get('content', '')
-            
-            # Look for SQL query patterns and table names
-            sql_pattern = r'SELECT.*FROM\s+`([^`]+)`'
-            table_match = re.search(sql_pattern, content, re.IGNORECASE | re.DOTALL)
-            
-            if table_match:
-                full_table_path = table_match.group(1)
-                # Extract just the table name from the full path
-                table_name = full_table_path.split('.')[-1] if '.' in full_table_path else full_table_path
-                return table_name
-            
-            # Also look for table patterns in text (OUT_*, DIM_*, etc.)
-            table_pattern = r'\b(OUT_[A-Z_]+_\d+_[A-Z_]+|OUT_[A-Z_]+_[A-Z_]+|DIM_[A-Z_]+|FACT_[A-Z_]+)\b'
-            table_matches = re.findall(table_pattern, content)
-            if table_matches:
-                return table_matches[0]
-    
-    return None
-
-def extract_recent_sql_result(conversation_history: list):
-    """Extract the most recent SQL query result from conversation history.
-    
-    Args:
-        conversation_history (list): Previous conversation messages
-        
-    Returns:
-        dict: Contains table_name and data from most recent query, or None if not found
-    """
-    table_name = extract_recent_table_name(conversation_history)
-    if table_name:
-        return {
-            'table_name': table_name,
-            'data': None  # We'll let the AI re-execute if needed
-        }
-    return None
-
 def auto_execute_table_query(user_message: str, conversation_history: list):
     """Automatically executes SQL queries for table data requests without asking for clarification.
     
@@ -912,79 +861,6 @@ def chat_with_gemini_client_style():
                 'reply': reply_text,
                 'displays': displays
             })
-
-        # Check if user is asking for more data, different table, or previous results
-        more_data_keywords = ['30 more', '30 records', 'more records', 'show more', 'load more']
-        show_results_keywords = ['show me the query results', 'show query results', 'display the results', 'show the results', 'display results']
-        table_switch_keywords = ['different table', 'switch to', 'show me', 'data from']
-        
-        user_lower = user_message_text.lower()
-        
-        # Handle requests for more records from the same table
-        if any(keyword in user_lower for keyword in more_data_keywords):
-            recent_table = extract_recent_table_name(conversation_history)
-            if recent_table:
-                # Extract number of records requested
-                import re
-                number_match = re.search(r'(\d+)', user_message_text)
-                limit = int(number_match.group(1)) if number_match else 30
-                
-                sql_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{recent_table}` LIMIT {limit};"
-                result = internal_execute_sql_query(sql_query)
-                
-                if result.get('status') == 'success':
-                    app.logger.info(f"Retrieved {limit} records from {recent_table}")
-                    displays = []
-                    if result.get('data'):
-                        app.logger.info(f"Adding table display with {len(result['data'])} rows")
-                        displays.append({
-                            'type': 'table',
-                            'title': f"{recent_table} - {limit} Records",
-                            'content': result['data']
-                        })
-                    else:
-                        app.logger.warning(f"Query successful but no data returned for {recent_table}")
-                    
-                    reply_text = f"Here are {limit} records from the `{recent_table}` table:"
-                    
-                    return jsonify({
-                        'reply': reply_text,
-                        'displays': displays
-                    })
-                else:
-                    app.logger.error(f"Query failed for {recent_table}: {result.get('error_message', 'Unknown error')}")
-        
-        # Handle requests to show previous query results
-        elif any(keyword in user_lower for keyword in show_results_keywords):
-            recent_table = extract_recent_table_name(conversation_history)
-            if recent_table:
-                app.logger.info(f"Re-executing query for recent table: {recent_table}")
-                
-                sql_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{recent_table}` LIMIT 10;"
-                result = internal_execute_sql_query(sql_query)
-                
-                if result.get('status') == 'success':
-                    displays = []
-                    if result.get('data'):
-                        app.logger.info(f"Re-displaying {len(result['data'])} rows from {recent_table}")
-                        displays.append({
-                            'type': 'table',
-                            'title': f"Query Results - {recent_table}",
-                            'content': result['data']
-                        })
-                    else:
-                        app.logger.warning(f"Query successful but no data returned for {recent_table}")
-                    
-                    reply_text = f"Here are the query results from `{recent_table}` table:"
-                    
-                    return jsonify({
-                        'reply': reply_text,
-                        'displays': displays
-                    })
-                else:
-                    app.logger.error(f"Failed to re-execute query for {recent_table}: {result.get('error_message', 'Unknown error')}")
-            else:
-                app.logger.info("User asked for query results but no recent table found in history")
 
         # Log each message in conversation history for debugging
         for i, msg in enumerate(conversation_history):

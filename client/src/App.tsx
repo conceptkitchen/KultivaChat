@@ -60,17 +60,17 @@ function AuthContent() {
     );
   }
 
-  // BYPASS: Skip authentication check completely for now
-  // if (!user) {
-  //   return (
-  //     <Switch>
-  //       <Route path="/auth" component={AuthPage} />
-  //       <Route>
-  //         <AuthPage />
-  //       </Route>
-  //     </Switch>
-  //   );
-  // }
+  // If not authenticated, use proper routing to auth page
+  if (!user) {
+    return (
+      <Switch>
+        <Route path="/auth" component={AuthPage} />
+        <Route>
+          <AuthPage />
+        </Route>
+      </Switch>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-neutral-50 text-neutral-700">
@@ -125,23 +125,31 @@ function AuthContent() {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-neutral-100 rounded-full flex items-center justify-center">
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="text-neutral-500"
-              >
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-            </div>
+            {user?.profileImageUrl ? (
+              <img
+                src={user.profileImageUrl}
+                alt="User profile"
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            ) : (
+              <div className="h-8 w-8 bg-neutral-100 rounded-full flex items-center justify-center">
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  className="text-neutral-500"
+                >
+                  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+            )}
             <LogoutButton />
           </div>
         </div>
