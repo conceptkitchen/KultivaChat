@@ -21,7 +21,14 @@ export function ProtectedRoute({
     );
   }
 
-  // Bypass authentication for now - always allow access
+  if (!user) {
+    return (
+      <Route path={path}>
+        <Redirect to="/auth" />
+      </Route>
+    );
+  }
+
   return (
     <Route path={path}>
       <Component />
