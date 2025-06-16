@@ -4,7 +4,6 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
-import { setupVite } from "./vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,8 +122,32 @@ async function initializeServer() {
     // Register API routes with authentication first
     await registerRoutes(app);
     
-    // Setup Vite development server for React frontend
-    await setupVite(app);
+    // Start Vite dev server separately on port 3000
+    const viteProcess = spawn('npx', ['vite', '--port', '3000'], {
+      cwd: process.cwd(),
+      stdio: 'pipe',
+      env: { ...process.env }
+    });
+    
+    viteProcess.stdout?.on('data', (data) => {
+      console.log('Vite:', data.toString());
+    });
+    
+    viteProcess.stderr?.on('data', (data) => {
+      console.log('Vite Error:', data.toString());
+    });
+    
+    // Proxy frontend requests to Vite dev server
+    app.use('/', createProxyMiddleware({
+      target: 'http://localhost:3000',
+      changeOrigin: true,
+      ws: true,
+      pathFilter: (path) => !path.startsWith('/api'),
+      onError: (err, req, res) => {
+        console.log('Proxy error:', err.message);
+        res.status(500).send('Frontend server unavailable');
+      }
+    }));
     
     console.log("Authentication and routes configured");
     
