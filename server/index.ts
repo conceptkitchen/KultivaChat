@@ -32,21 +32,22 @@ function startFlaskServer(): Promise<void> {
       
       // Flask is ready when it shows the server running message
       if (output.includes('Running on http://127.0.0.1:8081') && !flaskReady) {
-        flaskReady = true;
-        console.log('Flask server is ready');
-        resolve();
-      }
-      
-      // Also check for alternative Flask ready signals
-      if ((output.includes('Starting Flask server') || output.includes('Serving Flask app')) && !flaskReady) {
-        // Give Flask a few seconds to fully initialize
-        setTimeout(() => {
+        // Wait a bit more then test the connection
+        setTimeout(async () => {
           if (!flaskReady) {
-            flaskReady = true;
-            console.log('Flask server ready (alternative detection)');
-            resolve();
+            try {
+              const response = await fetch('http://localhost:8081/api/health');
+              if (response.ok) {
+                flaskReady = true;
+                console.log('Flask server is ready');
+                resolve();
+              }
+            } catch (e) {
+              console.log('Flask health check failed, waiting...');
+              setTimeout(() => resolve(), 3000);
+            }
           }
-        }, 10000);
+        }, 3000);
       }
     });
     
