@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
+import { setupVite } from "./vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -123,121 +124,9 @@ async function initializeServer() {
     await registerRoutes(app);
     
     if (process.env.NODE_ENV === 'production') {
-      // Production: serve a working HTML page immediately
-      console.log("Production mode: serving working HTML");
-      
-      app.get('*', (req, res) => {
-        if (req.path.startsWith('/api')) {
-          return;
-        }
-        
-        res.send(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kultivate AI</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .chat-container { margin-top: 20px; min-height: 300px; border: 1px solid #ccc; padding: 20px; border-radius: 8px; background: #fafafa; }
-        .message { padding: 10px; margin: 10px 0; border-radius: 8px; }
-        .user { background: #e3f2fd; text-align: right; }
-        .assistant { background: #f1f8e9; }
-        .input-container { display: flex; margin-top: 20px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; margin-left: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #1976D2; }
-        .status { color: #4CAF50; font-weight: bold; margin-bottom: 20px; }
-        .loading { color: #FF9800; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Kultivate AI Data Assistant</h1>
-        <div class="status">✓ Production mode - Backend connected and ready</div>
-        <p>Query your Keboola data using natural language with Gemini 2.0 Flash</p>
-        
-        <div class="chat-container" id="messages"></div>
-        
-        <div class="input-container">
-            <input type="text" id="messageInput" placeholder="Ask about your data..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-    </div>
-
-    <script>
-        let isLoading = false;
-        
-        async function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-            if (!message || isLoading) return;
-            
-            addMessage('user', message);
-            input.value = '';
-            isLoading = true;
-            addMessage('assistant', '🤔 Processing your query...', 'loading');
-            
-            try {
-                const response = await fetch('/api/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        conversationId: 'production-chat',
-                        content: message
-                    })
-                });
-                
-                const data = await response.json();
-                removeLoadingMessage();
-                addMessage('assistant', data.reply || data.error || 'No response received');
-                
-            } catch (error) {
-                removeLoadingMessage();
-                addMessage('assistant', 'Error: ' + error.message);
-            } finally {
-                isLoading = false;
-            }
-        }
-        
-        function addMessage(role, content, className = '') {
-            const messages = document.getElementById('messages');
-            const div = document.createElement('div');
-            div.className = 'message ' + role + (className ? ' ' + className : '');
-            div.textContent = content;
-            if (className === 'loading') {
-                div.id = 'loading-message';
-            }
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
-        }
-        
-        function removeLoadingMessage() {
-            const loading = document.getElementById('loading-message');
-            if (loading) loading.remove();
-        }
-        
-        function handleKeyPress(event) {
-            if (event.key === 'Enter' && !isLoading) {
-                sendMessage();
-            }
-        }
-        
-        // Test backend connection on load
-        fetch('/api/health')
-            .then(response => response.ok ? 
-                addMessage('assistant', '✅ Backend connection verified - Ready for data queries!') :
-                addMessage('assistant', '⚠️ Backend connection issue'))
-            .catch(() => addMessage('assistant', '⚠️ Backend connection failed'));
-    </script>
-</body>
-</html>
-        `);
-      });
+      // Production: serve built React app using setupVite's serveStatic function
+      console.log("Production mode: serving built React app from dist");
+      await setupVite(app);
     } else {
       // Development: proxy to Vite dev server
       console.log("Development mode: starting Vite dev server");
