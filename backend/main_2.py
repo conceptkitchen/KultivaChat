@@ -905,7 +905,7 @@ def chat_with_gemini_client_style():
                 "Gemini SDK types not available to create history.")
 
         chat_session = gemini_sdk_client.chats.create(
-            model='gemini-1.5-flash',
+            model='gemini-2.0-flash',
             config=gemini_generation_config_with_tools,
             history=full_history)
         app.logger.info(
