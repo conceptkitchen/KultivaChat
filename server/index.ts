@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -105,6 +106,24 @@ app.get('/health', (req, res) => {
 // Setup authentication and routes
 async function initializeServer() {
   try {
+    // Start Flask backend first
+    await startFlaskServer();
+    
+    // Add proxy middleware for backend API calls
+    app.use('/api/chat', createProxyMiddleware({
+      target: 'http://localhost:8081',
+      changeOrigin: true,
+      timeout: 30000,
+      proxyTimeout: 30000,
+      onError: (err, req, res) => {
+        console.error('Proxy error:', err.message);
+        res.status(503).json({ 
+          error: 'Backend temporarily unavailable',
+          details: err.message 
+        });
+      }
+    }));
+    
     // Register API routes with authentication
     await registerRoutes(app);
     
@@ -117,9 +136,6 @@ async function initializeServer() {
     });
     
     console.log("Authentication and routes configured");
-    
-    // Start Flask backend AFTER Node.js is ready
-    await startFlaskServer();
     
   } catch (error) {
     console.error("Error setting up server:", error);
