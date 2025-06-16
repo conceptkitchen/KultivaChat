@@ -410,28 +410,19 @@ def auto_execute_table_query(user_message: str, conversation_history: list):
         kapwa_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KAPWA_GARDENS' in t]
         if kapwa_customer_tables:
             # Pick highest numbered version
-            def extract_number(table_name):
-                match = re.search(r'_(\d+)_', table_name)
-                return int(match.group(1)) if match else 0
-            best_table = max(kapwa_customer_tables, key=extract_number)
+            best_table = max(kapwa_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
     
     elif 'kultivate labs' in user_lower and 'customer' in user_lower:
         kultivate_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KULTIVATE_LABS' in t]
         if kultivate_customer_tables:
-            def extract_number(table_name):
-                match = re.search(r'_(\d+)_', table_name)
-                return int(match.group(1)) if match else 0
-            best_table = max(kultivate_customer_tables, key=extract_number)
+            best_table = max(kultivate_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
     
     # Generic fallback - match any table with relevant keywords
     if not best_table:
         if 'customer' in user_lower:
             customer_tables = [t for t in available_tables if 'CUSTOMERS' in t]
             if customer_tables:
-                def extract_number(table_name):
-                    match = re.search(r'_(\d+)_', table_name)
-                    return int(match.group(1)) if match else 0
-                best_table = max(customer_tables, key=extract_number)
+                best_table = max(customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
     
     # Execute query if we found a table
     if best_table:
@@ -925,42 +916,9 @@ def chat_with_gemini_client_style():
         # Check if user is asking for more data, different table, or previous results
         more_data_keywords = ['30 more', '30 records', 'more records', 'show more', 'load more']
         show_results_keywords = ['show me the query results', 'show query results', 'display the results', 'show the results', 'display results']
-        table_redisplay_keywords = ['try again', 'cant see the table', "can't see the table", 'table not showing', 'show table again', 'display table again', 'table canvas']
         table_switch_keywords = ['different table', 'switch to', 'show me', 'data from']
         
         user_lower = user_message_text.lower()
-        
-        # Handle requests to re-display table (when user can't see it)
-        if any(keyword in user_lower for keyword in table_redisplay_keywords):
-            recent_table = extract_recent_table_name(conversation_history)
-            if recent_table:
-                app.logger.info(f"Re-displaying table data for: {recent_table}")
-                
-                sql_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{recent_table}` LIMIT 10;"
-                result = internal_execute_sql_query(sql_query)
-                
-                if result.get('status') == 'success':
-                    displays = []
-                    if result.get('data'):
-                        app.logger.info(f"Re-displaying {len(result['data'])} rows from {recent_table}")
-                        displays.append({
-                            'type': 'table',
-                            'title': f"Query Results - {recent_table}",
-                            'content': result['data']
-                        })
-                    else:
-                        app.logger.warning(f"Query successful but no data returned for {recent_table}")
-                    
-                    reply_text = f"I apologize that the table was not displayed correctly. I will try again to retrieve the list of tables from your BigQuery workspace. They will be displayed for you in a table below:"
-                    
-                    return jsonify({
-                        'reply': reply_text,
-                        'displays': displays
-                    })
-                else:
-                    app.logger.error(f"Failed to re-execute query for {recent_table}: {result.get('error_message', 'Unknown error')}")
-            else:
-                app.logger.info("User asked to re-display table but no recent table found in history")
         
         # Handle requests for more records from the same table
         if any(keyword in user_lower for keyword in more_data_keywords):
@@ -1273,7 +1231,6 @@ def chat_with_gemini_client_style():
                     "AI text suggests data/tables were retrieved; attempting fallback display generation."
                 )
                 try:
-                    import re  # Ensure re is available in this scope
                     fallback_query = None
                     fallback_title = "Query Results"
                     table_pattern = r'\b(OUT|DIM|FACT|STG)_[A-Z_0-9]+\b'
@@ -1332,7 +1289,6 @@ def chat_with_gemini_client_style():
                 ) or "following tables" in final_answer.lower():
                     in_table_list_context = True
 
-                import re  # Import re for this block
                 for line in lines:
                     stripped_line = line.strip()
                     if stripped_line.startswith(('- ', '* ')):
