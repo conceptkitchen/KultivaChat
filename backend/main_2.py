@@ -912,7 +912,29 @@ def chat_with_gemini_client_style():
             f"Created Gemini chat session with full history ({len(full_history)} messages). Sending user message: '{user_message_text}'"
         )
 
-        response = chat_session.send_message(user_message_text)
+        try:
+            response = chat_session.send_message(user_message_text)
+        except Exception as api_error:
+            # Handle API quota exceeded and other API errors gracefully
+            error_str = str(api_error)
+            if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "quota" in error_str.lower():
+                app.logger.error(f"Gemini API quota exceeded: {api_error}")
+                return jsonify({
+                    "error": "AI service quota exceeded. Please check your API key and billing settings.",
+                    "error_type": "quota_exceeded"
+                }), 429
+            elif "401" in error_str or "UNAUTHENTICATED" in error_str:
+                app.logger.error(f"Gemini API authentication failed: {api_error}")
+                return jsonify({
+                    "error": "AI service authentication failed. Please check your API key.",
+                    "error_type": "auth_failed"
+                }), 401
+            else:
+                app.logger.error(f"Gemini API error: {api_error}")
+                return jsonify({
+                    "error": "AI service temporarily unavailable. Please try again later.",
+                    "error_type": "api_error"
+                }), 503
 
         final_answer = ""
         try:
