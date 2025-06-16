@@ -1,0 +1,88 @@
+2025-06-16 07:04:16.61
+f1e4f694
+System
+starting up user application
+2025-06-16 07:04:16.82
+f1e4f694
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2025-06-16 07:04:16.82
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:16.83
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:16.83
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:16.90
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:17.01
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:17.26
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:17.29
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:17.32
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:18.72
+f1e4f694
+User
+> rest-express@1.0.0 start
+2025-06-16 07:04:18.72
+f1e4f694
+User
+> node production-deploy.js
+2025-06-16 07:04:18.79
+f1e4f694
+User
+Kultivate AI Production Deployment Starting...
+2025-06-16 07:04:18.80
+f1e4f694
+User
+Starting frontend server on port 5000...
+2025-06-16 07:04:19.02
+f1e4f694
+System
+error proxying request error=dial tcp 127.0.0.1:5000: connect: connection refused
+2025-06-16 07:04:19.58
+f1e4f694
+User
+Kultivate AI serving on port 5000
+2025-06-16 07:04:19.58
+f1e4f694
+User
+Authentication and routes configured
+2025-06-16 07:04:19.59
+f1e4f694
+User
+Starting Flask backend server...
+2025-06-16 07:04:21.84
+f1e4f694
+User
+Starting backend server on port 8081...
+2025-06-16 07:04:22.04
+f1e4f694
+User
+Starting Flask with environment variables: {
+2025-06-16 07:04:22.04
+f1e4f694
+User
+KBC_API_URL: true,
+2025-06-16 07:04:22.04
+f1e4f694
+User
+KBC_STORAGE_TOKEN: true,
