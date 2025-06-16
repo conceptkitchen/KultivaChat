@@ -410,19 +410,28 @@ def auto_execute_table_query(user_message: str, conversation_history: list):
         kapwa_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KAPWA_GARDENS' in t]
         if kapwa_customer_tables:
             # Pick highest numbered version
-            best_table = max(kapwa_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
+            def extract_number(table_name):
+                match = re.search(r'_(\d+)_', table_name)
+                return int(match.group(1)) if match else 0
+            best_table = max(kapwa_customer_tables, key=extract_number)
     
     elif 'kultivate labs' in user_lower and 'customer' in user_lower:
         kultivate_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KULTIVATE_LABS' in t]
         if kultivate_customer_tables:
-            best_table = max(kultivate_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
+            def extract_number(table_name):
+                match = re.search(r'_(\d+)_', table_name)
+                return int(match.group(1)) if match else 0
+            best_table = max(kultivate_customer_tables, key=extract_number)
     
     # Generic fallback - match any table with relevant keywords
     if not best_table:
         if 'customer' in user_lower:
             customer_tables = [t for t in available_tables if 'CUSTOMERS' in t]
             if customer_tables:
-                best_table = max(customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
+                def extract_number(table_name):
+                    match = re.search(r'_(\d+)_', table_name)
+                    return int(match.group(1)) if match else 0
+                best_table = max(customer_tables, key=extract_number)
     
     # Execute query if we found a table
     if best_table:
@@ -1231,6 +1240,7 @@ def chat_with_gemini_client_style():
                     "AI text suggests data/tables were retrieved; attempting fallback display generation."
                 )
                 try:
+                    import re  # Ensure re is available in this scope
                     fallback_query = None
                     fallback_title = "Query Results"
                     table_pattern = r'\b(OUT|DIM|FACT|STG)_[A-Z_0-9]+\b'
@@ -1289,6 +1299,7 @@ def chat_with_gemini_client_style():
                 ) or "following tables" in final_answer.lower():
                     in_table_list_context = True
 
+                import re  # Import re for this block
                 for line in lines:
                     stripped_line = line.strip()
                     if stripped_line.startswith(('- ', '* ')):
