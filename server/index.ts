@@ -119,26 +119,14 @@ async function initializeServer() {
       console.log('Backend health check failed, but continuing...');
     }
     
+    // Serve static files first
+    app.use(express.static(path.join(__dirname, '../dist')));
+    
     // Register API routes with authentication
     await registerRoutes(app);
     
-    // Serve static files from dist directory with proper headers
-    app.use(express.static(path.join(__dirname, '../dist'), {
-      setHeaders: (res, path) => {
-        if (path.endsWith('.js')) {
-          res.setHeader('Content-Type', 'application/javascript');
-        }
-        if (path.endsWith('.css')) {
-          res.setHeader('Content-Type', 'text/css');
-        }
-      }
-    }));
-    
-    // Serve React app for all non-API routes
+    // Catch-all for React SPA - must be last
     app.get('*', (req, res) => {
-      if (req.path.startsWith('/api')) {
-        return res.status(404).json({ error: 'API endpoint not found' });
-      }
       res.sendFile(path.join(__dirname, '../dist/index.html'));
     });
     
