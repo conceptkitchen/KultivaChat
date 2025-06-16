@@ -925,9 +925,42 @@ def chat_with_gemini_client_style():
         # Check if user is asking for more data, different table, or previous results
         more_data_keywords = ['30 more', '30 records', 'more records', 'show more', 'load more']
         show_results_keywords = ['show me the query results', 'show query results', 'display the results', 'show the results', 'display results']
+        table_redisplay_keywords = ['try again', 'cant see the table', "can't see the table", 'table not showing', 'show table again', 'display table again', 'table canvas']
         table_switch_keywords = ['different table', 'switch to', 'show me', 'data from']
         
         user_lower = user_message_text.lower()
+        
+        # Handle requests to re-display table (when user can't see it)
+        if any(keyword in user_lower for keyword in table_redisplay_keywords):
+            recent_table = extract_recent_table_name(conversation_history)
+            if recent_table:
+                app.logger.info(f"Re-displaying table data for: {recent_table}")
+                
+                sql_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{recent_table}` LIMIT 10;"
+                result = internal_execute_sql_query(sql_query)
+                
+                if result.get('status') == 'success':
+                    displays = []
+                    if result.get('data'):
+                        app.logger.info(f"Re-displaying {len(result['data'])} rows from {recent_table}")
+                        displays.append({
+                            'type': 'table',
+                            'title': f"Query Results - {recent_table}",
+                            'content': result['data']
+                        })
+                    else:
+                        app.logger.warning(f"Query successful but no data returned for {recent_table}")
+                    
+                    reply_text = f"I apologize that the table was not displayed correctly. I will try again to retrieve the list of tables from your BigQuery workspace. They will be displayed for you in a table below:"
+                    
+                    return jsonify({
+                        'reply': reply_text,
+                        'displays': displays
+                    })
+                else:
+                    app.logger.error(f"Failed to re-execute query for {recent_table}: {result.get('error_message', 'Unknown error')}")
+            else:
+                app.logger.info("User asked to re-display table but no recent table found in history")
         
         # Handle requests for more records from the same table
         if any(keyword in user_lower for keyword in more_data_keywords):
