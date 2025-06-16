@@ -1,0 +1,263 @@
+2025-06-16 06:46:53.11
+9cd00fa4
+User
+INFO:main_2:Starting Flask server on host='0.0.0.0', port=8081
+2025-06-16 06:46:53.11
+9cd00fa4
+User
+* Serving Flask app 'main_2'
+2025-06-16 06:46:53.11
+9cd00fa4
+User
+* Debug mode: off
+2025-06-16 06:46:53.11
+9cd00fa4
+User
+Flask: Successfully imported 'google.genai' and 'google.genai.types'
+2025-06-16 06:46:53.11
+9cd00fa4
+User
+* Serving Flask app 'main_2'
+2025-06-16 06:46:53.11
+9cd00fa4
+User
+* Debug mode: off
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+Flask Error: Address already in use
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+Port 8081 is in use by another program. Either identify and stop that program, or start the server with a different port.
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+* Running on all addresses (0.0.0.0)
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+* Running on http://127.0.0.1:8081
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+* Running on http://169.254.8.1:8081
+2025-06-16 06:46:53.12
+9cd00fa4
+User
+INFO:werkzeug:Press CTRL+C to quit
+2025-06-16 06:46:53.63
+9cd00fa4
+User
+Flask process exited with code 1
+2025-06-16 06:46:55.54
+d73ae481
+User
+Error setting up server: Error: Flask server startup timeout
+2025-06-16 06:46:55.54
+d73ae481
+User
+at Timeout._onTimeout (file:///home/runner/workspace/dist/index.js:642:16)
+2025-06-16 06:46:55.54
+d73ae481
+User
+at listOnTimeout (node:internal/timers:581:17)
+2025-06-16 06:46:55.54
+d73ae481
+User
+at process.processTimers (node:internal/timers:519:7)
+2025-06-16 06:48:04.54
+d73ae481
+User
+Message request body: {"conversationId":"f9e64c13-d7d9-4f4b-897c-9ddcb8988861","content":"hi"}
+2025-06-16 06:48:04.76
+d73ae481
+User
+Calling Python backend at http://localhost:8081/api/chat
+2025-06-16 06:48:04.81
+d73ae481
+User
+Python backend error: TypeError: fetch failed
+2025-06-16 06:48:04.81
+d73ae481
+User
+at node:internal/deps/undici/undici:13392:13
+2025-06-16 06:48:04.81
+d73ae481
+User
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+2025-06-16 06:48:04.81
+d73ae481
+User
+at async file:///home/runner/workspace/dist/index.js:509:34 {
+2025-06-16 06:48:04.81
+d73ae481
+User
+[cause]: Error: connect ECONNREFUSED 127.0.0.1:8081
+2025-06-16 06:48:04.81
+d73ae481
+User
+at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+2025-06-16 06:48:04.81
+d73ae481
+User
+errno: -111,
+2025-06-16 06:48:04.81
+d73ae481
+User
+code: 'ECONNREFUSED',
+2025-06-16 06:48:04.81
+d73ae481
+User
+syscall: 'connect',
+2025-06-16 06:48:04.81
+d73ae481
+User
+address: '127.0.0.1',
+2025-06-16 06:48:04.81
+d73ae481
+User
+port: 8081
+2025-06-16 06:48:04.81
+d73ae481
+User
+}
+2025-06-16 06:48:04.81
+d73ae481
+User
+}
+
+Wrap
+
+Colors
+Git Error
+PUSH_REJECTED
+The push was rejected by the remote. This is usually because the remote has commits that aren't in the local repository.
+Remote Updates
+origin/main•upstream
+last fetched 3 min ago
+14 commits to push
+Commit
+There are no changes to commit.
+#!/bin/bash
+
+# Comprehensive production startup script
+echo "Starting Kultivate AI production deployment..."
+
+# Force kill all related processes
+pkill -9 -f "node dist/index.js" 2>/dev/null || true
+pkill -9 -f "python main_2.py" 2>/dev/null || true  
+pkill -9 -f "tsx server/index.ts" 2>/dev/null || true
+sleep 3
+
+# Verify dist directory exists
+if [ ! -f "dist/index.js" ]; then
+    echo "Building production bundle..."
+    npm run build
+fi
+
+echo "Starting frontend server (port 5000 -> external port 80)..."
+NODE_ENV=production nohup node dist/index.js > frontend.log 2>&1 &
+FRONTEND_PID=$!
+echo "Frontend PID: $FRONTEND_PID"
+
+# Give frontend time to bind to port
+sleep 8
+
+echo "Starting backend server (port 8081)..."
+cd backend
+nohup python main_2.py > ../backend.log 2>&1 &
+BACKEND_PID=$!
+echo "Backend PID: $BACKEND_PID"
+cd ..
+
+# Verify both processes are running
+sleep 5
+
+if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+    echo "ERROR: Frontend failed to start"
+    cat frontend.log
+    exit 1
+fi
+
+if ! kill -0 $BACKEND_PID 2>/dev/null; then
+    echo "ERROR: Backend failed to start"  
+    cat backend.log
+    exit 1
+fi
+
+echo "SUCCESS: Both servers are running"
+echo "Frontend: http://localhost:5000 (external: port 80)"
+echo "Backend: http://localhost:8081"
+
+# Keep the main process alive to prevent deployment termination
+cleanup() {
+    echo "Received termination signal, cleaning up..."
+    kill $FRONTEND_PID 2>/dev/null || true
+    kill $BACKEND_PID 2>/dev/null || true
+    exit 0
+}
+
+# Set signal handlers
+trap cleanup SIGINT SIGTERM
+
+# Monitor and keep both processes alive indefinitely
+while true; do
+    # Check if frontend is still running
+    if ! kill -0 $FRONTEND_PID 2>/dev/null; then
+        echo "Frontend process died, restarting..."
+        NODE_ENV=production nohup node dist/index.js > frontend.log 2>&1 &
+        FRONTEND_PID=$!
+        echo "Frontend restarted with PID: $FRONTEND_PID"
+    fi
+    
+    # Check if backend is still running
+    if ! kill -0 $BACKEND_PID 2>/dev/null; then
+        echo "Backend process died, restarting..."
+        cd backend
+        nohup python main_2.py > ../backend.log 2>&1 &
+        BACKEND_PID=$!
+        echo "Backend restarted with PID: $BACKEND_PID"
+        cd ..
+    fi
+    
+    # Sleep before next check
+    sleep 15
+done
+/
+
+Selection deleted
+{
+  "name": "rest-express",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "NODE_ENV=development tsx server/index.ts",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "serve": "concurrently \"NODE_ENV=production node dist/index.js\" \"cd backend && python main_2.py\"",
+    "start": "node production-deploy.js",
+    "start-with-backend": "concurrently \"NODE_ENV=production node dist/index.js\" \"cd backend && python main_2.py\"",
+    "check": "tsc",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.37.0",
+    "@google/generative-ai": "^0.24.1",
+    "@hookform/resolvers": "^3.10.0",
+    "@jridgewell/trace-mapping": "^0.3.25",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@neondatabase/serverless": "^0.10.4",
+    "@radix-ui/react-accordion": "^1.2.4",
+    "@radix-ui/react-alert-dialog": "^1.1.7",
+    "@radix-ui/react-aspect-ratio": "^1.1.3",
+    "@radix-ui/react-avatar": "^1.1.4",
+    "@radix-ui/react-checkbox": "^1.1.5",
+    "@radix-ui/react-collapsible": "^1.1.4",
+    "@radix-ui/react-context-menu": "^2.2.7",
+    "@radix-ui/react-dialog": "^1.1.7",
+{"project_id":"kbc-use4-839-261b","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDh6RvU0oEePx+W\nlDpC9aroGl+8A73Mbo8To0obLIhXA5G41xoLXA9NqKDreodZN188n4jff+AbY0Au\npd3bTJ2Gqc9vRRyZgbmbpW9IS0AHk+Fj2tmCHEnXvWpaDBlMNFJz0g7LpiMWG9+Q\nA6Knkjuji7EP7GycQc9NdIEiCZt45LH72F7rbF30F1jhbMWc9ICwZGDb+hyqs+hx\nsM3qd9DXiETTVQ/sdAU9H3LDRALd5hbDOj+NW4wEIbtvto8Ze/lPGdOUK+8/jfvc\nTR98keHYuWMiy8sbw4fvEk1ANTq7KLllxjkTaRVTWq2Q4KGk0/Q8C0Pm4J6EUohL\nFgSKuJgzAgMBAAECggEAXYACDV0MpKyikcuKq5ELKeJUkjgIM5bkr8+LCeEuErl+\n8/5PILl6+fzbkWqWn0XMLIao+zvtUNiMxWHQB4ZXwlcA7EAx/JTU8ccQXl8Kwrgh\ndpcrI+86XsjePiO4yrHzGE2t4vrBldJ2fqAKj4l2FpPn9ju3nhqcxqV8Fs7cIrXZ\nhe3faEqfb4IyAXsG+93bLrqXQGoc0U3vQuPKO2uvunB+laIWj66btnGA/CCGkDV0\nQFzBbyB+4xSseqFtI1oUtCxnKIzmaB0MXLZAMnHjDJk/QNdhcdAVak+r+EK5VPfR\npnk1b8psiOaw2T9+xTbfAQHiAHimkWacwnHB0V1FpQKBgQD5DpqDnhdF8QZXAcHq\nthFvg5876xVz6eP1FUSu19Qwj+5fSOI8n+oau81SGxyni4PE+r4VXT2j1Tw70PUv\nn/sMYaPyB3LtQQx6f7J473vkePFjhbnvurSNv4GokGzYjngB5Df1KGXXdG2CQZrx\n7T/CbyKIpjk0UvH8pNMbT5+fXQKBgQDoNVIA5sA7POkUc18Gr4QWcyy54tnNqAkH\n4rIcthnIgzWPusr5X7cPDZ0z185P/nnHJCayUBMNnQlzraFnbtPERWqjJqthORtK\n3Bm4LewQ/bfQVBqF5JmOtRBtCoNEt4Vzu+l3Ff/J/j+4fiIXSFiw2vylPWkcF9/C\nHsA+peHszwKBgHqhWylFVTZF+BYtMlssLKeYynXJSbXaSzjosPnaIYuLwxY9n8+z\n+aQSJoWv/crtYgNCZwfD8k7R9qeJOsCpaAZvqTbJvifd6JQEfk8XtAwKFOko9iV4\n6+ADlIb4He//Lk3YHkljC8ordKQ3Q2CtrcBB0mIwXmhKEwaP7bY73V+tAoGAGrDO\nTTY40FZPAD/Go3EXQLFaab9ug5oV96cSDATOb+LNDElPPVzIIN3SvPvIRh+dBcvc\n+tADcKQlSvuhOs9dXgkQmdI/DrzOq0sjVa1JniZbs4GHTu6Yy/N6AN6deg+SMlxe\nGIcZ0LD9yAoPhxeUwjdZpPCrHUSNPrXkKQ9OKbcCgYBXoYZ/aN3399cuLjwMoZRY\ntHTE/nL/tmZELXds7SnLbdAFtkvdQluAaacssYFyCJq54PYIxUEbMgDJP8mCvh8T\n/qyla/JorCjhrmiL5cHDMMbRhy/nfpo/1Ak/17ML2y0o7qHIJipL5QXeCyxjtY7Y\nl0GCa5lSGURMr1vfNJR0ow==\n-----END PRIVATE KEY-----\n","token_uri":"https://oauth2.googleapis.com/token","client_email":"kbc-use4-ws-21894820@kbc-use4-839-261b.iam.gserviceaccount.com","client_id":"112980483775170505454","auth_uri":"https://accounts.google.com/o/oauth2/auth","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","private_key_id":"943bf19800fc0f4d41a60035899f1f35993bf803","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/kbc-use4-ws-21894820%40kbc-use4-839-261b.iam.gserviceaccount.com","type":"service_account"}
