@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
+import { setupVite } from "./vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,16 +120,11 @@ async function initializeServer() {
       console.log('Backend health check failed, but continuing...');
     }
     
-    // Serve static files first
-    app.use(express.static(path.join(__dirname, '../dist')));
-    
-    // Register API routes with authentication
+    // Register API routes with authentication first
     await registerRoutes(app);
     
-    // Catch-all for React SPA - must be last
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, '../dist/index.html'));
-    });
+    // Setup Vite development server for React frontend
+    await setupVite(app);
     
     console.log("Authentication and routes configured");
     
