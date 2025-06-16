@@ -207,13 +207,13 @@ You have the following tools at your disposal:
 
 2.  **Execute Action based on Query Type:**
     * **For Type A (Direct Table View):**
-        1.  Assume table is in `kbc-use4-839-261b. + KBC_WORKSPACE_SCHEMA + `.
-        2.  Formulate: `SELECT * FROM \`kbc-use4-839-261b. + KBC_WORKSPACE_SCHEMA + .TABLE_NAME\` LIMIT 10;` (substitute TABLE_NAME).
+        1.  Assume table is in `kbc-use4-839-261b.{workspace_schema}`.
+        2.  Formulate: `SELECT * FROM \`kbc-use4-839-261b.{workspace_schema}.TABLE_NAME\` LIMIT 10;` (substitute TABLE_NAME).
         3.  IMMEDIATELY call `execute_sql_query`. No confirmation, no preliminary schema check for this specific case.
     * **For Type B (Complex Analytical / Indirect Table):**
         1.  Follow the "Complex Analytical Questions and Reporting" detailed strategy above: Deconstruct Request -> Discover Tables & Schemas (using `INFORMATION_SCHEMA.TABLES` then `INFORMATION_SCHEMA.COLUMNS` for candidates) -> Formulate Complex SQL (JOINs, aggregations, filters, potentially using `get_zip_codes_for_city` if needed for location filtering by city against a zip_code column) -> Execute Query -> Refine if stuck (allowing specific clarification as an exception).
     * **For Type C (List BigQuery Tables):**
-        1.  SQL: `SELECT table_name FROM \`kbc-use4-839-261b. + KBC_WORKSPACE_SCHEMA + .INFORMATION_SCHEMA.TABLES\` ORDER BY table_name;`.
+        1.  SQL: `SELECT table_name FROM \`kbc-use4-839-261b.{workspace_schema}.INFORMATION_SCHEMA.TABLES\` ORDER BY table_name;`.
         2.  Call `execute_sql_query`.
     * **For Type D (Keboola Storage Exploration):**
         1.  Use `list_keboola_buckets`, `list_tables_in_keboola_bucket`, `get_keboola_table_detail` (for Keboola Storage table schemas) as appropriate.
@@ -244,7 +244,7 @@ User: "How many attendees live in SF and Daly City?"
 Your action path (following Workflow step 2, Type B):
 1.  "This is a Type B analytical question. Table for 'attendees' and filtering by 'SF and Daly City' is needed."
 2.  "Deconstruct: Entity='attendees', Metric='count', Filter='city is SF or Daly City'."
-3.  "Table Discovery: Call `execute_sql_query` with `SELECT table_name FROM \`kbc-use4-839-261b. + KBC_WORKSPACE_SCHEMA + .INFORMATION_SCHEMA.TABLES\`;`. Look for attendee tables."
+3.  "Table Discovery: Call `execute_sql_query` with `SELECT table_name FROM \`kbc-use4-839-261b.{workspace_schema}.INFORMATION_SCHEMA.TABLES\`;`. Look for attendee tables."
 4.  (Suppose `OUT_USER_PROFILES` is found).
 5.  "Announce: 'I'll look into `OUT_USER_PROFILES` to find attendees from SF and Daly City.'"
 6.  "Schema Review: Call `execute_sql_query` for `INFORMATION_SCHEMA.COLUMNS` for `OUT_USER_PROFILES`."
@@ -252,7 +252,7 @@ Your action path (following Workflow step 2, Type B):
 8.  "City-to-Zip: I need zip codes for 'San Francisco' and 'Daly City'. Use `get_zip_codes_for_city` tool.
     * Call `get_zip_codes_for_city(city_name='San Francisco', state_code='CA')`. (Assume it returns ['94102', '94103', ...])
     * Call `get_zip_codes_for_city(city_name='Daly City', state_code='CA')`. (Assume it returns ['94014', '94015', ...])"
-9.  "SQL Formulation: `SELECT COUNT(DISTINCT user_id) AS total_attendees FROM \`kbc-use4-839-261b. + KBC_WORKSPACE_SCHEMA + .OUT_USER_PROFILES\` WHERE zip_code IN ('94102', '94103', ..., '94014', '94015', ...);`"
+9.  "SQL Formulation: `SELECT COUNT(DISTINCT user_id) AS total_attendees FROM \`kbc-use4-839-261b.{workspace_schema}.OUT_USER_PROFILES\` WHERE zip_code IN ('94102', '94103', ..., '94014', '94015', ...);`"
 10. Call `execute_sql_query`.
 11. Respond with results and display announcement.
 
