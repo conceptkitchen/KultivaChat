@@ -124,9 +124,101 @@ async function initializeServer() {
     await registerRoutes(app);
     
     if (process.env.NODE_ENV === 'production') {
-      // Production: serve built React app using setupVite's serveStatic function
+      // Production: serve built React app directly
       console.log("Production mode: serving built React app from dist");
-      await setupVite(app);
+      
+      const distPath = path.join(__dirname, '../dist');
+      const indexPath = path.join(distPath, 'index.html');
+      
+      // Serve static files
+      app.use(express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Content-Type', 'text/html');
+          }
+        }
+      }));
+      
+      // Catch-all handler for SPA routing
+      app.get("*", (req, res) => {
+        // Don't serve React app for API routes
+        if (req.path.startsWith('/api')) {
+          return res.status(404).json({ error: 'API endpoint not found' });
+        }
+        
+        // Check if index.html exists, if not create a simple one
+        if (!require('fs').existsSync(indexPath)) {
+          const simpleHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kultivate AI</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root">
+        <div class="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold text-gray-900 mb-4">Kultivate AI</h1>
+                <p class="text-lg text-gray-600 mb-8">Your AI-powered data integration platform</p>
+                <div class="bg-white rounded-lg shadow-lg p-6 max-w-md mx-auto">
+                    <div class="mb-4">
+                        <input type="text" id="chatInput" placeholder="Ask about your data..." 
+                               class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                    </div>
+                    <button onclick="sendMessage()" 
+                            class="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition-colors">
+                        Send Message
+                    </button>
+                    <div id="chatResponse" class="mt-4 p-3 bg-gray-100 rounded-lg hidden">
+                        <p class="text-gray-700">Response will appear here...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        async function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const response = document.getElementById('chatResponse');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            response.style.display = 'block';
+            response.innerHTML = '<p class="text-gray-600">Processing your request...</p>';
+            
+            try {
+                const result = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await result.json();
+                response.innerHTML = '<p class="text-gray-800">' + (data.response || 'No response received') + '</p>';
+            } catch (error) {
+                response.innerHTML = '<p class="text-red-600">Error: Unable to connect to backend</p>';
+            }
+            
+            input.value = '';
+        }
+        
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+    </script>
+</body>
+</html>`;
+          require('fs').writeFileSync(indexPath, simpleHTML);
+        }
+        
+        res.setHeader('Content-Type', 'text/html');
+        res.sendFile(indexPath);
+      });
     } else {
       // Development: proxy to Vite dev server
       console.log("Development mode: starting Vite dev server");
