@@ -122,32 +122,40 @@ async function initializeServer() {
     // Register API routes with authentication first
     await registerRoutes(app);
     
-    // Start Vite dev server separately on port 3000
-    const viteProcess = spawn('npx', ['vite', '--port', '3000'], {
-      cwd: process.cwd(),
-      stdio: 'pipe',
-      env: { ...process.env }
-    });
-    
-    viteProcess.stdout?.on('data', (data) => {
-      console.log('Vite:', data.toString());
-    });
-    
-    viteProcess.stderr?.on('data', (data) => {
-      console.log('Vite Error:', data.toString());
-    });
-    
-    // Proxy frontend requests to Vite dev server
-    app.use('/', createProxyMiddleware({
-      target: 'http://localhost:3000',
-      changeOrigin: true,
-      ws: true,
-      pathFilter: (path) => !path.startsWith('/api'),
-      onError: (err, req, res) => {
-        console.log('Proxy error:', err.message);
-        res.status(500).send('Frontend server unavailable');
-      }
-    }));
+    if (process.env.NODE_ENV === 'production') {
+      // Production: serve built React app
+      console.log("Production mode: serving built React app");
+      app.use(express.static(path.join(__dirname, '../dist')));
+      
+      // Handle React Router routes
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, '../dist/index.html'));
+      });
+    } else {
+      // Development: proxy to Vite dev server
+      console.log("Development mode: starting Vite dev server");
+      const viteProcess = spawn('npx', ['vite', '--port', '3000'], {
+        cwd: process.cwd(),
+        stdio: 'pipe',
+        env: { ...process.env }
+      });
+      
+      viteProcess.stdout?.on('data', (data) => {
+        console.log('Vite:', data.toString());
+      });
+      
+      viteProcess.stderr?.on('data', (data) => {
+        console.log('Vite Error:', data.toString());
+      });
+      
+      // Proxy frontend requests to Vite dev server
+      app.use('/', createProxyMiddleware({
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true,
+        pathFilter: (path) => !path.startsWith('/api')
+      }));
+    }
     
     console.log("Authentication and routes configured");
     
