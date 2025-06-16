@@ -16,7 +16,7 @@ const frontend = spawn('node', ['dist/index.js'], {
   stdio: 'inherit'
 });
 
-// Wait for frontend to initialize
+// Wait longer for frontend to fully initialize
 setTimeout(() => {
   console.log('Starting backend server on port 8081...');
   
@@ -88,8 +88,8 @@ setTimeout(() => {
     req.end();
   };
 
-  // Start checking backend after initial delay - increased for production
-  setTimeout(checkBackend, 15000);
+  // Start checking backend after initial delay - reduced for faster startup
+  setTimeout(checkBackend, 5000);
 
 }, 3000);
 
