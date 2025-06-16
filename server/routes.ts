@@ -155,9 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Call your Python Flask backend for ALL messages
         try {
-          const backendUrl = process.env.NODE_ENV === 'production' 
-            ? 'http://localhost:8081/api/chat' 
-            : 'http://localhost:8081/api/chat';
+          const backendUrl = 'http://127.0.0.1:8081/api/chat';
           console.log(`Calling Python backend at ${backendUrl}`);
           
           const pythonResponse = await fetch(backendUrl, {
@@ -173,6 +171,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 timestamp: msg.timestamp
               }))
             }),
+
           });
 
           if (!pythonResponse.ok) {

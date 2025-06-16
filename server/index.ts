@@ -109,29 +109,36 @@ async function initializeServer() {
     // Start Flask backend first
     await startFlaskServer();
     
-    // Add proxy middleware for backend API calls
-    app.use('/api/chat', createProxyMiddleware({
-      target: 'http://localhost:8081',
-      changeOrigin: true,
-      timeout: 30000,
-      proxyTimeout: 30000,
-      onError: (err, req, res) => {
-        console.error('Proxy error:', err.message);
-        res.status(503).json({ 
-          error: 'Backend temporarily unavailable',
-          details: err.message 
-        });
+    // Direct backend health check
+    try {
+      const healthCheck = await fetch('http://127.0.0.1:8081/api/health');
+      if (healthCheck.ok) {
+        console.log('Backend connection verified');
       }
-    }));
+    } catch (e) {
+      console.log('Backend health check failed, but continuing...');
+    }
     
     // Register API routes with authentication
     await registerRoutes(app);
     
-    // Serve static files from client dist directory
-    app.use(express.static(path.join(__dirname, '../dist')));
+    // Serve static files from dist directory with proper headers
+    app.use(express.static(path.join(__dirname, '../dist'), {
+      setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+          res.setHeader('Content-Type', 'application/javascript');
+        }
+        if (path.endsWith('.css')) {
+          res.setHeader('Content-Type', 'text/css');
+        }
+      }
+    }));
     
-    // Serve React app for all other routes
+    // Serve React app for all non-API routes
     app.get('*', (req, res) => {
+      if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'API endpoint not found' });
+      }
       res.sendFile(path.join(__dirname, '../dist/index.html'));
     });
     
