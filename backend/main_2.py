@@ -1092,11 +1092,13 @@ def chat_with_gemini_client_style():
                     f"Successfully called get_history(). Number of messages: {len(retrieved_history) if retrieved_history else 0}"
                 )
 
+                # Look for the most recent function response with data
                 for message_content in reversed(retrieved_history):
-                    # Check both user and model messages for function responses
+                    if query_data:  # Already found data, break
+                        break
+                        
                     for part in message_content.parts:
-                        if hasattr(part, 'function_response'
-                                   ) and part.function_response:
+                        if hasattr(part, 'function_response') and part.function_response:
                             app.logger.info(
                                 f"Found function_response in history from tool: {part.function_response.name}"
                             )
@@ -1106,93 +1108,58 @@ def chat_with_gemini_client_style():
                                     f"Tool '{part.function_response.name}' raw returned dict: {str(func_tool_result)[:300]}..."
                                 )
 
-                                # Check if this is a nested result structure
-                                if isinstance(
-                                        func_tool_result,
-                                        dict) and 'result' in func_tool_result:
+                                # Handle nested result structure
+                                if isinstance(func_tool_result, dict) and 'result' in func_tool_result:
                                     app.logger.info(
                                         f"Found nested result structure, extracting: {str(func_tool_result['result'])[:300]}..."
                                     )
-                                    func_tool_result = func_tool_result[
-                                        'result']
+                                    func_tool_result = func_tool_result['result']
 
+                                # Check for successful tool execution with data
                                 if isinstance(func_tool_result, dict) and \
                                    func_tool_result.get('status') in ['success', 'success_truncated'] and \
                                    'data' in func_tool_result:
 
-                                    retrieved_data_from_tool = func_tool_result[
-                                        'data']
+                                    retrieved_data_from_tool = func_tool_result['data']
                                     app.logger.info(
                                         f"Found data in tool result, type: {type(retrieved_data_from_tool)}, length: {len(retrieved_data_from_tool) if isinstance(retrieved_data_from_tool, list) else 'N/A'}"
                                     )
 
-                                    if isinstance(retrieved_data_from_tool,
-                                                  list):
-                                        # Log first few items for debugging
-                                        if retrieved_data_from_tool:
-                                            app.logger.info(
-                                                f"Sample data items: {retrieved_data_from_tool[:2]}"
-                                            )
-
-                                        if not retrieved_data_from_tool or all(
-                                                isinstance(item, dict) for item
-                                                in retrieved_data_from_tool):
-                                            query_data = retrieved_data_from_tool
-
-                                            tool_display_title = func_tool_result.get(
-                                                "display_title")
-                                            if not tool_display_title:
-                                                if part.function_response.name == "internal_execute_sql_query":
-                                                    # Check if this looks like a table list query
-                                                    if any(
-                                                            item.get(
-                                                                'table_name')
-                                                            for item in
-                                                            retrieved_data_from_tool
-                                                            if isinstance(
-                                                                item, dict)):
-                                                        tool_display_title = "Available Data Tables"
-                                                    else:
-                                                        tool_display_title = "SQL Query Results"
+                                    # Ensure data is a list of dictionaries for table display
+                                    if isinstance(retrieved_data_from_tool, list) and \
+                                       (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):
+                                        
+                                        query_data = retrieved_data_from_tool
+                                        
+                                        # Set appropriate display title
+                                        tool_display_title = func_tool_result.get("display_title")
+                                        if not tool_display_title:
+                                            if part.function_response.name == "internal_execute_sql_query":
+                                                if any(item.get('table_name') for item in retrieved_data_from_tool if isinstance(item, dict)):
+                                                    tool_display_title = "Available Data Tables"
                                                 else:
-                                                    tool_display_title = f"Results from {part.function_response.name}"
-                                            app.logger.info(
-                                                f"SUCCESS: Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}"
-                                            )
-                                            break
-                                        else:
-                                            app.logger.warning(
-                                                f"Tool '{part.function_response.name}' provided data but some items are not dicts"
-                                            )
-                                    else:
-                                        app.logger.warning(
-                                            f"Tool '{part.function_response.name}' provided 'data' but it's not a list: {type(retrieved_data_from_tool)}"
+                                                    tool_display_title = "SQL Query Results"
+                                            else:
+                                                tool_display_title = f"Results from {part.function_response.name}"
+                                        
+                                        app.logger.info(
+                                            f"SUCCESS: Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}"
                                         )
-
-                                elif isinstance(func_tool_result,
-                                                dict) and func_tool_result.get(
-                                                    'status') == 'error':
+                                        break  # Found data, stop looking
+                                        
+                                elif isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
                                     app.logger.warning(
                                         f"Tool {part.function_response.name} executed with error: {func_tool_result.get('error_message')}"
-                                    )
-
-                                elif part.function_response.name == "get_zip_codes_for_city" and isinstance(
-                                        func_tool_result,
-                                        dict) and func_tool_result.get(
-                                            'status') == 'success':
-                                    app.logger.info(
-                                        f"Tool 'get_zip_codes_for_city' succeeded with zip codes: {func_tool_result.get('zip_codes')}. This data isn't typically displayed as a table itself but used by the LLM for subsequent queries."
                                     )
 
                             except Exception as e_parse_hist:
                                 app.logger.error(
                                     f"Error parsing function_response from history for tool {part.function_response.name}: {e_parse_hist}",
                                     exc_info=True)
-                    if query_data:
-                        break
+                                    
             except AttributeError as e_attr:
                 app.logger.error(
-                    f"'ChatSession' object (type: {type(chat_session)}) might not have 'get_history' or it failed: {e_attr}. This indicates an API mismatch or an unexpected object type for chat_session."
+                    f"'ChatSession' object might not have 'get_history' or it failed: {e_attr}"
                 )
             except Exception as e_hist:
                 app.logger.error(
@@ -1203,7 +1170,8 @@ def chat_with_gemini_client_style():
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
         )
 
-        if query_data and isinstance(query_data, list):
+        # Always try to create table display if we have valid data
+        if query_data is not None and isinstance(query_data, list):
             displays.append({
                 "type": "table",
                 "title": tool_display_title,
@@ -1212,117 +1180,58 @@ def chat_with_gemini_client_style():
             app.logger.info(
                 f"Created table display for '{tool_display_title}' with {len(query_data)} rows."
             )
-        elif query_data:
-            app.logger.info(
-                f"Tool returned data but it's not in list format for table display: {query_data}"
-            )
         else:
             app.logger.warning(
-                "No structured query_data extracted from tool calls for display. Checking text response for fallback table info."
+                "No structured query_data extracted from tool calls for display. Attempting fallback strategies."
             )
-            if final_answer and isinstance(final_answer, str) and any(
-                    phrase in final_answer.lower() for phrase in [
-                        "tables in your", "bigquery dataset", "list of tables",
-                        "here are the tables", "retrieved all the tables",
-                        "table below", "retrieved the data",
-                        "retrieved the schema", "sample row from"
-                    ]):
-                app.logger.info(
-                    "AI text suggests data/tables were retrieved; attempting fallback display generation."
-                )
-                try:
-                    fallback_query = None
-                    fallback_title = "Query Results"
-                    table_pattern = r'\b(OUT|DIM|FACT|STG)_[A-Z_0-9]+\b'
-                    table_matches = re.findall(table_pattern, final_answer,
-                                               re.IGNORECASE)
-
-                    if table_matches:
-                        table_name = table_matches[0]
-                        fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
-                        fallback_title = f"Data from {table_name} (Fallback)"
-                        app.logger.info(
-                            f"Fallback: Found table name '{table_name}' in AI text, will query."
-                        )
-                    elif any(
-                            phrase in final_answer.lower() for phrase in
-                        ["list of tables", "all tables", "tables available"]):
-                        fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
-                        fallback_title = "Available Tables (Fallback)"
-                        app.logger.info(
-                            "Fallback: AI text suggests a table list, will query INFORMATION_SCHEMA."
-                        )
-
-                    if fallback_query:
-                        fallback_result = internal_execute_sql_query(
-                            fallback_query)
-                        if fallback_result.get(
-                                'status') == 'success' and fallback_result.get(
-                                    'data'):
+            
+            # Enhanced fallback: try to extract and re-execute if we can identify table operations
+            if final_answer and isinstance(final_answer, str):
+                # Look for table references in the AI response
+                import re
+                table_pattern = r'\b(OUT_[A-Z_0-9]+|DIM_[A-Z_0-9]+|FACT_[A-Z_0-9]+|STG_[A-Z_0-9]+)\b'
+                table_matches = re.findall(table_pattern, final_answer, re.IGNORECASE)
+                
+                # Check if response suggests tables were retrieved or listed
+                table_keywords = [
+                    "tables in your", "bigquery workspace", "list of tables", 
+                    "here are the tables", "retrieved all the tables",
+                    "table below", "retrieved the data", "query results",
+                    "sample row from", "displaying", "will be displayed"
+                ]
+                
+                has_table_context = any(phrase in final_answer.lower() for phrase in table_keywords)
+                
+                if has_table_context or table_matches:
+                    app.logger.info(f"Fallback: AI response suggests table data. Found tables: {table_matches}")
+                    
+                    try:
+                        if table_matches:
+                            # Use the first table found for data display
+                            table_name = table_matches[0]
+                            fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
+                            fallback_title = f"Data from {table_name}"
+                            app.logger.info(f"Fallback: Executing query for table '{table_name}'")
+                        else:
+                            # Default to listing tables
+                            fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+                            fallback_title = "Available Tables"
+                            app.logger.info("Fallback: Listing available tables")
+                        
+                        fallback_result = internal_execute_sql_query(fallback_query)
+                        if fallback_result.get('status') in ['success', 'success_truncated'] and fallback_result.get('data'):
                             displays.append({
                                 "type": "table",
                                 "title": fallback_title,
                                 "content": fallback_result['data']
                             })
-                            app.logger.info(
-                                f"Fallback query successful, created display '{fallback_title}' with {len(fallback_result['data'])} rows"
-                            )
+                            app.logger.info(f"Fallback successful: Created display '{fallback_title}' with {len(fallback_result['data'])} rows")
                         else:
-                            app.logger.warning(
-                                f"Fallback query failed or returned no data: {fallback_result.get('error_message', 'No data')}"
-                            )
-                except Exception as e_fallback:
-                    app.logger.error(
-                        f"Error during fallback display generation: {e_fallback}",
-                        exc_info=True)
-
-            if not displays and final_answer and isinstance(
-                    final_answer, str) and any(
-                        phrase in final_answer.lower() for phrase in [
-                            "tables in your", "bigquery dataset",
-                            "list of tables", "here are the tables"
-                        ]):
-                lines = final_answer.split('\n')
-                table_names_from_text = []
-                in_table_list_context = False
-                if "here are the tables" in final_answer.lower(
-                ) or "following tables" in final_answer.lower():
-                    in_table_list_context = True
-
-                for line in lines:
-                    stripped_line = line.strip()
-                    if stripped_line.startswith(('- ', '* ')):
-                        table_name_candidate = stripped_line[2:].strip('`"')
-                        if table_name_candidate and ('.' in table_name_candidate or \
-                           (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in table_name_candidate) or \
-                           re.match(r'^(OUT|DIM|FACT|STG)_[A-Z_0-9]+$', table_name_candidate, re.IGNORECASE)) and \
-                           not any(char in table_name_candidate for char in ['(', ')', ':', '?']):
-                            table_names_from_text.append(table_name_candidate)
-                    elif in_table_list_context and stripped_line and not stripped_line.endswith(
-                            ':'):
-                        if (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in stripped_line) or '`' in stripped_line or \
-                           re.match(r'^(OUT|DIM|FACT|STG)_[A-Z_0-9]+$', stripped_line.strip('`"'), re.IGNORECASE):
-                            table_names_from_text.append(
-                                stripped_line.strip('`"'))
-
-                unique_table_names = sorted(list(set(table_names_from_text)))
-                if unique_table_names:
-                    app.logger.info(
-                        f"Fallback (text parsing): Extracted table names: {unique_table_names}"
-                    )
-                    if not any(
-                            d.get("title") ==
-                            "Identified Data Tables (from text)"
-                            for d in displays):  # Avoid double adding
-                        displays.append({
-                            "type":
-                            "table",
-                            "title":
-                            "Identified Data Tables (from text)",
-                            "content": [{
-                                "Table Name": name
-                            } for name in unique_table_names]
-                        })
+                            app.logger.warning(f"Fallback query failed: {fallback_result.get('error_message', 'No data returned')}")
+                            
+                    except Exception as e_fallback:
+                        app.logger.error(f"Error during fallback display generation: {e_fallback}", exc_info=True)
+            
         return jsonify({"reply": final_answer, "displays": displays})
 
     except Exception as e:
