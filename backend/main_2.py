@@ -1004,7 +1004,7 @@ def chat_with_gemini_client_style():
                 google_genai_types.Content(
                     role="user",
                     parts=[
-                        google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)
+                        google_genai_types.Part(text=get_system_instruction_prompt())
                     ]),
                 google_genai_types.Content(
                     role="model",
