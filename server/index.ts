@@ -123,13 +123,15 @@ async function initializeServer() {
     await registerRoutes(app);
     
     if (process.env.NODE_ENV === 'production') {
-      // Production: serve built React app
-      console.log("Production mode: serving built React app");
-      app.use(express.static(path.join(__dirname, '../dist')));
+      // Production: serve React app directly from client directory
+      console.log("Production mode: serving React app from client");
+      app.use(express.static(path.join(__dirname, '../client')));
+      app.use('/src', express.static(path.join(__dirname, '../client/src')));
+      app.use('/node_modules', express.static(path.join(__dirname, '../node_modules')));
       
-      // Handle React Router routes
+      // Handle React Router routes - serve index.html for all non-API routes
       app.get('*', (req, res) => {
-        res.sendFile(path.join(__dirname, '../dist/index.html'));
+        res.sendFile(path.join(__dirname, '../index.html'));
       });
     } else {
       // Development: proxy to Vite dev server
