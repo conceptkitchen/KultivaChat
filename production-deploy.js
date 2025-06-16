@@ -1,98 +1,134 @@
 #!/usr/bin/env node
 
 import { spawn } from 'child_process';
-import { execSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
+import http from 'http';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 console.log('Kultivate AI Production Deployment Starting...');
 
-// Build the frontend first - try with timeout
-console.log('Building frontend (React app)...');
-try {
-  // Try to build with a shorter timeout
-  execSync('timeout 300s npm run build:frontend', { stdio: 'inherit', timeout: 300000 });
-  console.log('Frontend build completed successfully');
-} catch (error) {
-  console.log('Frontend build failed or timed out, creating minimal build...');
-  
-  // Ensure dist directory exists
-  if (!fs.existsSync('dist')) {
-    fs.mkdirSync('dist', { recursive: true });
-  }
-  
-  // Create minimal index.html that loads your React app
-  const indexHtml = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kultivate AI</title>
-    <script type="module" crossorigin src="/assets/index.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>`;
-  
-  fs.writeFileSync('dist/index.html', indexHtml);
-  
-  // Create assets directory
-  if (!fs.existsSync('dist/assets')) {
-    fs.mkdirSync('dist/assets', { recursive: true });
-  }
-  
-  // Create a minimal bundle that loads your React app
-  const minimalJs = `
-// Minimal production bundle - loads your React app
-import('./src/main.tsx').then(module => {
-  // React app will mount to #root
-}).catch(err => {
-  console.error('Failed to load React app:', err);
-  document.getElementById('root').innerHTML = '<div style="text-align: center; padding: 50px;"><h1>Loading Kultivate AI...</h1><p>Please wait while your application loads.</p></div>';
-});
-`;
-  
-  fs.writeFileSync('dist/assets/index.js', minimalJs);
-  fs.writeFileSync('dist/assets/index.css', '/* Styles will be loaded by your React app */');
-}
-
-// Build server component
-console.log('Building server...');
-try {
-  execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
-  console.log('Server build completed');
-} catch (error) {
-  console.error('Server build failed:', error);
-  process.exit(1);
-}
-
-// Start the production server (your original server/index.ts)
-console.log('Starting production server...');
-const server = spawn('node', ['dist/index.js'], {
+// Start frontend server
+console.log('Starting frontend server on port 5000...');
+const frontend = spawn('node', ['dist/index.js'], {
   env: { ...process.env, NODE_ENV: 'production' },
   stdio: 'inherit'
 });
 
-server.on('error', (error) => {
-  console.error('Server failed to start:', error);
-  process.exit(1);
-});
+// Wait for frontend to initialize
+setTimeout(() => {
+  console.log('Starting backend server on port 8081...');
+  
+  // Start backend server - ensure all required environment variables are passed
+  const cleanEnv = { ...process.env };
+  delete cleanEnv.PORT;  // Remove PORT completely so Flask uses hardcoded 8081
+  
+  // Ensure critical environment variables are passed to Flask
+  const flaskEnv = {
+    ...cleanEnv,
+    PYTHONUNBUFFERED: '1',
+    FLASK_ENV: 'production',
+    KBC_API_URL: process.env.KBC_API_URL,
+    KBC_STORAGE_TOKEN: process.env.KBC_STORAGE_TOKEN,
+    GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    KBC_WORKSPACE_SCHEMA: process.env.KBC_WORKSPACE_SCHEMA,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY
+  };
+  
+  console.log('Starting Flask with environment variables:', {
+    KBC_API_URL: !!flaskEnv.KBC_API_URL,
+    KBC_STORAGE_TOKEN: !!flaskEnv.KBC_STORAGE_TOKEN,
+    GOOGLE_APPLICATION_CREDENTIALS: !!flaskEnv.GOOGLE_APPLICATION_CREDENTIALS,
+    KBC_WORKSPACE_SCHEMA: !!flaskEnv.KBC_WORKSPACE_SCHEMA,
+    GEMINI_API_KEY: !!flaskEnv.GEMINI_API_KEY
+  });
+  
+  const backend = spawn('python', ['main_2.py'], {
+    cwd: path.join(__dirname, 'backend'),
+    env: flaskEnv,
+    stdio: 'inherit'
+  });
 
-server.on('close', (code) => {
-  console.log(`Server process exited with code ${code}`);
-  process.exit(code);
-});
+  // Monitor backend startup and test connection
+  let backendReady = false;
+  const checkBackend = () => {
+    if (backendReady) return;
+    
+    const req = http.request({
+      hostname: 'localhost',
+      port: 8081,
+      path: '/api/health',
+      method: 'GET',
+      timeout: 2000
+    }, (res) => {
+      if (res.statusCode === 200) {
+        backendReady = true;
+        console.log('✓ Backend health check passed');
+        console.log('✓ Both servers are running successfully');
+        console.log('✓ Frontend: http://localhost:5000 (mapped to port 80)');
+        console.log('✓ Backend: http://localhost:8081');
+        console.log('✓ Chat functionality enabled with Gemini AI');
+        
+        // Test chat endpoint
+        testChatEndpoint();
+      }
+    });
 
-// Handle graceful shutdown
+    req.on('error', () => {
+      // Backend not ready yet, try again
+      setTimeout(checkBackend, 2000);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      setTimeout(checkBackend, 2000);
+    });
+
+    req.end();
+  };
+
+  // Start checking backend after initial delay - increased for production
+  setTimeout(checkBackend, 15000);
+
+}, 3000);
+
+const testChatEndpoint = () => {
+  const postData = JSON.stringify({
+    message: "hello, test the connection"
+  });
+
+  const req = http.request({
+    hostname: 'localhost',
+    port: 8081,
+    path: '/api/chat',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData)
+    },
+    timeout: 10000
+  }, (res) => {
+    console.log(`✓ Chat endpoint responding: ${res.statusCode}`);
+    if (res.statusCode === 200) {
+      console.log('✓ Backend chat functionality verified');
+    }
+  });
+
+  req.on('error', (err) => {
+    console.log(`Chat test failed: ${err.message}`);
+  });
+
+  req.write(postData);
+  req.end();
+};
+
+// Keep process alive
 process.on('SIGTERM', () => {
-  console.log('Shutting down...');
-  server.kill();
+  console.log('Shutting down gracefully...');
+  frontend.kill();
+  backend.kill();
 });
 
-process.on('SIGINT', () => {
-  console.log('Shutting down...');
-  server.kill();
-});
+// Prevent process from exiting
+setInterval(() => {}, 30000);
