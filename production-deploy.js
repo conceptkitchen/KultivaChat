@@ -11,7 +11,7 @@ console.log('Kultivate AI Production Deployment Starting...');
 
 // Start frontend server
 console.log('Starting frontend server on port 5000...');
-const frontend = spawn('node', ['dist/index.js'], {
+const frontend = spawn('node', ['production-server.js'], {
   env: { ...process.env, NODE_ENV: 'production' },
   stdio: 'inherit'
 });
