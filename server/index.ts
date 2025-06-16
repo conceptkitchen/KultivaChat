@@ -21,7 +21,6 @@ function startFlaskServer(): Promise<void> {
     const backendPath = path.join(__dirname, '../backend');
     flaskProcess = spawn('python', ['main_2.py'], {
       cwd: backendPath,
-      env: process.env,
       stdio: ['ignore', 'pipe', 'pipe']
     });
     
