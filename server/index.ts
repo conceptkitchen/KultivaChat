@@ -2,7 +2,9 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
+import { setupVite } from "./vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -121,89 +123,8 @@ async function initializeServer() {
     // Register API routes with authentication first
     await registerRoutes(app);
     
-    // Create a simple working frontend
-    app.get('/', (req, res) => {
-      res.send(`
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kultivate AI</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .chat-container { margin-top: 20px; }
-        .message { padding: 10px; margin: 10px 0; border-radius: 8px; }
-        .user { background: #e3f2fd; text-align: right; }
-        .assistant { background: #f1f8e9; }
-        .input-container { display: flex; margin-top: 20px; }
-        input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
-        button { padding: 10px 20px; margin-left: 10px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer; }
-        button:hover { background: #1976D2; }
-        .status { color: #4CAF50; font-weight: bold; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>🚀 Kultivate AI Data Assistant</h1>
-        <div class="status">✓ Backend connected and ready</div>
-        <p>Query your Keboola data using natural language with Gemini 2.0 Flash</p>
-        
-        <div class="chat-container" id="messages"></div>
-        
-        <div class="input-container">
-            <input type="text" id="messageInput" placeholder="Ask about your data..." onkeypress="handleKeyPress(event)">
-            <button onclick="sendMessage()">Send</button>
-        </div>
-    </div>
-
-    <script>
-        async function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-            if (!message) return;
-            
-            addMessage('user', message);
-            input.value = '';
-            
-            try {
-                const response = await fetch('/api/messages', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        conversationId: 'simple-chat',
-                        content: message
-                    })
-                });
-                
-                const data = await response.json();
-                addMessage('assistant', data.reply || data.error || 'No response received');
-                
-            } catch (error) {
-                addMessage('assistant', 'Error: ' + error.message);
-            }
-        }
-        
-        function addMessage(role, content) {
-            const messages = document.getElementById('messages');
-            const div = document.createElement('div');
-            div.className = 'message ' + role;
-            div.textContent = content;
-            messages.appendChild(div);
-            messages.scrollTop = messages.scrollHeight;
-        }
-        
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        }
-    </script>
-</body>
-</html>
-      `);
-    });
+    // Setup Vite development server for React frontend
+    await setupVite(app);
     
     console.log("Authentication and routes configured");
     
