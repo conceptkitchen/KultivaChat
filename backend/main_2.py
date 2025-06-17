@@ -639,6 +639,28 @@ def get_current_time() -> dict:
     return {"status": "success", "current_time": current_time_str}
 
 
+def query_database_tool(query: str) -> dict:
+    """
+    Queries a database for data and returns it in a structured format for tables.
+    Use this when the user asks to see data, tables, or reports.
+    """
+    print(f"--- Tool: query_database_tool called with query: {query} ---")
+    # Mock data for demonstration. Replace with actual BigQuery/DB calls.
+    if "orders" in query.lower():
+        table_data = {
+            "headers": ["Order ID", "Product", "Amount", "Status"],
+            "rows": [
+                ["1001", "Laptop", 1200, "Shipped"],
+                ["1002", "Mouse", 25, "Processing"],
+                ["1003", "Keyboard", 75, "Shipped"],
+            ]
+        }
+        # The return format is critical for the frontend
+        return {"status": "success", "type": "table", "data": table_data}
+    else:
+        return {"status": "error", "message": "I can only provide data for 'orders'."}
+
+
 def get_zip_codes_for_city(
         city_name: str,
         state_code: Optional[str] = None) -> dict:  # CORRECTED SIGNATURE
@@ -699,7 +721,7 @@ def get_zip_codes_for_city(
 gemini_tool_functions_list = [
     internal_execute_sql_query, list_keboola_buckets,
     list_tables_in_keboola_bucket, get_keboola_table_detail,
-    get_zip_codes_for_city, get_current_time
+    get_zip_codes_for_city, get_current_time, query_database_tool
 ]
 
 # --- Initialize Gemini Client (using genai.Client and GenerateContentConfig) ---
