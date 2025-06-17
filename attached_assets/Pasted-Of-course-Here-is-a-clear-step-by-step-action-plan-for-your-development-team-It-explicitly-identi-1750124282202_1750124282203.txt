@@ -1,0 +1,217 @@
+Of course. Here is a clear, step-by-step action plan for your development team. It explicitly identifies what to remove, what to consolidate, and how to refactor your codebase to build a stable, professional, and persistent application on Replit.
+
+---
+
+### **To the Development Team: Action Plan for Stabilizing KultivaChat**
+
+**Objective:** Overhaul the current codebase to resolve critical stability, connection, and timeout issues. The goal is a professional-grade application that runs reliably on Replit.
+
+### **Step 1: Aggressive Code & File Cleanup**
+
+The current repository has numerous conflicting and redundant files, which is a major source of confusion and bugs. We will simplify this first.
+
+**Task 1.1: Delete Redundant Startup Scripts**
+These scripts are from previous deployment attempts and are now superseded by a single, reliable script. Their presence is confusing and dangerous.
+
+* **Action:** Delete the following files:
+    * `start.sh`
+    * `start_backend.sh`
+    * `start_flask.sh`
+    * `start-production.js`
+    * `start-prod.js`
+    * `production-deploy.js`
+    * `simple-server.js`
+    * `simple-frontend-server.js`
+* **Reason:** All startup logic will be consolidated into a single `production-start.sh` script. These files create ambiguity about how the application is supposed to run.
+
+**Task 1.2: Delete Unused Backend Server**
+You have two backends: a Python one in `backend/` and a TypeScript one in `server/`. All logs and core logic point to the Python ADK server being the one you actually use. The Node.js server is unused code that adds significant confusion.
+
+* **Action:** Delete the entire `server/` directory.
+* **Reason:** This removes ambiguity. Your application has one backend (Python/Flask), not two. This simplifies debugging, deployment, and onboarding for new developers.
+
+**Task 1.3: Delete Obsolete `keep_alive.py` script**
+This script is a workaround for Replit's "sleeping" feature. We will use a professional solution instead.
+
+* **Action:** Delete `backend/keep_alive.py`.
+* **Reason:** This script is a fragile hack. The combination of a stable Gunicorn server and Replit's "Always On" feature (Step 6) makes this script obsolete and unnecessary.
+
+### **Step 2: Refactor and Stabilize the Python Backend**
+
+The Flask development server is the primary cause of timeouts. We will replace it with `gunicorn` and make the code more robust.
+
+**Task 2.1: Add Gunicorn to `backend/requirements.txt`**
+Ensure this line is in the file:
+```
+gunicorn
+```
+
+**Task 2.2: Make `run_flask.py` Production-Ready**
+Refactor the script to expose the Flask `app` for Gunicorn to use. The `app.run()` call is now only for local development.
+
+```python
+# backend/run_flask.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from backend.main_2 import main_agent, runner, session_service, APP_NAME, USER_ID
+from google.genai import types
+import logging
+
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
+
+# Initialize Flask app
+app = Flask(__name__)
+# Be specific with CORS in production for better security
+CORS(app, resources={r"/api/*": {"origins": "*"}}) # Or specify your frontend domain
+
+@app.route('/api/chat', methods=['POST'])
+async def chat_handler():
+    try:
+        data = request.json
+        if not data or 'message' not in data:
+            logging.warning("Received request with no message.")
+            return jsonify({"error": "Message not provided"}), 400
+
+        user_message = data['message']
+        session_id = data.get('sessionId', 'default_session')
+        logging.info(f"Received message for session: {session_id}")
+
+        # Ensure session exists
+        try:
+            await session_service.get_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
+        except Exception:
+            logging.info(f"Creating new session: {session_id}")
+            await session_service.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
+
+        content = types.Content(role='user', parts=[types.Part(text=user_message)])
+
+        final_response = "Sorry, I couldn't process your request."
+        events = runner.run(user_id=USER_ID, session_id=session_id, new_message=content)
+        for event in events:
+            if event.is_final_response() and event.content and event.content.parts:
+                # Handle both structured (tool) and text responses
+                part = event.content.parts[0]
+                if part.function_call:
+                    # If the final response is a tool call, we should ideally format it
+                    # For now, we'll send a structured response
+                    final_response = {"type": "tool_call", "data": {"name": part.function_call.name, "args": dict(part.function_call.args)}}
+                elif part.text:
+                    final_response = {"type": "text", "data": part.text}
+                break
+        
+        return jsonify({"reply": final_response})
+
+    except Exception as e:
+        logging.error(f"An unhandled error occurred in chat_handler: {e}", exc_info=True)
+        return jsonify({"error": "A critical server error occurred."}), 500
+
+# This block is for LOCAL DEVELOPMENT ONLY.
+# Gunicorn will be used in production and will NOT run this.
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+```
+
+**Task 2.3: Add a Structured Data Tool to `main_2.py`**
+To fix the table canvas issue, the agent needs a tool that returns structured JSON, not just text.
+
+* **Action:** Add this tool to `backend/main_2.py` and include it in your agent's tool list.
+
+    ```python
+    # In backend/main_2.py
+    def query_database_tool(query: str) -> dict:
+        """
+        Queries a database for data and returns it in a structured format for tables.
+        Use this when the user asks to see data, tables, or reports.
+        """
+        print(f"--- Tool: query_database_tool called with query: {query} ---")
+        # Mock data for demonstration. Replace with actual BigQuery/DB calls.
+        if "orders" in query.lower():
+            table_data = {
+                "headers": ["Order ID", "Product", "Amount", "Status"],
+                "rows": [
+                    ["1001", "Laptop", 1200, "Shipped"],
+                    ["1002", "Mouse", 25, "Processing"],
+                    ["1003", "Keyboard", 75, "Shipped"],
+                ]
+            }
+            # The return format is critical for the frontend
+            return {"status": "success", "type": "table", "data": table_data}
+        else:
+            return {"status": "error", "message": "I can only provide data for 'orders'."}
+
+    # In main_2.py, update the agent definition
+    main_agent = Agent(
+        # ... your existing parameters
+        instruction="...If the user asks to see data or a table, use the 'query_database_tool'...",
+        tools=[get_weather, query_database_tool], // Make sure to add the new tool
+    )
+    ```
+
+### **Step 3: Unify the Production Startup Script**
+
+This is the single source of truth for running your app in production.
+
+* **Action:** Create a **new** `production-start.sh` file at the root of your project.
+
+    ```bash
+    #!/bin/bash
+    set -e # Exit immediately if a command exits with a non-zero status.
+
+    echo "--- KULTIVACHAT PRODUCTION STARTUP ---"
+
+    # 1. Install frontend dependencies
+    echo "[1/4] Installing frontend dependencies..."
+    cd client
+    npm install
+    cd ..
+    echo "✅ Frontend dependencies installed."
+
+    # 2. Build the production frontend
+    echo "[2/4] Building production frontend..."
+    cd client
+    npm run build
+    cd ..
+    echo "✅ Frontend build complete."
+
+    # 3. Install backend dependencies
+    echo "[3/4] Installing backend dependencies..."
+    pip install -r backend/requirements.txt
+    echo "✅ Backend dependencies installed."
+
+    # 4. Start the Gunicorn backend server on Replit's designated port
+    echo "[4/4] Starting Gunicorn server..."
+    # --timeout: Prevents timeouts on slow AI tasks.
+    # --workers: Number of processes to handle requests. Adjust based on your Repl's resources.
+    # --bind: Binds to the port Replit exposes to the internet.
+    exec gunicorn --bind 0.0.0.0:8080 --workers 3 --timeout 120 'backend.run_flask:app'
+    ```
+
+### **Step 4: Configure Replit Environment**
+
+**Task 4.1: Set the Run Command**
+In your Replit workspace, open the `.replit` file and ensure it has this content:
+```
+run = "bash production-start.sh"
+```
+
+**Task 4.2: Use Replit Secrets for API Keys**
+Do not store API keys in `.env` files or hardcode them. Use the "Secrets" tool in the Replit sidebar.
+
+* **Action:** Create secrets for `GOOGLE_API_KEY` and any other sensitive keys your application needs. Your Python code will automatically have access to them as environment variables.
+
+### **Step 5: Finalize Frontend and Deploy**
+
+**Task 5.1: Update the Frontend to Render Tables**
+Ensure your `canvas-display.tsx` component is ready to receive the structured `table` data from the backend.
+
+* **Action:** In `client/src/components/chat.tsx`, when you receive a reply from the API, check if `reply.type === 'table'` and pass the `reply.data` to your table rendering component.
+
+**Task 5.2: Enable "Always On"**
+This is the final step to ensure your app is persistent.
+
+* **Action:** In your Replit workspace, find the "Always On" toggle and turn it on. This is a paid feature but is essential for a professional, production application.
+
+---
+
+By following these steps, you will have a clean, stable, and professional application architecture that eliminates the root causes of the bugs you were facing.
