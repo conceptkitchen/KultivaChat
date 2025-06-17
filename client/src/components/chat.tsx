@@ -97,23 +97,67 @@ export function Chat({ conversation }: ChatProps) {
     console.log("Sending message to API:", content);
     
     try {
-      // Send to API
-      const response = await sendMessageMutation.mutateAsync({
-        conversationId: conversation.id,
-        content,
+      // Send to backend chat API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: content,
+          conversation_history: messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }))
+        }),
       });
       
-      // Get response data
       const data = await response.json();
       
-      // Manually update messages with the response
-      const aiMessage: Message = {
-        id: data.assistantMessage.id,
-        role: "assistant",
-        content: data.assistantMessage.content,
-        displays: data.assistantMessage.displays || [],
-        timestamp: new Date(data.assistantMessage.timestamp),
-      };
+      // Handle structured response from backend
+      let aiMessage: Message;
+      let displays: any[] = [];
+      
+      if (data.reply && typeof data.reply === 'object' && data.reply.type === 'table') {
+        // Handle structured table response
+        displays = [{
+          type: 'table',
+          title: 'Query Results',
+          content: data.reply.data.rows.map((row: any[], index: number) => {
+            const rowObj: Record<string, any> = {};
+            data.reply.data.headers.forEach((header: string, headerIndex: number) => {
+              rowObj[header] = row[headerIndex];
+            });
+            return rowObj;
+          })
+        }];
+        
+        aiMessage = {
+          id: uuidv4(),
+          role: "assistant",
+          content: "Here's the data you requested:",
+          displays,
+          timestamp: new Date(),
+        };
+      } else if (data.reply && typeof data.reply === 'object' && data.reply.type === 'text') {
+        // Handle text response
+        aiMessage = {
+          id: uuidv4(),
+          role: "assistant",
+          content: data.reply.data,
+          displays: [],
+          timestamp: new Date(),
+        };
+      } else {
+        // Handle simple string response
+        aiMessage = {
+          id: uuidv4(),
+          role: "assistant",
+          content: typeof data.reply === 'string' ? data.reply : JSON.stringify(data.reply),
+          displays: [],
+          timestamp: new Date(),
+        };
+      }
       
       // Replace loading message with actual response
       setMessages(prev => 
@@ -122,7 +166,6 @@ export function Chat({ conversation }: ChatProps) {
       
       setIsProcessing(false);
     } catch (error) {
-      // Only log the error but don't show toast
       console.error("Error occurred:", error);
       
       // Remove loading message
