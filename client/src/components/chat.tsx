@@ -4,8 +4,7 @@ import { ChatBubble, ChatBubbleSkeleton } from "@/components/ui/chat-bubble";
 import { ChatInput } from "@/components/ui/chat-input";
 import { Message, Conversation } from "@/lib/utils";
 import { v4 as uuidv4 } from "uuid";
-import { apiRequest } from "@/lib/queryClient";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatProps {
@@ -17,7 +16,6 @@ export function Chat({ conversation }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   
   // For debugging
   console.log("Chat rendering with conversation:", conversation.id);
@@ -30,34 +28,7 @@ export function Chat({ conversation }: ChatProps) {
     }
   }, [conversation]);
 
-  const sendMessageMutation = useMutation({
-    mutationFn: async (message: { conversationId: string; content: string; systemMessage?: string }) => {
-      return await apiRequest("POST", "/api/messages", message);
-    },
-    onSuccess: (response) => {
-      // Update the conversation in the cache
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/conversations", conversation.id] 
-      });
-    },
-    onError: (error) => {
-      // Only show real errors with message text
-      if (error instanceof Error && error.message && 
-          error.message !== '{}' && 
-          error.message !== 'Failed to fetch') {
-        console.error("Actual error sending message:", error);
-        toast({
-          title: "Error",
-          description: "Failed to send message. Please try again.",
-          variant: "destructive",
-        });
-      }
-      // Remove the loading messages
-      setMessages((prev) => prev.filter((msg) => !msg.isLoading));
-      setIsProcessing(false);
-    }
-  });
+
 
   const handleSendMessage = async (content: string) => {
     if (isProcessing) return;
@@ -234,7 +205,7 @@ export function Chat({ conversation }: ChatProps) {
             message={message}
           />
         ))}
-        {sendMessageMutation.isPending && <ChatBubbleSkeleton />}
+        {isProcessing && <ChatBubbleSkeleton />}
       </ScrollArea>
 
       <ChatInput 
