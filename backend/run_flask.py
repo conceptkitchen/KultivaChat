@@ -1,54 +1,60 @@
-#!/usr/bin/env python3
-"""
-Robust Flask server runner with auto-restart capability
-"""
-import os
-import sys
-import time
-import signal
-import subprocess
-from pathlib import Path
+# backend/run_flask.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from backend.main_2 import main_agent, runner, session_service, APP_NAME, USER_ID
+from google.genai import types
+import logging
 
-def run_flask():
-    """Run Flask server with automatic restart on crash"""
-    script_dir = Path(__file__).parent
-    main_script = script_dir / "main_2.py"
-    
-    while True:
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
+
+# Initialize Flask app
+app = Flask(__name__)
+# Be specific with CORS in production for better security
+CORS(app, resources={r"/api/*": {"origins": "*"}}) # Or specify your frontend domain
+
+@app.route('/api/chat', methods=['POST'])
+async def chat_handler():
+    try:
+        data = request.json
+        if not data or 'message' not in data:
+            logging.warning("Received request with no message.")
+            return jsonify({"error": "Message not provided"}), 400
+
+        user_message = data['message']
+        session_id = data.get('sessionId', 'default_session')
+        logging.info(f"Received message for session: {session_id}")
+
+        # Ensure session exists
         try:
-            print(f"Starting Flask server from {main_script}")
-            process = subprocess.Popen(
-                [sys.executable, str(main_script)],
-                cwd=script_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True,
-                bufsize=1
-            )
-            
-            # Stream output in real-time
-            for line in process.stdout:
-                print(line.strip())
-                if "Running on" in line:
-                    print("Backend server is ready!")
-                    
-            process.wait()
-            print(f"Flask process exited with code {process.returncode}")
-            
-            if process.returncode != 0:
-                print("Restarting Flask server in 5 seconds...")
-                time.sleep(5)
-            else:
-                break
-                
-        except KeyboardInterrupt:
-            print("Shutting down Flask server...")
-            if 'process' in locals():
-                process.terminate()
-            break
-        except Exception as e:
-            print(f"Error running Flask server: {e}")
-            time.sleep(5)
+            await session_service.get_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
+        except Exception:
+            logging.info(f"Creating new session: {session_id}")
+            await session_service.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
 
-if __name__ == "__main__":
-    run_flask()
+        content = types.Content(role='user', parts=[types.Part(text=user_message)])
+
+        final_response = "Sorry, I couldn't process your request."
+        events = runner.run(user_id=USER_ID, session_id=session_id, new_message=content)
+        for event in events:
+            if event.is_final_response() and event.content and event.content.parts:
+                # Handle both structured (tool) and text responses
+                part = event.content.parts[0]
+                if part.function_call:
+                    # If the final response is a tool call, we should ideally format it
+                    # For now, we'll send a structured response
+                    final_response = {"type": "tool_call", "data": {"name": part.function_call.name, "args": dict(part.function_call.args)}}
+                elif part.text:
+                    final_response = {"type": "text", "data": part.text}
+                break
+        
+        return jsonify({"reply": final_response})
+
+    except Exception as e:
+        logging.error(f"An unhandled error occurred in chat_handler: {e}", exc_info=True)
+        return jsonify({"error": "A critical server error occurred."}), 500
+
+# This block is for LOCAL DEVELOPMENT ONLY.
+# Gunicorn will be used in production and will NOT run this.
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
