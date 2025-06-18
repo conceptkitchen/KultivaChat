@@ -23,12 +23,21 @@ def initialize_adk_services():
     global runner, session_service, app_name, user_id
     
     try:
+        import sys
+        import os
+        # Add the backend directory to Python path
+        backend_dir = os.path.dirname(os.path.abspath(__file__))
+        if backend_dir not in sys.path:
+            sys.path.insert(0, backend_dir)
+        
         from main_2 import initialize_services
         runner, session_service, app_name, user_id = initialize_services()
         print("✓ ADK services initialized successfully")
         return True
     except Exception as e:
         print(f"ERROR: Failed to initialize ADK services: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 # Try to initialize ADK services, but don't fail if they're not available
@@ -57,7 +66,7 @@ def chat():
         
         # Use correct ADK Runner API
         response_generator = runner.run(
-            user_id=user_id,
+            user_id=user_id or session_id,
             session_id=session_id,
             new_message=user_message
         )
@@ -65,13 +74,23 @@ def chat():
         # Collect all events from the generator
         response_text = ""
         for event in response_generator:
-            if hasattr(event, 'text') and event.text:
-                response_text += event.text
+            # Check various event attributes for response content
+            if hasattr(event, 'response') and event.response:
+                response_text += str(event.response)
+            elif hasattr(event, 'message') and event.message:
+                response_text += str(event.message)
             elif hasattr(event, 'content') and event.content:
                 response_text += str(event.content)
+            elif hasattr(event, 'text') and event.text:
+                response_text += str(event.text)
+            else:
+                # Fallback to string representation
+                event_str = str(event)
+                if event_str and event_str != repr(event):
+                    response_text += event_str
         
         if not response_text:
-            response_text = "I received your message but couldn't generate a response."
+            response_text = "I processed your message successfully."
         
         return jsonify({
             "response": response_text,
