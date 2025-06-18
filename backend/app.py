@@ -55,40 +55,23 @@ def chat():
         user_message = data['message']
         session_id = str(uuid.uuid4())
         
-        # Try different ADK Runner API patterns
-        response = None
-        error_msg = None
+        # Use correct ADK Runner API
+        response_generator = runner.run(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=user_message
+        )
         
-        try:
-            # Pattern 1: session_id and new_message
-            response = runner.run(session_id=session_id, new_message=user_message)
-        except TypeError as e1:
-            try:
-                # Pattern 2: user_id and message
-                response = runner.run(user_id=session_id, message=user_message)
-            except TypeError as e2:
-                try:
-                    # Pattern 3: positional args
-                    response = runner.run(session_id, user_message)
-                except TypeError as e3:
-                    try:
-                        # Pattern 4: just message
-                        response = runner.run(user_message)
-                    except TypeError as e4:
-                        error_msg = f"All runner.run patterns failed: {e1}, {e2}, {e3}, {e4}"
+        # Collect all events from the generator
+        response_text = ""
+        for event in response_generator:
+            if hasattr(event, 'text') and event.text:
+                response_text += event.text
+            elif hasattr(event, 'content') and event.content:
+                response_text += str(event.content)
         
-        if response is None and error_msg:
-            raise Exception(error_msg)
-        
-        # Extract response text
-        if hasattr(response, 'text'):
-            response_text = response.text
-        elif hasattr(response, 'content'):
-            response_text = response.content
-        elif isinstance(response, dict) and 'response' in response:
-            response_text = response['response']
-        else:
-            response_text = str(response)
+        if not response_text:
+            response_text = "I received your message but couldn't generate a response."
         
         return jsonify({
             "response": response_text,
