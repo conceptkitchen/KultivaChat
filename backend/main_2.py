@@ -223,7 +223,6 @@ def initialize_services():
     runner = Runner(
         agent=main_agent,
         app_name=APP_NAME,
-        session_service=session_service,
-        client=client
+        session_service=session_service
     )
     return runner, session_service, APP_NAME, USER_ID

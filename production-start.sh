@@ -27,4 +27,4 @@ echo "[4/4] Starting Gunicorn server..."
 # --timeout: Prevents timeouts on slow AI tasks.
 # --workers: Number of processes to handle requests. Adjust based on your Repl's resources.
 # --bind: Binds to the port Replit exposes to the internet.
-exec gunicorn --bind 0.0.0.0:8080 --workers 3 --timeout 120 'backend.run_flask:app'
+exec gunicorn --bind 0.0.0.0:8080 --workers 3 --timeout 120 backend.app:app
