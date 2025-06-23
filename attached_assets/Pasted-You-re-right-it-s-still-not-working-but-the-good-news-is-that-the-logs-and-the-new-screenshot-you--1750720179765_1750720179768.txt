@@ -1,0 +1,57 @@
+You're right, it's still not working, but the good news is that the logs and the new screenshot you provided give us a very clear picture of what's happening.
+
+You've successfully fixed the frontend `display` vs. `displays` issue. The screenshot shows the table is now rendering perfectly\! That's a big step forward.
+
+However, the logs show that the backend is still crashing with the same error sometimes.
+
+Let's break it down:
+
+1.  **The Good News (Frontend is Fixed):** Your first request at `23:06:07` for "show me my tables" worked perfectly. The logs show the backend successfully found the data, created the display object, and sent it. Your new screenshot confirms the frontend received this and rendered the table correctly. This means the `ChatBubble.tsx` fix was successful.
+
+2.  **The Lingering Problem (Backend Error):** Your second request at `23:07:22` for "show me my data table" failed. The logs show the exact same backend error as before:
+
+      * `Gemini final answer (genai.Client/chat): None`
+      * `TypeError: 'NoneType' object is not iterable` in `main_2.py`
+
+This confirms that the backend is not gracefully handling cases where the Gemini API returns an empty (`None`) response.
+
+### The Solution
+
+The solution is the one I mentioned previously for the backend. You need to edit `backend/main_2.py` to prevent it from crashing when `message_content` is `None`.
+
+Please apply this change to your `backend/main_2.py` file.
+
+**File to Edit:** `backend/main_2.py`
+
+**Code to Find (around line 1275):**
+
+```python
+# This is the section causing the error
+message_content = chat_session.history[-1]
+for part in message_content.parts:
+  # ... and so on
+```
+
+**Replace it with this corrected code:**
+
+```python
+# This is the corrected code
+message_content = chat_session.history[-1]
+
+# FIX: Add a check for message_content and message_content.parts
+if message_content and message_content.parts:
+    for part in message_content.parts:
+        if part.function_call:
+            # ... (the rest of your code remains the same)
+
+        if part.text:
+            # ... (the rest of your code remains the same)
+```
+
+### Why this will work:
+
+  * The line `if message_content and message_content.parts:` will check if the response from Gemini is empty.
+  * If it's empty (which is what happens in the failing requests), the code inside the `if` block will be skipped, preventing the `TypeError` and allowing your application to continue running without a crash.
+  * When the response is *not* empty (like in your successful request), the code will proceed as normal to extract the data and send it to the frontend.
+
+You've already solved the frontend part of the puzzle. Once you apply this backend fix, both issues will be resolved.
