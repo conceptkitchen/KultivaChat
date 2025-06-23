@@ -44,9 +44,11 @@ export function Chat({ conversation }: ChatProps) {
       return response.json();
     },
     onSuccess: (data, variables) => {
-      console.log('Backend response received successfully');
-      console.log('Displays found:', data.displays?.length || 0);
-      
+      console.log('Backend response received:', data);
+
+      // Fix: Check for singular 'display' object from backend and convert to array
+      const displays = data.display ? [data.display] : (data.displays || []);
+
       const userMessage = {
         id: `user-${Date.now()}`,
         role: 'user' as const,
@@ -58,15 +60,11 @@ export function Chat({ conversation }: ChatProps) {
         id: `assistant-${Date.now()}`,
         role: 'assistant' as const,
         content: data.reply || data.final_answer || "No response",
-        displays: data.displays || [],
+        displays: displays, // Use the corrected displays variable
         timestamp: new Date(),
       };
 
       console.log('Creating assistant message with displays:', assistantMessage.displays.length);
-      if (assistantMessage.displays.length > 0) {
-        console.log('First display type:', assistantMessage.displays[0].type);
-        console.log('First display content length:', assistantMessage.displays[0].content?.length || 0);
-      }
 
       setMessages(prev => 
         prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
