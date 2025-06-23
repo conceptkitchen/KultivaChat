@@ -1484,9 +1484,13 @@ def chat_with_gemini_client_style():
                         # Define the pattern for table names (looking for BigQuery table references)
                         table_pattern = r"`?([\w-]+)`?\.`?([\w-]+)`?\.`?([\w-]+)`?"
                         
-                        # Find all matches of the pattern - using the module-level re import
-                        import re  # Ensure re is available in this scope
-                        matches = re.findall(table_pattern, final_answer)
+                        # Find all matches of the pattern - re is imported at module level
+                        try:
+                            matches = re.findall(table_pattern, final_answer)
+                        except NameError:
+                            # Fallback if re is not accessible in scope
+                            import re as re_module
+                            matches = re_module.findall(table_pattern, final_answer)
                         
                         # Extract the table names (third part of each match)
                         table_matches = [match[2] for match in matches if len(match) >= 3]
