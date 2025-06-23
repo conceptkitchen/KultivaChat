@@ -99,10 +99,13 @@ function startFlaskServer(): Promise<void> {
 
 // Proxy all /api requests to Flask backend BEFORE authentication
 app.use('/api', createProxyMiddleware({
-  target: 'http://localhost:8081',
+  target: 'http://localhost:8081/api',
   changeOrigin: true,
+  pathRewrite: {
+    '^/api': '' // Remove /api prefix since target already includes it
+  },
   onProxyReq: (proxyReq, req, res) => {
-    console.log(`Proxying ${req.method} ${req.url} to backend`);
+    console.log(`Proxying ${req.method} ${req.originalUrl} to http://localhost:8081/api${req.url}`);
   },
   onError: (err, req, res) => {
     console.error('Proxy Error:', err.message);
