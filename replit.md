@@ -112,13 +112,14 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
-- **June 23, 2025**: Fixed critical table display issue in chat interface
-  - Backend successfully retrieves 61+ Kapwa Gardens table names from BigQuery
-  - Fixed table rendering in CanvasDisplay component using native HTML table elements
-  - Emergency display creation ensures table data always appears when requested
-  - Improved table styling with proper borders, alternating row colors, and responsive design
-  - Chat interface now displays actual data tables instead of empty responses
-  - Complete data flow working: BigQuery → Backend → Frontend → User display
+- **June 23, 2025**: CRITICAL FIX - Resolved table display bug in backend data processing
+  - Fixed faulty check logic in `backend/main_2.py` that was preventing proper table rendering
+  - Removed misleading `elif query_data:` condition that caused confusing error logs
+  - Implemented proper `isinstance(query_data, list)` check as per user-provided fix instructions
+  - Backend now correctly processes 64 Kapwa Gardens table names from BigQuery
+  - CanvasDisplay component completely rewritten with clean, functional table rendering
+  - Data flow now works correctly: BigQuery → Backend → Frontend → User display
+  - Table displays with proper styling, scrollable content, and copy functionality
 
 - **June 23, 2025**: Fixed critical frontend-backend API communication and data access
   - Implemented manual proxy middleware between Node.js (port 5000) and Flask (port 8081)

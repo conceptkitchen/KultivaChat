@@ -1,0 +1,59 @@
+Of course. Let's get this sorted out. I understand your frustration. The good news is that you are correct: the backend is successfully retrieving the data. The logs clearly show the data is being fetched from BigQuery. The breakdown is happening in the final step of packaging this data for the front-end.
+
+The core of the problem lies in a faulty check within your `backend/main_2.py` file, which is causing the application to follow a fallback "emergency" path that doesn't correctly format the data for the `canvas-display` component.
+
+### The Problem: A Flawed Check
+
+In your `main_2.py` file, there's a section of code that is supposed to check if the data returned from a tool is a list that can be turned into a table. You can see the effect of this faulty check in this confusing log message that you've correctly identified:
+
+`Flask Error: INFO:main_2:Tool returned data but it's not in list format for table display: [{'table_name': '...'}, ...]`
+
+The log message itself is contradictory: it says the data isn't a list, and then it prints the data, which clearly *is* a list. This indicates that the `if` condition that triggers this log message is bugged. This faulty check causes the normal table creation process to fail, and the application then triggers the "emergency display creation," which has its own issues in how it structures the final output.
+
+### The Solution
+
+You need to modify the logic in `backend/main_2.py` that processes the tool's output and creates the display object.
+
+**1. Locate the Faulty Logic in `backend/main_2.py`**
+
+Open `conceptkitchen/kultivachat/KultivaChat-61fcd469afd87826986e7077210b4ae8be5b7216/backend/main_2.py` and find the `get_display_from_history` function. Inside it, you'll see a block that looks similar to this:
+
+```python
+# (Inside the get_display_from_history function)
+
+# This check is flawed because query_data is already the list of items.
+# It should not be treated like a dictionary.
+if 'data' not in query_data or not isinstance(query_data['data'], list):
+    logger.info(f"Tool returned data but it's not in list format for table display: {query_data}")
+    # ... emergency logic follows ...
+```
+
+**2. Correct the Logic**
+
+Replace that flawed conditional block. The logic should directly check if `query_data` is a list and if it contains data.
+
+Here is the corrected code:
+
+```python
+# (Inside the get_display_from_history function)
+
+# --- REPLACEMENT LOGIC ---
+if isinstance(query_data, list) and query_data:
+    # If it's a list and not empty, create the display object directly
+    logger.info(f"SUCCESS: Data for display extracted from tool '{tool_name}' with {len(query_data)} items. Title: {title}")
+    display_object = create_display_object(title, query_data, tool_name)
+    if display_object:
+        displays.append(display_object)
+else:
+    # If the check fails, now we can log it and consider emergency measures
+    logger.warning(f"Tool returned data is not in a list format or is empty: {query_data}")
+    # The rest of your emergency logic can go here if still needed.
+```
+
+### Why This Fixes the Issue
+
+1.  **Correct Type Checking:** The new code correctly checks `isinstance(query_data, list)`. Your logs show that `query_data` is indeed a list of dictionaries, so this condition will now pass.
+2.  **Eliminates the Faulty Path:** This change prevents the code from ever reaching the confusing "emergency" logic when the data is valid.
+3.  **Correct Data Structure:** By calling `create_display_object` within this correct path, it will create the `display` object with the `content` field being a direct list of your table's rows. Your frontend `canvas-display.tsx` component expects `display.content` to be an array it can map over, and now it will be.
+
+After making this change in `backend/main_2.py` and restarting your backend server, the "show me my table data" command should now correctly display the table in your chat interface.

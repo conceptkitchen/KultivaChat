@@ -1443,10 +1443,19 @@ def chat_with_gemini_client_style():
                 final_answer = "Here are your available data tables:"
             else:
                 final_answer = "I'm ready to help you analyze your data. What would you like to explore?"
-        elif query_data:
-            app.logger.info(
-                f"Tool returned data but it's not in list format for table display: {query_data}"
-            )
+        
+        # FIXED: Proper check for query_data to create displays
+        if query_data and isinstance(query_data, list) and query_data:
+            app.logger.info(f"SUCCESS: Data for display extracted from tool with {len(query_data)} items")
+            if not displays:  # Only create display if we don't already have one
+                displays.append({
+                    "type": "table",
+                    "title": "Available Data Tables",
+                    "content": query_data
+                })
+                app.logger.info(f"Created display object with {len(query_data)} rows")
+                if not final_answer or final_answer.strip() == "":
+                    final_answer = "Here are your available data tables:"
         else:
             app.logger.warning(
                 "No structured query_data extracted from tool calls for display. Checking text response for fallback table info."
