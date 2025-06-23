@@ -25,7 +25,12 @@ interface CanvasDisplayProps {
 export function CanvasDisplay({ displays }: CanvasDisplayProps) {
   const { toast } = useToast();
   
-  if (!displays || displays.length === 0) return null;
+  console.log("CanvasDisplay received:", displays);
+  
+  if (!displays || displays.length === 0) {
+    console.log("CanvasDisplay: No displays to render");
+    return null;
+  }
 
   const handleCopy = (content: string) => {
     navigator.clipboard.writeText(content)
@@ -74,8 +79,16 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
       case "table":
         const tableData = display.content as Record<string, any>[];
         
+        console.log("Processing table display:", { 
+          hasContent: !!display.content, 
+          isArray: Array.isArray(tableData),
+          length: tableData?.length,
+          sampleData: tableData?.[0]
+        });
+        
         // Handle empty or invalid table data
         if (!tableData || !Array.isArray(tableData)) {
+          console.log("Invalid table data");
           return (
             <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
               No valid table data available
@@ -186,41 +199,45 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
 
   return (
     <div className="space-y-4">
-      {displays.map((display, index) => (
-        <Card key={index} className="shadow-sm border-neutral-200 overflow-hidden">
-          <CardHeader className="bg-secondary px-4 py-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-white text-sm font-medium">
-              {display.title || (display.type.charAt(0).toUpperCase() + display.type.slice(1))}
-            </CardTitle>
-            <div className="flex space-x-2">
-              {display.type === "code" && (
-                <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </Button>
-              )}
-              {(display.type === "table" || display.type === "visualization") && (
-                <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
-                  <Expand className="h-3 w-3 mr-1" />
-                  Expand
-                </Button>
-              )}
-              {(display.type === "table" || display.type === "documentation" || display.type === "code") && (
-                <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
-                  <Download className="h-3 w-3 mr-1" />
-                  Download
-                </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className={cn(
-            "p-0",
-            display.type === "table" ? "bg-white" : "p-4"
-          )}>
-            {renderContent(display)}
-          </CardContent>
-        </Card>
-      ))}
+      <div className="text-xs text-green-600 mb-2">CanvasDisplay rendering {displays.length} displays</div>
+      {displays.map((display, index) => {
+        console.log(`Rendering display ${index}:`, display);
+        return (
+          <Card key={index} className="shadow-sm border-neutral-200 overflow-hidden">
+            <CardHeader className="bg-secondary px-4 py-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-white text-sm font-medium">
+                {display.title || (display.type.charAt(0).toUpperCase() + display.type.slice(1))}
+              </CardTitle>
+              <div className="flex space-x-2">
+                {display.type === "code" && (
+                  <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
+                    <Copy className="h-3 w-3 mr-1" />
+                    Copy
+                  </Button>
+                )}
+                {(display.type === "table" || display.type === "visualization") && (
+                  <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
+                    <Expand className="h-3 w-3 mr-1" />
+                    Expand
+                  </Button>
+                )}
+                {(display.type === "table" || display.type === "documentation" || display.type === "code") && (
+                  <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className={cn(
+              "p-0",
+              display.type === "table" ? "bg-white" : "p-4"
+            )}>
+              {renderContent(display)}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
