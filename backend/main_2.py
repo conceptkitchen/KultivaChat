@@ -969,10 +969,14 @@ def send_message_to_conversation(conversation_id):
         user_msg_id = str(uuid.uuid4())
         assistant_msg_id = str(uuid.uuid4())
         
-        # CRITICAL FIX: Always create display for table requests regardless of AI response
-        app.logger.info(f"Pre-emergency check: displays={len(displays)}, user_content='{user_content}', final_answer preview='{final_answer[:50]}'")
-        if not displays and ("table" in user_content.lower() or "data" in user_content.lower()):
-            app.logger.info("Triggering emergency display creation...")
+        # Only create display for explicit table requests, not casual mentions
+        app.logger.info(f"Pre-emergency check: displays={len(displays)}, user_content='{user_content}', final_answer preview='{final_answer[:50] if final_answer else 'None'}'")
+        explicit_table_requests = [
+            "show me my tables", "list tables", "what tables do i have", 
+            "show me my data tables", "display tables", "available tables"
+        ]
+        if not displays and any(phrase in user_message_text.lower() for phrase in explicit_table_requests):
+            app.logger.info("Triggering emergency display creation for explicit table request...")
             try:
                 direct_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
                 app.logger.info(f"Direct query result: {direct_result}")
@@ -1385,10 +1389,10 @@ def chat_with_gemini_client_style():
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
         )
 
-        # Create displays array directly from tool results
+        # Create displays array only for explicit data requests
         displays = []
         
-        # First check if we have query_data from the main extraction logic
+        # Only create displays if we have valid query_data from explicit requests
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
                 "type": "table", 
@@ -1396,36 +1400,16 @@ def chat_with_gemini_client_style():
                 "content": query_data
             })
             app.logger.info(f"Created display from query_data with {len(query_data)} rows")
-        else:
-            # Fallback: directly extract from latest chat history
-            try:
-                retrieved_history = chat_session.get_history()
-                for message_content in reversed(retrieved_history):
-                    if hasattr(message_content, 'parts') and message_content.parts:
-                        for part in message_content.parts:
-                            if hasattr(part, 'function_response') and part.function_response:
-                                func_result = part.function_response.response
-                                if isinstance(func_result, dict):
-                                    # Extract nested result data
-                                    result_data = func_result.get('result', func_result)
-                                    if isinstance(result_data, dict) and result_data.get('status') == 'success':
-                                        table_data = result_data.get('data', [])
-                                        if table_data and isinstance(table_data, list):
-                                            displays.append({
-                                                "type": "table",
-                                                "title": "Available Data Tables", 
-                                                "content": table_data
-                                            })
-                                            app.logger.info(f"Created fallback display with {len(table_data)} rows")
-                                            break
-                    if displays:
-                        break
-            except Exception as e:
-                app.logger.error(f"Error in fallback display creation: {e}")
                 
-        # Force create display if we have no displays but tool returned data
-        if not displays:
-            # Direct extraction from tool results as last resort
+        # Only force create display for explicit table requests
+        explicit_table_keywords = [
+            "show me my tables", "list tables", "what tables do i have", 
+            "show me my data tables", "display tables", "available tables"
+        ]
+        user_wants_tables = any(phrase in user_message_text.lower() for phrase in explicit_table_keywords)
+        
+        if not displays and user_wants_tables:
+            # Direct extraction from tool results for explicit table requests only
             try:
                 tool_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
                 if tool_result.get('status') == 'success' and tool_result.get('data'):
@@ -1434,7 +1418,7 @@ def chat_with_gemini_client_style():
                         "title": "Available Data Tables",
                         "content": tool_result['data']
                     })
-                    app.logger.info(f"Force-created display with {len(tool_result['data'])} rows")
+                    app.logger.info(f"Force-created display with {len(tool_result['data'])} rows for explicit request")
                     final_answer = "Here are your available data tables:"
             except Exception as e:
                 app.logger.error(f"Error in force display creation: {e}")
@@ -1495,9 +1479,16 @@ def chat_with_gemini_client_style():
                         # Extract the table names (third part of each match)
                         table_matches = [match[2] for match in matches if len(match) >= 3]
                     
-                    # Force create a display with the table data we already have
-                    if not displays:
-                        # We know from logs that we have 64 tables, create display directly
+                    # Only force create display for explicit table requests
+                    explicit_table_requests = [
+                        "show me my tables", "list tables", "what tables do i have", 
+                        "show me my data tables", "display tables", "available tables",
+                        "tables in your", "bigquery dataset", "list of tables"
+                    ]
+                    should_show_tables = any(phrase in final_answer.lower() for phrase in explicit_table_requests) if final_answer else False
+                    
+                    if not displays and should_show_tables:
+                        # Only create table display for explicit requests
                         table_list_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
                         try:
                             bigquery_result = execute_bigquery_query(table_list_query)
