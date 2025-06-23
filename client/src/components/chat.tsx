@@ -59,7 +59,16 @@ export function Chat({ conversation }: ChatProps) {
         timestamp: new Date(),
       };
 
-      console.log(`Table display complete: ${assistantMessage.displays.length} displays`);
+      console.log('=== REACT QUERY MUTATION SUCCESS ===');
+      console.log('Raw backend response:', JSON.stringify(data, null, 2));
+      console.log('Extracted displays:', JSON.stringify(data.displays, null, 2));
+      console.log(`Assistant message displays: ${assistantMessage.displays.length}`);
+      
+      if (assistantMessage.displays.length > 0) {
+        console.log('First display structure:', JSON.stringify(assistantMessage.displays[0], null, 2));
+      } else {
+        console.log('ERROR: No displays found in assistant message');
+      }
 
       setMessages(prev => 
         prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
