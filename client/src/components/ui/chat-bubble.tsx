@@ -13,6 +13,9 @@ interface ChatBubbleProps {
 export function ChatBubble({ message, className }: ChatBubbleProps) {
   const isUser = message.role === "user";
 
+  // Handle both single 'display' object and array of 'displays'
+  const displays = message.display ? [message.display] : message.displays;
+
   return (
     <div
       className={cn(
@@ -49,15 +52,15 @@ export function ChatBubble({ message, className }: ChatBubbleProps) {
           >
             <div className="whitespace-pre-wrap">
               {/* Clean up JSON formatting if present */}
-              {message.content.startsWith('{"content":') ? 
+              {typeof message.content === 'string' && message.content.startsWith('{"content":') ? 
                 JSON.parse(message.content).content : 
                 message.content
               }
             </div>
             
-            {!isUser && message.displays && message.displays.length > 0 && (
+            {!isUser && displays && displays.length > 0 && (
               <div className="mt-4">
-                <CanvasDisplay displays={message.displays} />
+                <CanvasDisplay displays={displays} />
               </div>
             )}
           </div>
