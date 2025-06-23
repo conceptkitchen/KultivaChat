@@ -32,10 +32,13 @@ export function Chat({ conversation }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({
+          message: content,
+          conversation_history: []
+        })
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
@@ -49,16 +52,15 @@ export function Chat({ conversation }: ChatProps) {
       };
 
       const assistantMessage = {
-        id: data.assistantMessage.id,
+        id: `assistant-${Date.now()}`,
         role: 'assistant' as const,
-        content: data.assistantMessage.content,
-        displays: data.assistantMessage.displays || [],
-        timestamp: new Date(data.assistantMessage.timestamp),
+        content: data.reply || "No response",
+        displays: data.displays || [],
+        timestamp: new Date(),
       };
 
-      console.log(`Table display fix: Assistant message has ${assistantMessage.displays.length} displays`);
+      console.log(`Table display complete: ${assistantMessage.displays.length} displays`);
 
-      // Immediately update local state with the complete message including displays
       setMessages(prev => 
         prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
       );
