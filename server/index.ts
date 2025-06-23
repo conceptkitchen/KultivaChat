@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,19 @@ function startFlaskServer(): Promise<void> {
   });
 }
 
+// Proxy all /api requests to Flask backend BEFORE authentication
+app.use('/api', createProxyMiddleware({
+  target: 'http://localhost:8081',
+  changeOrigin: true,
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`Proxying ${req.method} ${req.url} to backend`);
+  },
+  onError: (err, req, res) => {
+    console.error('Proxy Error:', err.message);
+    res.status(500).json({ error: 'Backend connection failed' });
+  }
+}));
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -104,8 +118,8 @@ app.get('/health', (req, res) => {
 // Setup authentication and routes
 async function initializeServer() {
   try {
-    // Register API routes with authentication
-    await registerRoutes(app);
+    // Register non-API routes with authentication (if needed)
+    // await registerRoutes(app);
     
     // Serve static files from client dist directory
     app.use(express.static(path.join(__dirname, '../dist')));
