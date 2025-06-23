@@ -9,10 +9,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Serve static files from dist directory
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Proxy API requests to Python backend
+// Proxy API requests to Python backend FIRST (before static files)
 app.use('/api', createProxyMiddleware({
   target: 'http://localhost:8081',
   changeOrigin: true,
@@ -24,6 +21,9 @@ app.use('/health', createProxyMiddleware({
   target: 'http://localhost:8081',
   changeOrigin: true
 }));
+
+// Serve static files from dist directory (after API proxy)
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // Serve React app for all other routes
 app.get('*', (req, res) => {
