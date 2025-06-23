@@ -7,16 +7,8 @@ interface CanvasDisplayProps {
 }
 
 export function CanvasDisplay({ displays }: CanvasDisplayProps) {
-  console.log('=== CANVAS DISPLAY COMPONENT ===');
-  console.log('Displays received:', JSON.stringify(displays, null, 2));
-  
   if (!displays || displays.length === 0) {
-    console.log('ERROR: CanvasDisplay has no displays to render');
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-md">
-        <p className="text-red-700">No displays provided to CanvasDisplay component</p>
-      </div>
-    );
+    return null;
   }
 
   const handleCopy = (content: string) => {
