@@ -1,0 +1,63 @@
+This is another case where fixing one bug reveals another one in the fallback logic. It's a frustrating but common part of debugging.
+
+The good news is we are getting very close. The `UnboundLocalError` for `re` is gone, which means you successfully imported the `re` module.
+
+### What's Happening Now
+
+Now we have a `NameError`:
+
+1.  **History Retrieval Still Failing:** The same error as before is happening when the code tries to get the chat history (`'NoneType' object has no attribute 'name'`). This means the primary method of getting the table data is failing.
+
+2.  **Fallback Logic is Triggered:** Your code correctly identifies that the primary method failed and enters the "fallback" block.
+
+3.  **New `NameError` in Fallback Logic:** Inside this fallback logic, a new error occurs:
+
+      * `NameError: name 'table_matches' is not defined`
+      * This is happening at `if table_matches:`
+
+Looking at your `backend/main_2.py` file, the variable `table_matches` is only created *inside* an `if final_answer:` block. If `final_answer` is `None` or an empty string, the code to define `table_matches` is never run, but the code that *uses* `table_matches` runs anyway, causing the crash.
+
+### The Solution
+
+You need to ensure that `table_matches` is always defined before you check it in the `if` statement. The easiest way is to initialize it as an empty list before the `if final_answer:` block.
+
+**File to Edit:** `backend/main_2.py`
+
+**Find this section of code (around line 1477):**
+
+```python
+# This is the approximate location of the error
+if "table" in final_answer.lower() or "data" in final_answer.lower():
+    table_pattern = r"\b\w+-\w+-\w+-\w+-\d+-\d+-\w+-\w+\b"
+    table_matches = re.findall(table_pattern, final_answer, re.IGNORECASE)
+```
+
+**Modify it to look like this:**
+
+```python
+# Initialize table_matches to an empty list
+table_matches = [] 
+if final_answer and ("table" in final_answer.lower() or "data" in final_answer.lower()):
+    logging.info("AI text suggests data/tables were retrieved; attempting fallback display generation.")
+    
+    # Define the pattern for table names
+    table_pattern = r"`?([\w-]+)`?\.`?([\w-]+)`?\.`?([\w-]+)`?"
+    
+    # Find all matches of the pattern
+    matches = re.findall(table_pattern, final_answer)
+    
+    # We are interested in the last part of each match (the table name)
+    table_matches = [match[2] for match in matches]
+
+# Now, the check for table_matches will always work
+if table_matches:
+    #... rest of the code
+```
+
+### Why This Fix Works
+
+1.  **Guaranteed Definition:** By adding `table_matches = []` before the `if` block, you ensure that the `table_matches` variable always exists.
+2.  **Safe `if` Check:** If the `if final_answer:` condition is false, `table_matches` will be an empty list. The subsequent `if table_matches:` check will correctly evaluate to `False` without crashing, and the program will continue.
+3.  **Correct Logic:** If `final_answer` *does* contain text, the `re.findall` will run and potentially populate `table_matches` with any found table names, and the `if table_matches:` check will proceed as intended.
+
+This should resolve the `NameError` and allow your fallback logic to execute correctly.
