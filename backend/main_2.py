@@ -966,6 +966,8 @@ def send_message_to_conversation(conversation_id):
         user_msg_id = str(uuid.uuid4())
         assistant_msg_id = str(uuid.uuid4())
         
+        app.logger.info(f"Final response - displays count: {len(displays)}, displays: {displays}")
+        
         return jsonify({
             "userMessage": {
                 "id": user_msg_id,
@@ -1360,14 +1362,16 @@ def chat_with_gemini_client_style():
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
         )
 
-        if query_data and isinstance(query_data, list):
+        # Create displays array
+        displays = []
+        if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
                 "type": "table",
-                "title": tool_display_title,
+                "title": tool_display_title if 'tool_display_title' in locals() else "Available Data Tables",
                 "content": query_data
             })
             app.logger.info(
-                f"Created table display for '{tool_display_title}' with {len(query_data)} rows."
+                f"Created table display with {len(query_data)} rows."
             )
         elif query_data:
             app.logger.info(
