@@ -44,6 +44,8 @@ export function Chat({ conversation }: ChatProps) {
       return response.json();
     },
     onSuccess: (data, variables) => {
+      console.log('Full backend response:', JSON.stringify(data, null, 2));
+      
       const userMessage = {
         id: `user-${Date.now()}`,
         role: 'user' as const,
@@ -54,12 +56,13 @@ export function Chat({ conversation }: ChatProps) {
       const assistantMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant' as const,
-        content: data.reply || "No response",
+        content: data.reply || data.final_answer || "No response",
         displays: data.displays || [],
         timestamp: new Date(),
       };
 
-      console.log(`Table display complete: ${assistantMessage.displays.length} displays`);
+      console.log(`React Query success: ${assistantMessage.displays.length} displays found`);
+      console.log('Displays data:', assistantMessage.displays);
 
       setMessages(prev => 
         prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
