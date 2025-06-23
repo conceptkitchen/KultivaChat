@@ -1,0 +1,94 @@
+You are absolutely right to be frustrated, and your instinct is correct. Based on the `chat.tsx` code you've provided, **the problem is on the frontend**.
+
+Let me be clear: your backend is working. The logs show it's successfully finding the data, preparing it for display, and sending it. The issue is that your `chat.tsx` component is not correctly reading the data that the backend is sending.
+
+### The Core Problem: A Mismatch in `chat.tsx`
+
+The issue is a subtle but critical mismatch between the data structure your backend sends and the structure your `chat.tsx` component expects.
+
+1.  **Backend sends:** A JSON response containing a single object named `display`. The logs confirm this: `SUCCESS: Data for **display** extracted...`
+2.  **Frontend expects:** Your `chat.tsx` code is explicitly looking for an array named `displays` (plural).
+
+Look at this section in your `sendMessageMutation`'s `onSuccess` handler:
+
+```typescript
+// From your chat.tsx
+const assistantMessage = {
+    id: `assistant-${Date.now()}`,
+    role: 'assistant' as const,
+    content: data.reply || data.final_answer || "No response",
+    // This line is the problem. It looks for "displays" (plural)
+    displays: data.displays || [], 
+    timestamp: new Date(),
+};
+```
+
+When the backend sends `{ "display": { ... } }`, your code sees that `data.displays` is `undefined` and sets `assistantMessage.displays` to an empty array `[]`. This "empty" message is then passed to the `ChatBubble` component, which correctly renders nothing.
+
+### The Fix
+
+You need to update the `onSuccess` handler in `client/src/components/chat.tsx` to correctly handle the singular `display` object from the backend and put it into the `displays` array that the rest of your frontend expects.
+
+**File to Edit:** `client/src/components/chat.tsx`
+
+**Find this `onSuccess` block:**
+
+```typescript
+// The original, incorrect block
+onSuccess: (data, variables) => {
+    console.log('Backend response received successfully');
+    console.log('Displays found:', data.displays?.length || 0);
+    
+    // ...
+
+    const assistantMessage = {
+        // ...
+        displays: data.displays || [],
+        // ...
+    };
+
+    // ...
+},
+```
+
+**Replace it with this corrected version:**
+
+```typescript
+// The new, corrected block
+onSuccess: (data, variables) => {
+    console.log('Backend response received:', data); // More detailed logging
+
+    // This is the fix: Check for the singular 'display' object from the backend
+    // and put it into an array for the frontend.
+    const displays = data.display ? [data.display] : (data.displays || []);
+
+    const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user' as const,
+        content: variables,
+        timestamp: new Date(),
+    };
+
+    const assistantMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant' as const,
+        content: data.reply || data.final_answer || "No response",
+        displays: displays, // Use the corrected 'displays' variable
+        timestamp: new Date(),
+    };
+
+    console.log('Creating assistant message with displays:', assistantMessage.displays.length);
+
+    setMessages(prev => 
+        prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
+    );
+
+    setIsProcessing(false);
+},
+```
+
+### Why This Works
+
+This change mirrors the logic we previously applied to `ChatBubble`. It explicitly checks for the `display` property that the backend is sending. If it finds it, it wraps it in an array `[data.display]`, which is the format the rest of your frontend components now expect. If it doesn't find it, it defaults to an empty array, preserving the original behavior for messages without tables.
+
+You were right to focus on the frontend. The backend has been doing its job, but the `chat.tsx` component was simply misinterpreting the response. This fix should finally make the table rendering consistent and reliable.
