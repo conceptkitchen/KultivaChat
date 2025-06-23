@@ -25,11 +25,8 @@ interface CanvasDisplayProps {
 export function CanvasDisplay({ displays }: CanvasDisplayProps) {
   const { toast } = useToast();
   
-  console.log("CanvasDisplay received:", displays);
-  
   if (!displays || displays.length === 0) {
-    console.log("CanvasDisplay: No displays to render");
-    return null;
+    return <div className="text-red-500 text-sm">CanvasDisplay: No displays provided</div>;
   }
 
   const handleCopy = (content: string) => {
@@ -79,16 +76,8 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
       case "table":
         const tableData = display.content as Record<string, any>[];
         
-        console.log("Processing table display:", { 
-          hasContent: !!display.content, 
-          isArray: Array.isArray(tableData),
-          length: tableData?.length,
-          sampleData: tableData?.[0]
-        });
-        
         // Handle empty or invalid table data
         if (!tableData || !Array.isArray(tableData)) {
-          console.log("Invalid table data");
           return (
             <div className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
               No valid table data available
@@ -122,47 +111,45 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
         }
         
         return (
-          <div className="border rounded-md w-full overflow-hidden">
-            <div className="overflow-x-auto overflow-y-auto max-h-96 bg-white">
-              <Table className="w-full min-w-max">
-                <TableHeader className="sticky top-0 bg-gray-50 z-10">
-                  <TableRow>
+          <div className="border rounded-md w-full overflow-hidden bg-white">
+            <div className="overflow-x-auto overflow-y-auto max-h-96">
+              <table className="w-full border-collapse">
+                <thead className="sticky top-0 bg-gray-50 z-10">
+                  <tr>
                     {columns.map((column) => (
-                      <TableHead key={column} className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-gray-700 border-b whitespace-nowrap min-w-32">
-                        {column}
-                      </TableHead>
+                      <th key={column} className="px-4 py-3 text-left font-semibold text-xs uppercase tracking-wider text-gray-700 border-b border-gray-300 whitespace-nowrap">
+                        {column.replace(/_/g, ' ')}
+                      </th>
                     ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                  </tr>
+                </thead>
+                <tbody>
                   {tableData.map((row, i) => (
-                    <TableRow key={i} className={i % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
+                    <tr key={i} className={i % 2 === 0 ? "bg-white hover:bg-gray-50" : "bg-gray-50 hover:bg-gray-100"}>
                       {columns.map((column) => (
-                        <TableCell key={column} className="px-4 py-3 text-sm text-gray-900 border-b border-gray-200">
-                          <div className="min-w-0 break-words" title={String(row[column] || '')}>
+                        <td key={column} className="px-4 py-3 text-sm text-gray-900 border-b border-gray-200">
+                          <div className="min-w-0 break-words max-w-xs" title={String(row[column] || '')}>
                             {String(row[column] || '')}
                           </div>
-                        </TableCell>
+                        </td>
                       ))}
-                    </TableRow>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
-            <div className="flex items-center justify-between p-3 border-t border-neutral-200 bg-gray-50">
-              <span className="text-sm text-neutral-600 font-medium">
-                Showing {tableData.length} {tableData.length === 1 ? 'record' : 'records'} from your Keboola workspace
+            <div className="flex items-center justify-between p-3 border-t border-gray-200 bg-gray-50">
+              <span className="text-sm text-gray-600 font-medium">
+                Showing {tableData.length} {tableData.length === 1 ? 'table' : 'tables'} from your Kapwa Gardens workspace
               </span>
               <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
+                <button 
                   onClick={() => handleCopy(JSON.stringify(tableData, null, 2))}
-                  className="text-xs"
+                  className="text-xs px-3 py-1 bg-white border border-gray-300 rounded hover:bg-gray-50 flex items-center"
                 >
                   <Copy className="h-3 w-3 mr-1" />
                   Copy Data
-                </Button>
+                </button>
               </div>
             </div>
           </div>
@@ -199,45 +186,41 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
 
   return (
     <div className="space-y-4">
-      <div className="text-xs text-green-600 mb-2">CanvasDisplay rendering {displays.length} displays</div>
-      {displays.map((display, index) => {
-        console.log(`Rendering display ${index}:`, display);
-        return (
-          <Card key={index} className="shadow-sm border-neutral-200 overflow-hidden">
-            <CardHeader className="bg-secondary px-4 py-2 flex flex-row items-center justify-between">
-              <CardTitle className="text-white text-sm font-medium">
-                {display.title || (display.type.charAt(0).toUpperCase() + display.type.slice(1))}
-              </CardTitle>
-              <div className="flex space-x-2">
-                {display.type === "code" && (
-                  <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
-                    <Copy className="h-3 w-3 mr-1" />
-                    Copy
-                  </Button>
-                )}
-                {(display.type === "table" || display.type === "visualization") && (
-                  <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
-                    <Expand className="h-3 w-3 mr-1" />
-                    Expand
-                  </Button>
-                )}
-                {(display.type === "table" || display.type === "documentation" || display.type === "code") && (
-                  <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
-                    <Download className="h-3 w-3 mr-1" />
-                    Download
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className={cn(
-              "p-0",
-              display.type === "table" ? "bg-white" : "p-4"
-            )}>
-              {renderContent(display)}
-            </CardContent>
-          </Card>
-        );
-      })}
+      {displays.map((display, index) => (
+        <Card key={index} className="shadow-sm border-neutral-200 overflow-hidden">
+          <CardHeader className="bg-secondary px-4 py-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-white text-sm font-medium">
+              {display.title || (display.type.charAt(0).toUpperCase() + display.type.slice(1))}
+            </CardTitle>
+            <div className="flex space-x-2">
+              {display.type === "code" && (
+                <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
+                  <Copy className="h-3 w-3 mr-1" />
+                  Copy
+                </Button>
+              )}
+              {(display.type === "table" || display.type === "visualization") && (
+                <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
+                  <Expand className="h-3 w-3 mr-1" />
+                  Expand
+                </Button>
+              )}
+              {(display.type === "table" || display.type === "documentation" || display.type === "code") && (
+                <Button variant="ghost" size="sm" className="text-neutral-300 hover:text-white text-xs py-1 px-2 h-auto">
+                  <Download className="h-3 w-3 mr-1" />
+                  Download
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className={cn(
+            "p-0",
+            display.type === "table" ? "bg-white" : "p-4"
+          )}>
+            {renderContent(display)}
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }

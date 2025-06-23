@@ -57,35 +57,34 @@ export function ChatBubble({ message, className }: ChatBubbleProps) {
             
             {!isUser && message.displays && message.displays.length > 0 && (
               <div className="mt-4">
-
-                {message.displays.map((display, idx) => (
-                  display.type === "table" ? (
-                    <div key={idx} className="border rounded-md bg-white p-4 mt-2">
-                      <h3 className="font-semibold mb-3">{display.title || "Data Table"}</h3>
-                      <div className="overflow-auto max-h-96">
-                        <table className="w-full border-collapse border border-gray-300">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Table Name</th>
+                <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                  DEBUG: Found {message.displays.length} displays. First display: {message.displays[0]?.type} with {Array.isArray(message.displays[0]?.content) ? message.displays[0].content.length : 0} items
+                </div>
+                <CanvasDisplay displays={message.displays} />
+                {message.displays[0]?.type === "table" && (
+                  <div className="mt-2 border rounded-md bg-white p-4">
+                    <h3 className="font-semibold mb-3 text-gray-800">Backup Table Display</h3>
+                    <div className="overflow-auto max-h-96">
+                      <table className="w-full border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="border border-gray-300 px-3 py-2 text-left font-semibold text-xs">Table Name</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(message.displays[0].content as any[]).slice(0, 10).map((row: any, idx: number) => (
+                            <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                              <td className="border border-gray-300 px-3 py-2 text-sm">{row.table_name}</td>
                             </tr>
-                          </thead>
-                          <tbody>
-                            {(display.content as any[]).map((row, rowIdx) => (
-                              <tr key={rowIdx} className={rowIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                                <td className="border border-gray-300 px-3 py-2 text-sm">{row.table_name}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-600">
-                        Showing {(display.content as any[]).length} tables from your Kapwa Gardens workspace
-                      </div>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ) : (
-                    <CanvasDisplay key={idx} displays={[display]} />
-                  )
-                ))}
+                    <div className="mt-2 text-xs text-gray-600">
+                      Showing first 10 of {(message.displays[0].content as any[]).length} tables
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
