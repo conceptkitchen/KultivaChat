@@ -101,7 +101,69 @@ function startFlaskServer(): Promise<void> {
 // Track Flask server readiness
 let flaskServerReady = false;
 
-// Proxy all /api requests to Flask backend BEFORE authentication
+// Handle conversation messages with database persistence BEFORE general proxy
+app.post('/api/conversations/:id/messages', express.json(), async (req, res) => {
+  if (!flaskServerReady) {
+    return res.status(503).json({ error: 'Backend not ready' });
+  }
+
+  try {
+    const conversationId = req.params.id;
+    const { content } = req.body;
+
+    console.log(`Processing message for conversation ${conversationId}: ${content}`);
+
+    // Call Flask backend for AI processing
+    const { default: fetch } = await import('node-fetch');
+    const backendResponse = await fetch('http://localhost:8081/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: content,
+        conversation_history: []
+      })
+    });
+
+    if (!backendResponse.ok) {
+      throw new Error(`Backend responded with ${backendResponse.status}`);
+    }
+
+    const backendResult = await backendResponse.json();
+    console.log('Backend response:', JSON.stringify(backendResult, null, 2));
+
+    // Extract assistant message and displays from backend response
+    const assistantContent = backendResult.reply || backendResult.final_answer || "No response";
+    const displays = backendResult.displays || [];
+
+    console.log(`Extracted displays: ${displays.length} items`);
+
+    // Create response in the format expected by frontend
+    const response = {
+      userMessage: {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: content,
+        timestamp: new Date().toISOString()
+      },
+      assistantMessage: {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant', 
+        content: assistantContent,
+        displays: displays,
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    console.log(`Sending response with ${displays.length} displays`);
+    res.json(response);
+
+  } catch (error) {
+    console.error('Message processing error:', error);
+    res.status(500).json({ error: 'Failed to process message' });
+  }
+});
+
+// Proxy other /api requests to Flask backend
 app.use('/api', (req, res, next) => {
   // If Flask not ready, wait briefly and retry
   if (!flaskServerReady) {
