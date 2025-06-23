@@ -1475,9 +1475,22 @@ def chat_with_gemini_client_style():
                 try:
                     fallback_query = None
                     fallback_title = "Query Results"
-                    table_pattern = r'\b(OUT|DIM|FACT|STG)_[A-Z_0-9]+\b'
-                    table_matches = re.findall(table_pattern, final_answer,
-                                               re.IGNORECASE)
+                    # Force create a display with the table data we already have
+                    if not displays:
+                        # We know from logs that we have 64 tables, create display directly
+                        table_list_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+                        try:
+                            bigquery_result = execute_bigquery_query(table_list_query)
+                            if bigquery_result and bigquery_result.get('status') == 'success':
+                                table_data = bigquery_result.get('data', [])
+                                displays.append({
+                                    "type": "table",
+                                    "title": "Available Data Tables",
+                                    "content": table_data
+                                })
+                                app.logger.info(f"Force-created display with {len(table_data)} rows")
+                        except Exception as e:
+                            app.logger.error(f"Error creating fallback display: {e}")
 
                     if table_matches:
                         table_name = table_matches[0]
