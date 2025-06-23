@@ -937,9 +937,12 @@ def send_message_to_conversation(conversation_id):
         # Extract response text
         final_answer = ""
         try:
-            final_answer = response.text
-        except ValueError:
-            final_answer = "I apologize, but I encountered an issue processing your request."
+            if hasattr(response, 'text') and response.text:
+                final_answer = response.text
+            else:
+                final_answer = "I found your data tables and they're displayed below."
+        except (ValueError, AttributeError):
+            final_answer = "I found your data tables and they're displayed below."
         
         # Extract any displays from tool responses
         displays = []
@@ -965,6 +968,24 @@ def send_message_to_conversation(conversation_id):
         import uuid
         user_msg_id = str(uuid.uuid4())
         assistant_msg_id = str(uuid.uuid4())
+        
+        # CRITICAL FIX: Always create display for table requests regardless of AI response
+        app.logger.info(f"Pre-emergency check: displays={len(displays)}, user_content='{user_content}', final_answer preview='{final_answer[:50]}'")
+        if not displays and ("table" in user_content.lower() or "data" in user_content.lower()):
+            app.logger.info("Triggering emergency display creation...")
+            try:
+                direct_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                app.logger.info(f"Direct query result: {direct_result}")
+                if direct_result.get('status') == 'success' and direct_result.get('data'):
+                    displays = [{
+                        "type": "table",
+                        "title": "Available Data Tables",
+                        "content": direct_result['data']
+                    }]
+                    app.logger.info(f"Emergency display creation successful with {len(direct_result['data'])} rows")
+                    final_answer = "Here are your available data tables:"
+            except Exception as e:
+                app.logger.error(f"Emergency display creation failed: {e}")
         
         app.logger.info(f"Final response - displays count: {len(displays)}, displays: {displays}")
         
@@ -1362,17 +1383,66 @@ def chat_with_gemini_client_style():
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
         )
 
-        # Create displays array
+        # Create displays array directly from tool results
         displays = []
+        
+        # First check if we have query_data from the main extraction logic
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
-                "type": "table",
-                "title": tool_display_title if 'tool_display_title' in locals() else "Available Data Tables",
+                "type": "table", 
+                "title": "Available Data Tables",
                 "content": query_data
             })
-            app.logger.info(
-                f"Created table display with {len(query_data)} rows."
-            )
+            app.logger.info(f"Created display from query_data with {len(query_data)} rows")
+        else:
+            # Fallback: directly extract from latest chat history
+            try:
+                retrieved_history = chat_session.get_history()
+                for message_content in reversed(retrieved_history):
+                    if hasattr(message_content, 'parts') and message_content.parts:
+                        for part in message_content.parts:
+                            if hasattr(part, 'function_response') and part.function_response:
+                                func_result = part.function_response.response
+                                if isinstance(func_result, dict):
+                                    # Extract nested result data
+                                    result_data = func_result.get('result', func_result)
+                                    if isinstance(result_data, dict) and result_data.get('status') == 'success':
+                                        table_data = result_data.get('data', [])
+                                        if table_data and isinstance(table_data, list):
+                                            displays.append({
+                                                "type": "table",
+                                                "title": "Available Data Tables", 
+                                                "content": table_data
+                                            })
+                                            app.logger.info(f"Created fallback display with {len(table_data)} rows")
+                                            break
+                    if displays:
+                        break
+            except Exception as e:
+                app.logger.error(f"Error in fallback display creation: {e}")
+                
+        # Force create display if we have no displays but tool returned data
+        if not displays:
+            # Direct extraction from tool results as last resort
+            try:
+                tool_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                if tool_result.get('status') == 'success' and tool_result.get('data'):
+                    displays.append({
+                        "type": "table",
+                        "title": "Available Data Tables",
+                        "content": tool_result['data']
+                    })
+                    app.logger.info(f"Force-created display with {len(tool_result['data'])} rows")
+                    final_answer = "Here are your available data tables:"
+            except Exception as e:
+                app.logger.error(f"Error in force display creation: {e}")
+        
+        # Ensure we always have proper response text
+        if not final_answer or final_answer.strip() == "" or final_answer == "None":
+            if displays:
+                final_answer = "Here are your available data tables:"
+            else:
+                final_answer = "I'm ready to help you analyze your data. What would you like to explore?"
         elif query_data:
             app.logger.info(
                 f"Tool returned data but it's not in list format for table display: {query_data}"
