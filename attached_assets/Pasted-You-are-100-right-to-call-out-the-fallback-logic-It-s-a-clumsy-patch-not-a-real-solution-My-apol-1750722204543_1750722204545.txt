@@ -1,0 +1,195 @@
+You are 100% right to call out the fallback logic. It's a clumsy patch, not a real solution. My apologies for getting stuck on that. You're right to push for fixing the core problem, and your suspicion that it's related to the frontend is spot on.
+
+Let's ignore the fallback and fix the *real* issue.
+
+The fundamental problem is that the backend is losing the conversation context with every message. The reason is in your `chat.tsx` file.
+
+### The Real Problem: `conversation_history: []`
+
+Your `chat.tsx` is sending a new, blank history to the backend every single time you send a message.
+
+Look at this code in `sendMessageMutation`:
+
+```typescript
+// in client/src/components/chat.tsx
+
+mutationFn: async (content: string) => {
+    const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            message: content,
+            // THIS is the problem. You are erasing the history.
+            conversation_history: [] 
+        })
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+},
+```
+
+Every time you send a message ("hi", "show me my tables"), the backend receives a history of `[]`. This is why:
+
+1.  The `get_history()` function in the backend is failing or acting weirdly—it's trying to process a history that's been wiped clean and rebuilt from scratch in every request.
+2.  The AI seems to have amnesia. You ask for tables, it shows them. You ask again, and it has no memory of the previous turn because the history was blanked out.
+
+### The Fix: Send the Real History
+
+We need to make the frontend send the *actual* conversation history with each request. This will preserve the context, allow the backend to work as designed, and get rid of all the downstream errors.
+
+**File to Edit:** `client/src/components/chat.tsx`
+
+**Action:** Modify the `handleSendMessage` function and the `sendMessageMutation` to use the current `messages` state as the history.
+
+```tsx
+import React, { useEffect, useRef, useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChatBubble, ChatBubbleSkeleton } from "@/components/ui/chat-bubble";
+import { ChatInput } from "@/components/ui/chat-input";
+import { Message, Conversation } from "@/lib/utils";
+import { v4 as uuidv4 } from "uuid";
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+
+interface ChatProps {
+  conversation: Conversation;
+}
+
+// Define the type for our mutation variables
+type SendMessageVars = {
+  content: string;
+  history: Message[];
+};
+
+export function Chat({ conversation }: ChatProps) {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (conversation && conversation.messages) {
+      setMessages(conversation.messages);
+    }
+  }, [conversation]);
+
+  // UPDATE THE MUTATION
+  const sendMessageMutation = useMutation({
+    mutationFn: async ({ content, history }: SendMessageVars) => { // Use the new type
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: content,
+          // Send the REAL history
+          conversation_history: history 
+        })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      // This logic should now work correctly
+      const displays = data.display ? [data.display] : (data.displays || []);
+
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user' as const,
+        content: variables.content, // Get content from variables
+        timestamp: new Date(),
+      };
+
+      const assistantMessage = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant' as const,
+        content: data.reply || data.final_answer || "No response",
+        displays: displays,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => 
+        prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
+      );
+
+      setIsProcessing(false);
+    },
+    onError: (error) => {
+      console.error("Error sending message:", error);
+      setMessages((prev) => prev.filter((msg) => !msg.isLoading));
+      setIsProcessing(false);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // UPDATE handleSendMessage
+  const handleSendMessage = async (content: string) => {
+    if (isProcessing) return;
+
+    // We can filter out loading messages and any other system messages if needed
+    const historyForBackend = messages.filter(m => !m.isLoading);
+
+    setIsProcessing(true);
+    
+    const userMessage: Message = {
+      id: uuidv4(),
+      role: "user",
+      content,
+      timestamp: new Date(),
+    };
+    
+    const loadingMessage: Message = {
+      id: uuidv4(),
+      role: "assistant",
+      content: "",
+      timestamp: new Date(),
+      isLoading: true,
+    };
+    
+    setMessages([...messages, userMessage, loadingMessage]);
+    
+    // Call the mutation with both the new message AND the history
+    sendMessageMutation.mutate({ content, history: historyForBackend });
+  };
+
+  // ... (the rest of your component remains the same)
+  // ... (useEffect for auto-scrolling)
+  // ... (useEffect for loading initial messages)
+  // ... (return statement with JSX)
+  return (
+    <div className="flex flex-col h-full overflow-hidden bg-neutral-50">
+      <ScrollArea 
+        ref={scrollAreaRef}
+        className="flex-1 p-4 md:px-8 space-y-6 custom-scrollbar overflow-y-auto max-h-[calc(100vh-160px)]"
+        style={{ overscrollBehavior: "contain" }}
+      >
+        {messages.map((message) => (
+          <ChatBubble 
+            key={message.id} 
+            message={message}
+          />
+        ))}
+        {sendMessageMutation.isPending && <ChatBubbleSkeleton />}
+      </ScrollArea>
+
+      <ChatInput 
+        onSend={handleSendMessage}
+        disabled={isProcessing}
+      />
+    </div>
+  );
+}
+```
+
+### Summary of Changes
+
+1.  **`SendMessageVars` Type:** Created a type to make it clear our mutation now takes a `content` string and a `history` array.
+2.  **`mutationFn` Updated:** It now accepts the `{ content, history }` object and sends the `history` to the backend in the `conversation_history` field.
+3.  **`handleSendMessage` Updated:** It now captures the current `messages` state and passes it along with the new message content when calling `sendMessageMutation.mutate()`.
+
+This is the proper way to handle conversational context. The frontend holds the state of the conversation and provides it to the backend for each turn. This should fix the root cause and make the entire application behave as expected, without any need for clumsy fallbacks.
