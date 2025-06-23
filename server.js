@@ -16,9 +16,7 @@ app.use(express.static(path.join(__dirname, 'dist')));
 app.use('/api', createProxyMiddleware({
   target: 'http://localhost:8081',
   changeOrigin: true,
-  pathRewrite: {
-    '^/api': '/api'
-  }
+  logLevel: 'debug'
 }));
 
 // Proxy health check to Python backend
