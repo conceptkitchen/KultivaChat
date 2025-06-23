@@ -1475,6 +1475,22 @@ def chat_with_gemini_client_style():
                 try:
                     fallback_query = None
                     fallback_title = "Query Results"
+                    
+                    # Initialize table_matches to empty list to prevent NameError
+                    table_matches = []
+                    
+                    # Extract table names from final_answer if it contains table references
+                    if final_answer and ("table" in final_answer.lower() or "data" in final_answer.lower()):
+                        # Define the pattern for table names (looking for BigQuery table references)
+                        table_pattern = r"`?([\w-]+)`?\.`?([\w-]+)`?\.`?([\w-]+)`?"
+                        
+                        # Find all matches of the pattern - using the module-level re import
+                        import re  # Ensure re is available in this scope
+                        matches = re.findall(table_pattern, final_answer)
+                        
+                        # Extract the table names (third part of each match)
+                        table_matches = [match[2] for match in matches if len(match) >= 3]
+                    
                     # Force create a display with the table data we already have
                     if not displays:
                         # We know from logs that we have 64 tables, create display directly
