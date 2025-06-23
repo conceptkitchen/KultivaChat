@@ -1,11 +1,11 @@
 import os
+import re  # For fallback logic - moved to top
 from flask import Flask, jsonify, request
 from kbcstorage.client import Client as KeboolaStorageClient
 from google.cloud import bigquery
 import logging
 import json
 import time
-import re  # For fallback logic
 from difflib import SequenceMatcher
 
 # typing.Optional is crucial for parameters with a default value of None

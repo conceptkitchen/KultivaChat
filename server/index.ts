@@ -34,6 +34,7 @@ function startFlaskServer(): Promise<void> {
       // Flask is ready when it shows the server running message
       if (output.includes('Running on http://127.0.0.1:8081') && !flaskReady) {
         flaskReady = true;
+        flaskServerReady = true; // Set flag for proxy
         console.log('Flask server is ready');
         resolve();
       }
@@ -97,9 +98,23 @@ function startFlaskServer(): Promise<void> {
   });
 }
 
+// Track Flask server readiness
+let flaskServerReady = false;
+
 // Proxy all /api requests to Flask backend BEFORE authentication
 app.use('/api', (req, res, next) => {
-  // Manual proxy implementation to preserve full path
+  // If Flask not ready, wait briefly and retry
+  if (!flaskServerReady) {
+    setTimeout(() => {
+      handleProxyRequest(req, res);
+    }, 1000);
+    return;
+  }
+  
+  handleProxyRequest(req, res);
+});
+
+function handleProxyRequest(req: any, res: any) {
   const targetUrl = `http://localhost:8081${req.originalUrl}`;
   console.log(`Manual proxy: ${req.method} ${req.originalUrl} -> ${targetUrl}`);
   
@@ -135,7 +150,7 @@ app.use('/api', (req, res, next) => {
         res.status(500).json({ error: 'Backend connection failed' });
       });
   });
-});
+}
 
 // Health check
 app.get('/health', (req, res) => {
