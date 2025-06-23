@@ -870,6 +870,16 @@ def create_conversation():
         "updatedAt": "2025-06-23T21:00:00Z"
     })
 
+@app.route('/api/conversations/<conversation_id>', methods=['GET'])
+def get_conversation(conversation_id):
+    # Return the conversation details
+    return jsonify({
+        "id": conversation_id,
+        "title": "New Conversation",
+        "createdAt": "2025-06-23T21:00:00Z",
+        "updatedAt": "2025-06-23T21:00:00Z"
+    })
+
 @app.route('/api/conversations/<conversation_id>/messages', methods=['GET'])
 def get_conversation_messages(conversation_id):
     # Return empty messages for new conversations
