@@ -120,6 +120,7 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
   - Fixed React Query mutation in `client/src/components/chat.tsx` to use correct `/api/chat` endpoint
   - CRITICAL FIX: Updated ChatBubble component to properly handle displays array structure
   - Fixed displays property handling in `client/src/components/ui/chat-bubble.tsx` to support both singular and plural display formats
+  - Fixed backend TypeError in `backend/main_2.py` by adding null check for message_content.parts to prevent crashes
   - CanvasDisplay component completely rewritten with clean, functional table rendering
   - Backend successfully processes and returns 64 Kapwa Gardens table names from BigQuery
   - Complete data flow verified: BigQuery → Backend → Node.js Proxy → Frontend → User display

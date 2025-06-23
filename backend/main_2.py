@@ -1274,10 +1274,12 @@ def chat_with_gemini_client_style():
 
                 for message_content in reversed(retrieved_history):
                     # Check both user and model messages for function responses
-                    for part in message_content.parts:
-                        if hasattr(part, 'function_response'
+                    # FIX: Add a check for message_content and message_content.parts to prevent TypeError
+                    if message_content and message_content.parts:
+                        for part in message_content.parts:
+                            if hasattr(part, 'function_response'
                                    ) and part.function_response:
-                            app.logger.info(
+                                app.logger.info(
                                 f"Found function_response in history from tool: {part.function_response.name}"
                             )
                             try:
