@@ -110,6 +110,12 @@ The application uses a multi-stage deployment approach:
 ```
 Changelog:
 - June 23, 2025. Initial setup
+- June 23, 2025. Fixed deployment issues:
+  - Resolved Python dependency error with Runner initialization
+  - Created proper WSGI entry point for Gunicorn
+  - Fixed port configuration to bind to port 5000
+  - Updated Gunicorn configuration for production deployment
+  - Successfully deployed with health check and chat API endpoints working
 ```
 
 ## User Preferences
