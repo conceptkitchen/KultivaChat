@@ -16,14 +16,14 @@ echo "[4/5] Installing backend dependencies..."
 pip install -r backend/requirements_minimal.txt
 
 echo "[5/5] Starting servers..."
-# Start Python backend on port 8081
+# Start Python backend on port 8081 in background
 cd backend
-gunicorn --config gunicorn.conf.py wsgi:application &
+python simple_flask_app.py &
 BACKEND_PID=$!
 
-# Wait a moment for backend to start
+# Wait for backend to start
 sleep 3
 
 # Start Node.js frontend server on port 5000
 cd ..
-exec node simple_server.js
+exec node working_server.cjs
