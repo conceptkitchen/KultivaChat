@@ -26,4 +26,4 @@ sleep 3
 
 # Start Node.js frontend server on port 5000
 cd ..
-exec node server.js
+exec node simple_server.js
