@@ -13,4 +13,5 @@ echo "[3/4] Installing backend dependencies..."
 pip install -r backend/requirements.txt
 
 echo "[4/4] Starting Python Gunicorn server..."
-exec gunicorn --workers 3 --timeout 120 'backend.run_flask:app' --bind 0.0.0.0:8080
+cd backend
+exec gunicorn --config gunicorn.conf.py wsgi:app
