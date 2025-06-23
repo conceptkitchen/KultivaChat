@@ -60,6 +60,9 @@ export function ChatBubble({ message, className }: ChatBubbleProps) {
             
             {!isUser && displays && displays.length > 0 && (
               <div className="mt-4">
+                <div className="text-xs text-gray-500 mb-2">
+                  Showing {displays.length} display(s)
+                </div>
                 <CanvasDisplay displays={displays} />
               </div>
             )}

@@ -44,7 +44,8 @@ export function Chat({ conversation }: ChatProps) {
       return response.json();
     },
     onSuccess: (data, variables) => {
-      console.log('Full backend response:', JSON.stringify(data, null, 2));
+      console.log('Backend response received successfully');
+      console.log('Displays found:', data.displays?.length || 0);
       
       const userMessage = {
         id: `user-${Date.now()}`,
@@ -61,8 +62,11 @@ export function Chat({ conversation }: ChatProps) {
         timestamp: new Date(),
       };
 
-      console.log(`React Query success: ${assistantMessage.displays.length} displays found`);
-      console.log('Displays data:', assistantMessage.displays);
+      console.log('Creating assistant message with displays:', assistantMessage.displays.length);
+      if (assistantMessage.displays.length > 0) {
+        console.log('First display type:', assistantMessage.displays[0].type);
+        console.log('First display content length:', assistantMessage.displays[0].content?.length || 0);
+      }
 
       setMessages(prev => 
         prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
@@ -72,6 +76,7 @@ export function Chat({ conversation }: ChatProps) {
     },
     onError: (error) => {
       console.error("Error sending message:", error);
+      console.log("Error occurred:", error);
       setMessages((prev) => prev.filter((msg) => !msg.isLoading));
       setIsProcessing(false);
       toast({

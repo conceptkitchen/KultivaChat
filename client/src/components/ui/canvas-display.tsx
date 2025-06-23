@@ -7,7 +7,10 @@ interface CanvasDisplayProps {
 }
 
 export function CanvasDisplay({ displays }: CanvasDisplayProps) {
+  console.log('CanvasDisplay received displays:', displays?.length || 0);
+  
   if (!displays || displays.length === 0) {
+    console.log('No displays to render');
     return null;
   }
 
@@ -16,16 +19,22 @@ export function CanvasDisplay({ displays }: CanvasDisplayProps) {
   };
 
   const renderDisplay = (display: DisplayContent, index: number) => {
+    console.log(`Rendering display ${index}:`, display.type, 'with content length:', display.content?.length || 0);
+    
     if (display.type === "table") {
       const tableData = display.content as Record<string, any>[];
       
       if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
+        console.log('No table data found for display', index);
         return (
           <div key={index} className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">
             No table data available
           </div>
         );
       }
+      
+      console.log(`Table has ${tableData.length} rows`);
+      console.log('First row keys:', Object.keys(tableData[0] || {}));
 
       const columns = Object.keys(tableData[0] || {});
       
