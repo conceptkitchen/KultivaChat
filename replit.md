@@ -110,9 +110,19 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 - **Port Mapping**: External port 80 maps to internal port 5000
 - **Environment**: Production variables configured in Replit secrets
 
+## Recent Changes
+
+- **June 23, 2025**: Fixed critical frontend-backend API communication
+  - Implemented manual proxy middleware between Node.js (port 5000) and Flask (port 8081)
+  - Fixed "New Chat" button functionality - now creates and opens conversations properly
+  - Added missing `/api/conversations/{id}` route for individual conversation access
+  - Complete API endpoints now responding correctly (HTTP 200 status)
+  - Chat functionality fully operational - users can create conversations and send messages
+  - Data analysis pipeline working (AI processing user queries about Keboola/BigQuery data)
+
 ## Changelog
 
-- June 23, 2025. Initial setup
+- June 23, 2025. Initial setup and frontend-backend integration completed
 
 ## User Preferences
 
