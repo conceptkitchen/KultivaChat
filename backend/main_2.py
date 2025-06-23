@@ -970,7 +970,7 @@ def send_message_to_conversation(conversation_id):
         assistant_msg_id = str(uuid.uuid4())
         
         # Only create display for explicit table requests, not casual mentions
-        app.logger.info(f"Pre-emergency check: displays={len(displays)}, user_content='{user_content}', final_answer preview='{final_answer[:50] if final_answer else 'None'}'")
+        app.logger.info(f"Pre-emergency check: displays={len(displays)}, user_message='{user_message_text}', final_answer preview='{final_answer[:50] if final_answer else 'None'}'")
         explicit_table_requests = [
             "show me my tables", "list tables", "what tables do i have", 
             "show me my data tables", "display tables", "available tables"
