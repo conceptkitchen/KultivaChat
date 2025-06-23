@@ -10,8 +10,8 @@ echo "[2/4] Building production frontend..."
 cd client && npm run build && cd ..
 
 echo "[3/4] Installing backend dependencies..."
-pip install -r backend/requirements.txt
+pip install -r backend/requirements_minimal.txt
 
 echo "[4/4] Starting Python Gunicorn server..."
 cd backend
-exec gunicorn --config gunicorn.conf.py wsgi:app
+exec gunicorn --config gunicorn.conf.py wsgi:application
