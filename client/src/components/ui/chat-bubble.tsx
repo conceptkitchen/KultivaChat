@@ -57,7 +57,35 @@ export function ChatBubble({ message, className }: ChatBubbleProps) {
             
             {!isUser && message.displays && message.displays.length > 0 && (
               <div className="mt-4">
-                <CanvasDisplay displays={message.displays} />
+
+                {message.displays.map((display, idx) => (
+                  display.type === "table" ? (
+                    <div key={idx} className="border rounded-md bg-white p-4 mt-2">
+                      <h3 className="font-semibold mb-3">{display.title || "Data Table"}</h3>
+                      <div className="overflow-auto max-h-96">
+                        <table className="w-full border-collapse border border-gray-300">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Table Name</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(display.content as any[]).map((row, rowIdx) => (
+                              <tr key={rowIdx} className={rowIdx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                <td className="border border-gray-300 px-3 py-2 text-sm">{row.table_name}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-600">
+                        Showing {(display.content as any[]).length} tables from your Kapwa Gardens workspace
+                      </div>
+                    </div>
+                  ) : (
+                    <CanvasDisplay key={idx} displays={[display]} />
+                  )
+                ))}
               </div>
             )}
           </div>
