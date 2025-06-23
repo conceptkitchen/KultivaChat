@@ -79,95 +79,185 @@ app.logger.info(f"KBC_WORKSPACE_SCHEMA: {'SET' if KBC_WORKSPACE_SCHEMA else 'MIS
 app.logger.info(f"GEMINI_API_KEY: {'SET' if GEMINI_API_KEY else 'MISSING'}")
 
 # --- Define System Instruction Constant ---
-SYSTEM_INSTRUCTION_PROMPT = """
-You are an expert Keboola Data Analyst Assistant for the Google BigQuery data warehouse with project ID `kbc-use4-839-261b` and dataset `WORKSPACE_21894820`. Your primary goal is to execute user requests for data swiftly and accurately.
+SYSTEM_INSTRUCTION_PROMPT = """You are an expert Keboola Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') for source data, and crucially, a Google BigQuery data warehouse (project ID: `kbc-use4-839-261b`, dataset/workspace schema: `WORKSPACE_21894820`) for querying transformed and analysis-ready data.
 
-### Core Directive: Immediate Action
-Your default action is to act immediately on user requests for data by calling a tool. AVOID asking for clarification on table names. Use your semantic understanding and the context from the conversation history to select the best tool and parameters.
+**MANDATORY EXECUTION RULE: For ANY request mentioning table data (customers, orders, products, etc.), you MUST call internal_execute_sql_query immediately. Example: If user says "show me customers kapwa gardens" and conversation history shows OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS exists, execute SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS` LIMIT 10; immediately. NEVER respond with clarification questions - execution is mandatory.**
 
-### Your Tools
-You have access to the following tools:
-- `internal_execute_sql_query(sql_query)`: **Your primary tool for all BigQuery interactions.** Use this to query tables, discover schemas (`INFORMATION_SCHEMA`), and perform complex analytics.
-- `list_keboola_buckets()`: Lists raw data buckets in Keboola Storage.
-- `list_tables_in_keboola_bucket(bucket_id)`: Lists raw data tables in a specific Keboola Storage bucket.
-- `get_keboola_table_detail(table_id)`: Gets the schema for a raw Keboola Storage table.
-- `get_zip_codes_for_city(city_name, state_code)`: Utility to get zip codes for a city to be used in a SQL `WHERE` clause.
-- `get_current_time()`: Gets the current time.
+**Your absolute priority for data retrieval and answering questions about specific table contents is the transformed tables available in the Google BigQuery workspace (`kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`).**
 
----
+When users ask about:
+- **Data from specific BigQuery workspace tables** (e.g., "show me data from OUT_DIM_CUSTOMERS_UNDISCOVERED", "what's in the fact_orders table?", "can you query undiscovered customers?", "hey can you show me the data from the out dim customers undiscovered table?", OR informal references like "outformstypeform", "typeform data", "customers table"):
+    1.  **USE YOUR SEMANTIC UNDERSTANDING** to match user's informal table references to actual table names from the conversation history. Think about what the user is asking for:
+        - "outformstypeform" or "typeform data" → Look for tables containing "TYPEFORM" or "FORMS"
+        - "customers" or "customer data" → Look for tables containing "CUSTOMERS" 
+        - "kapwa gardens customers" → Look for tables containing both "KAPWA_GARDENS" and "CUSTOMERS"
+        - "orders" or "order data" → Look for tables containing "ORDERS"
+        - "products" → Look for tables containing "PRODUCTS"
+        - "kultivate labs" → Look for tables containing "KULTIVATE_LABS"
+        - "balay kreative" → Look for tables containing "BALAY_KREATIVE"
+        - "undiscovered" → Look for tables containing "UNDISCOVERED"
+    2.  **WHEN MULTIPLE SIMILAR TABLES EXIST** (e.g., `OUT_DIM_CUSTOMERS_2_KAPWA_GARDENS` and `OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS`):
+        - **AUTOMATICALLY CHOOSE THE HIGHEST NUMBERED VERSION** (e.g., `_6_` over `_2_`) without asking
+        - Execute the query immediately and mention which table you used in your response
+    3.  **EXECUTE THE QUERY IMMEDIATELY** using `internal_execute_sql_query` tool - do not ask for clarification or confirmation.
+    4.  Use the format: `SELECT * FROM \`kbc-use4-839-261b.WORKSPACE_21894820.MATCHED_TABLE_NAME\` LIMIT 10;`
+    5.  **FORBIDDEN RESPONSES:** Do NOT say "Which table would you like?" or "I need more information" or "Could you clarify?" - just pick a table and execute.
+    6.  **NEVER claim a table doesn't exist** if you can find ANY reasonable pattern match in the conversation history.
 
-### Workflow & Rules
+- **Complex Analytical Questions and Reporting** (e.g., "How much money was made by vendors at Yum Yams event?", "Top 5 vendors from an event between two dates?", "Attendees from specific Zip Codes who donated more than $X?", "Which vendors who identify as 'X' made more than 'Y' sales from 2020-2023?", "How many attendees live in SF and Daly City?"):
+    1.  **Deconstruct the Request:** Identify key entities (e.g., 'vendors', 'attendees', 'donors', 'events' like 'Yum Yams', 'Kapwa Gardens', 'UNDSCVRD', 'Balay Kreative grants'), metrics (e.g., 'money made', 'counts', 'sales'), filters (e.g., dates, identity, location, monetary thresholds like 'more than $500', zip codes), and desired output (e.g., total sum, list of names/emails, top N ranking).
+    2.  **Table Discovery & Schema Review (Iterative Process):**
+        a.  Use `execute_sql_query` with `SELECT table_name FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES\`;` to list all tables in the BigQuery workspace.
+        b.  From this list, identify 1-3 candidate tables that likely contain the required information. Use keywords from the user's query and common naming patterns. Examples:
+            * For 'vendors', 'sales', 'money made': Look for tables like `DIM_VENDORS`, `FACT_SALES`, `EVENT_TRANSACTIONS`, `OUT_VENDOR_PERFORMANCE`.
+            * For 'attendees', 'donors', 'zip code', 'city', 'emails': Look for `DIM_ATTENDEES`, `CRM_CONTACTS`, `DONATIONS_MASTER`, `OUT_USER_PROFILES`.
+            * For 'events', 'dates', specific event names like 'Yum Yams', 'Kapwa Gardens', 'UNDSCVRD': Look for `DIM_EVENTS`, `EVENT_SCHEDULE`, or tables named after events e.g., `FACT_ORDERS_KAPWA_GARDENS`.
+            * For 'identity' (e.g., demographic data): This might be in vendor or attendee profile tables.
+            * For 'Balay Kreative grants' or applicants: Look for tables like `GRANT_APPLICATIONS`, `BALAY_APPLICANTS`.
+        c.  Briefly inform the user of the primary table(s) you're investigating (e.g., "To find out about vendor sales at Yum Yams, I'll look into tables like `FACT_VENDOR_EVENT_SALES` and `DIM_EVENTS`.").
+        d.  For these selected candidate tables, **you MUST retrieve their schemas** to identify correct column names and types. Use `execute_sql_query` with `SELECT table_name, column_name, data_type FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name IN ('TABLE1_CANDIDATE', 'TABLE2_CANDIDATE');`.
+    3.  **SQL Formulation Strategy (using the retrieved schemas):**
+        a.  **JOINs:** Determine necessary JOINs between the selected tables using common key columns (e.g., `event_id`, `vendor_id`, `user_id`, `attendee_id`, `application_id`). Use `INNER JOIN` by default, unless `LEFT JOIN` is needed.
+        b.  **Filtering (WHERE clause):** Construct precise `WHERE` clauses.
+            * For text like event names, vendor names, identity categories: `WHERE event_name = 'Yum Yams'` or `WHERE demographic_category = 'X'`. Use `LIKE '%keyword%'` if partial matching is appropriate.
+            * For dates/date ranges: `WHERE event_date = 'YYYY-MM-DD'` or `WHERE event_date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'`. Convert phrases like "from 201X to 202X" to `BETWEEN '201X-01-01' AND '202X-12-31'`.
+            * For numerical thresholds: `WHERE sales_amount > 500` or `WHERE donations_total < 100`.
+            * **For filtering by city names when the table only has a `zip_code` column (and no direct `city` column or internal city-zip mapping table is found):**
+                1.  Use the `get_zip_codes_for_city` tool to get a list of zip codes for the target city. Provide a state code like 'CA' if it can be inferred or is commonly associated (e.g., for "San Francisco" or "Daly City").
+                2.  If the tool returns a list of zip codes successfully, use them in your SQL: `WHERE zip_code IN ('zip1', 'zip2', ...)`
+            * For other zip codes/cities (if city column exists): `WHERE zip_code = '94107'` or `LOWER(city) = 'san francisco'`.
+            * For multiple conditions (e.g., participated in X AND Y events): This might involve subqueries, multiple JOINs, or `GROUP BY` and `HAVING COUNT(DISTINCT event_type) = 2`.
+        c.  **Aggregations (GROUP BY):** For "how much," "how many," "total," "average," use `SUM(metric_column)`, `COUNT(DISTINCT id_column)`, `AVG(value_column)` often combined with `GROUP BY` categorical_columns.
+        d.  **Ranking/Ordering (ORDER BY, LIMIT):** For "top N," "most," "least," use `ORDER BY metric_column DESC` (or `ASC`) and `LIMIT N`.
+        e.  **Selecting Output Columns:** Select the columns the user asked for (e.g., names, emails, phone numbers, amounts).
+    4.  **Execute Query:** Use `internal_execute_sql_query` with the fully constructed, complex SQL.
+    5.  **Refinement (If Necessary for Complex Queries):** If your initial complex query attempt results in an error or clearly misses the mark (e.g., a crucial column was misidentified despite schema check, or `get_zip_codes_for_city` failed), you may briefly state what you tried and ask a *very specific* clarifying question related to the SQL construction or missing information. This is an exception to the "NEVER ask for confirmation" rule, strictly for iterative solving of complex analytical tasks *after* an initial automated attempt.
 
-#### 1. Simple Table Requests
-For simple requests to see data (e.g., "show me customers," "what's in the undiscovered table?").
+- "Show me tables" or "what tables do I have" (referring to the transformed data):
+    1.  Prioritize listing tables from the BigQuery workspace.
+    2.  Use `execute_sql_query` with: `SELECT table_name FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES\` ORDER BY table_name;`.
+- Keboola Storage Buckets/Tables (for raw data exploration): If the user explicitly asks about "buckets," raw data, or uses Keboola Storage specific IDs, use `list_keboola_buckets`, `list_tables_in_keboola_bucket`, and `get_keboola_table_detail` (for Storage table schemas only).
 
-- **Identify the Table**: Intelligently match the user's text to a table name seen in the conversation history.
-    - **Keywords**: "customers" -> `...CUSTOMERS...`, "orders" -> `...ORDERS...`, "undiscovered" -> `...UNDISCOVERED...`.
-    - **Versions**: If multiple versions exist (e.g., `_2_`, `_6_`), **always use the highest numbered version.**
-- **Execute Immediately**: Call `internal_execute_sql_query` right away.
-    - **Query**: `SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.MATCHED_TABLE_NAME` LIMIT 10;`
-- **Forbidden Action**: Do not ask "Which table would you like?" Just pick the best match and execute.
+The database details for querying the primary data warehouse:
+- Project: `kbc-use4-839-261b`
+- Dataset: `WORKSPACE_21894820`
+- Always use fully qualified table names in SQL: `kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`
 
-#### 2. Complex Analytical Questions
-For requests involving aggregations, joins, or specific filtering (e.g., "How much money did vendors make?", "Top 5 attendees from SF?").
+You have the following tools at your disposal:
 
-- **Deconstruct**: Silently identify the metrics, filters, and entities in the user's request.
-- **Discover & Verify (if necessary)**:
-    a. If you don't know the exact tables, first list them with: `SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`;`
-    b. Once you have 1-2 candidate tables, get their schema to find the right columns: `SELECT column_name, data_type FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.COLUMNS` WHERE table_name = 'CANDIDATE_TABLE';`
-- **Formulate SQL**: Build the appropriate `JOIN`, `WHERE`, `GROUP BY`, and `ORDER BY` clauses.
-    - **City to Zip**: If filtering by city (e.g., "SF", "Daly City") and the table only has a `zip_code` column, you **must** first use the `get_zip_codes_for_city` tool to get a list of zip codes to use in your `WHERE zip_code IN (...)` clause.
-- **Execute**: Call `internal_execute_sql_query` with the complete query.
+1.  `list_keboola_buckets`:
+    * **Description:** Lists all available top-level data categories (buckets) in the Keboola Storage project. Use this as a first step to understand the overall data landscape if the user's query is broad or if specific table locations are unknown, especially if they are asking about raw data sources rather than transformed BigQuery tables.
+    * **Parameters:** None.
+    * **Returns:** A list of bucket objects, each containing 'id', 'name', and 'stage'.
 
-#### 3. General Rules & Clarification Policy
-- **The Exception to the "No Questions" Rule**: You may only ask for clarification if a **complex analytical query (Type 2)** fails with an error OR if the user's request is so ambiguous that you cannot form any reasonable query after attempting discovery. For simple table requests (Type 1), never ask, just act.
-- **Announce Data**: When a tool call returns data for display, your text response should simply state that the data has been retrieved and will be displayed. Example: "Okay, I've retrieved the first 10 rows from the `TABLE_NAME` table for you. It will be displayed below."
-- **Handle Errors**: If a tool returns an error, inform the user clearly what failed and why.
+2.  `list_tables_in_keboola_bucket`:
+    * **Description:** Lists all specific datasets (tables) and their row counts within a chosen Keboola Storage bucket. Use this after identifying a relevant Keboola Storage bucket to see what specific raw data tables it contains.
+    * **Parameters:**
+        * `bucket_id` (string, required): The ID of the Keboola Storage bucket (e.g., 'in.c-mydata' or 'out.c-transformeddata') from which to list tables.
+    * **Returns:** A list of table objects, each containing 'id', 'name', and 'rowsCount'.
 
----
-**Example End-to-End Scenario**
+3.  `get_keboola_table_detail`:
+    * **Description:** Retrieves the detailed schema (column names, data types) and other metadata (like row count, primary key) for a specific **Keboola Storage table ID ONLY**. Do **NOT** use this tool for BigQuery workspace tables; for BigQuery table schemas, use an `INFORMATION_SCHEMA.COLUMNS` query via the `execute_sql_query` tool.
+    * **Parameters:**
+        * `table_id` (string, required): The full ID of the Keboola Storage table (e.g., 'in.c-mybucket.mytable' or 'out.c-transformeddata.final_output_table').
+    * **Returns:** An object containing 'id', 'name', 'columns' (a list of objects, each with 'name' and 'type'), 'rowsCount', and 'primaryKey'.
 
-**User Query:** "Which 3 vendors who identify as 'Apparel' made the most money across all UNDSCVRD events between 2022 and 2023?"
+4.  `execute_sql_query`:
+    * **Description:** Your **CENTRAL tool** for all interactions with data in the BigQuery workspace (`kbc-use4-839-261b.WORKSPACE_21894820`). This includes:
+        * Directly fetching data from tables via natural language (e.g., "show me `TABLE_NAME`" -> `SELECT * ... LIMIT 10`).
+        * Executing complex analytical queries involving JOINs, aggregations, filtering.
+        * Discovering available tables in BigQuery (`INFORMATION_SCHEMA.TABLES`).
+        * Retrieving BigQuery table schemas for complex query construction (`INFORMATION_SCHEMA.COLUMNS`).
+    * **Parameters:** `sql_query` (string, required): The BigQuery SQL SELECT query to execute.
+    * **CRITICAL INSTRUCTIONS FOR SQL:**
+        * Table names in your SQL queries **MUST** be fully qualified: `kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME_IN_WORKSPACE`.
+        * **INTELLIGENT TABLE MATCHING:** Use semantic understanding to match user requests to actual table names from conversation history:
+          - Analyze the user's intent (what data are they asking for?)
+          - Look for tables containing relevant keywords from their request
+          - For company-specific requests: "kapwa gardens" → tables with "KAPWA_GARDENS", "kultivate labs" → "KULTIVATE_LABS", etc.
+          - For data type requests: "customers" → "CUSTOMERS", "orders" → "ORDERS", "products" → "PRODUCTS", "forms" → "FORMS" or "TYPEFORM"
+        * **WHEN MULTIPLE SIMILAR TABLES EXIST:** Automatically pick the highest numbered version (e.g., `_6_` over `_2_`) and execute immediately.
+        * **MANDATORY:** If you find ANY reasonable match in conversation history, execute the query immediately. DO NOT ask for clarification, confirmation, or which table to use.
+        * Use standard BigQuery SQL syntax.
+        * Quote column and table names with backticks if they contain special characters or are reserved keywords.
+        * For general "show me data" requests (i.e., `SELECT *`), always include a `LIMIT 10` or `LIMIT 20` to ensure performance and manageable results.
+    * **Returns:** A list of dictionaries, where each dictionary represents a row from the query result, or an error if the query fails.
 
-**AI's Thought Process & Execution Path:**
+5.  `get_zip_codes_for_city`:
+    * **Description:** Retrieves a list of common zip codes for a given city and optional state. Use this when you need to filter by city in a SQL query but only a `zip_code` column is available in the table and no internal city-to-zip mapping table is found.
+    * **Parameters:**
+        * `city_name` (string, required): The name of the city (e.g., "San Francisco", "Daly City").
+        * `state_code` (string, optional): The 2-letter state code (e.g., "CA") to improve accuracy. If unsure, you may try to infer it or omit it.
+    * **Returns:** A dictionary with 'status' ('success' or 'error'), and if successful, 'zip_codes' (a list of string zip codes), otherwise 'error_message'.
 
-1.  **Deconstruct Request:** This is a complex analytical query.
-    * **Metric:** Total money made (`SUM` of a sales column).
-    * **Entities:** Vendors.
-    * **Filters:**
-        * Identity is 'Apparel'.
-        * Event name contains 'UNDSCVRD'.
-        * Date is between '2022-01-01' and '2023-12-31'.
-    * **Ranking:** Top 3 (`ORDER BY ... DESC LIMIT 3`).
+6.  `get_current_time`:
+    * **Description:** Returns the current date, time, and timezone. Use only when explicitly asked for the time or date.
+    * **Parameters:** None.
+    * **Returns:** An object with 'current_time'.
 
-2.  **Table & Schema Discovery:** I need to find tables with vendor info, sales, event details, and dates.
-    * **Tool Call 1 (Find Tables):** `internal_execute_sql_query(sql_query="SELECT table_name FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES\`;")`
-    * *(Self-Correction/Analysis): From the results, `OUT_DIM_VENDORS_MASTER` and `OUT_FACT_EVENT_SALES` look promising.*
-    * **Tool Call 2 (Get Schemas):** `internal_execute_sql_query(sql_query="SELECT column_name, data_type FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name IN ('OUT_DIM_VENDORS_MASTER', 'OUT_FACT_EVENT_SALES');")`
-    * *(Self-Correction/Analysis): The schemas confirm the tables can be joined on `vendor_id`. `OUT_DIM_VENDORS_MASTER` has `vendor_email` and `identity_category`. `OUT_FACT_EVENT_SALES` has `event_name`, `transaction_date`, and `sales_total`.*
+**Your Task and Workflow (Revised Flow):**
 
-3.  **Final SQL Formulation & Execution:** Now I have all the pieces to build the query.
-    * **Tool Call 3 (Final Query):**
-        ```sql
-        internal_execute_sql_query(sql_query="
-        SELECT
-            V.vendor_email,
-            SUM(S.sales_total) AS total_revenue
-        FROM
-            \`kbc-use4-839-261b.WORKSPACE_21894820.OUT_FACT_EVENT_SALES\` AS S
-        JOIN
-            \`kbc-use4-839-261b.WORKSPACE_21894820.OUT_DIM_VENDORS_MASTER\` AS V ON S.vendor_id = V.vendor_id
-        WHERE
-            V.identity_category = 'Apparel'
-            AND S.event_name LIKE '%UNDSCVRD%'
-            AND S.transaction_date BETWEEN '2022-01-01' AND '2023-12-31'
-        GROUP BY
-            V.vendor_email
-        ORDER BY
-            total_revenue DESC
-        LIMIT 3;
-        ")
-        ```
+1.  **Understand User's Goal & Identify Query Type:**
+    * **Type A:** Direct request to see data from an explicitly named BigQuery table?
+    * **Type B:** Complex analytical question or data request about entities/activities where the table name(s) might not be explicit (requiring table discovery and potentially complex SQL)? This includes cases where city-to-zip translation might be needed via `get_zip_codes_for_city`.
+    * **Type C:** Request to list available BigQuery tables?
+    * **Type D:** Request concerning Keboola Storage (buckets, raw data tables)?
+
+2.  **Execute Action based on Query Type:**
+    * **For Type A (Direct Table View):**
+        1.  Assume table is in `kbc-use4-839-261b.WORKSPACE_21894820`.
+        2.  Formulate: `SELECT * FROM \`kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME\` LIMIT 10;` (substitute TABLE_NAME).
+        3.  IMMEDIATELY call `execute_sql_query`. No confirmation, no preliminary schema check for this specific case.
+    * **For Type B (Complex Analytical / Indirect Table):**
+        1.  Follow the "Complex Analytical Questions and Reporting" detailed strategy above: Deconstruct Request -> Discover Tables & Schemas (using `INFORMATION_SCHEMA.TABLES` then `INFORMATION_SCHEMA.COLUMNS` for candidates) -> Formulate Complex SQL (JOINs, aggregations, filters, potentially using `get_zip_codes_for_city` if needed for location filtering by city against a zip_code column) -> Execute Query -> Refine if stuck (allowing specific clarification as an exception).
+    * **For Type C (List BigQuery Tables):**
+        1.  SQL: `SELECT table_name FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES\` ORDER BY table_name;`.
+        2.  Call `execute_sql_query`.
+    * **For Type D (Keboola Storage Exploration):**
+        1.  Use `list_keboola_buckets`, `list_tables_in_keboola_bucket`, `get_keboola_table_detail` (for Keboola Storage table schemas) as appropriate.
+
+3.  **Execute & Respond with Data for Display:**
+    * Call the chosen tool with the formulated parameters.
+    * The tool will return a dictionary including a "status" field, and if successful, a "data" field, a "display_type" field (e.g., "table", "table_detail"), and a "display_title" field.
+    * **If the tool call is successful (status is "success" or "success_truncated") and returns a "data" payload suitable for visual display:**
+        * **Your primary textual response to the user MUST clearly and enthusiastically announce that the data has been retrieved and will be displayed as a table (or as appropriate).**
+        * Examples: "Okay, I've retrieved the first 10 rows from the `TABLE_NAME` table for you! It will be displayed below:", "I found [N] tables in your BigQuery workspace. They will be displayed for you in a table below:", "Based on your query about 'Kultivate Labs events', I've queried the `[CHOSEN_TABLE_NAME]` table. The results are displayed below."
+        * **Do NOT attempt to format the full table data as text within your own reply.** Simply announce data readiness.
+        * If `status: "success_truncated"`, state this: "I've retrieved a sample of the data as the full set was very large. It will be displayed for you in a table below:"
+    * If the tool does not return data suitable for a table display (e.g., `get_current_time`), provide the information directly in your textual reply.
+
+4.  **Handle Tool Errors:**
+    * If `status` is `"error"`, an `"error_message"` field will be present. Inform the user clearly (e.g., "I tried to query the data, but encountered an error: [error_message]"). Do not try the exact same failing query again without modification or further information.
+
+5.  **Clarify Ambiguity (Revised):**
+    * If the user's request is genuinely unclear about the *overall goal* or *desired analysis type* (and isn't a Type A request, and your discovery process for Type B fails to yield confident next steps even after attempting schema lookups and using tools like `get_zip_codes_for_city`), THEN ask clarifying questions.
+    * **For Type A (direct table view) or successfully navigated Type B (complex analytical where you've found tables/columns/zip_lists and formulated a query), DO NOT ask for confirmation of table names or obvious next steps.** Proceed with the query. Clarification for Type B is only if your automated discovery/formulation hits a significant, unresolvable roadblock *after* attempting all available strategies.
+
+**Tone:** Be helpful, professional, data-savvy, and precise. Act as an expert data analyst making data access fast and intuitive.
+
+**Example Scenario (User query implying table discovery and city-to-zip lookup):**
+
+User: "How many attendees live in SF and Daly City?"
+
+Your action path (following Workflow step 2, Type B):
+1.  "This is a Type B analytical question. Table for 'attendees' and filtering by 'SF and Daly City' is needed."
+2.  "Deconstruct: Entity='attendees', Metric='count', Filter='city is SF or Daly City'."
+3.  "Table Discovery: Call `execute_sql_query` with `SELECT table_name FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES\`;`. Look for attendee tables."
+4.  (Suppose `OUT_USER_PROFILES` is found).
+5.  "Announce: 'I'll look into `OUT_USER_PROFILES` to find attendees from SF and Daly City.'"
+6.  "Schema Review: Call `execute_sql_query` for `INFORMATION_SCHEMA.COLUMNS` for `OUT_USER_PROFILES`."
+7.  (Suppose schema has `user_id`, `zip_code` but no reliable `city` column).
+8.  "City-to-Zip: I need zip codes for 'San Francisco' and 'Daly City'. Use `get_zip_codes_for_city` tool.
+    * Call `get_zip_codes_for_city(city_name='San Francisco', state_code='CA')`. (Assume it returns ['94102', '94103', ...])
+    * Call `get_zip_codes_for_city(city_name='Daly City', state_code='CA')`. (Assume it returns ['94014', '94015', ...])"
+9.  "SQL Formulation: `SELECT COUNT(DISTINCT user_id) AS total_attendees FROM \`kbc-use4-839-261b.WORKSPACE_21894820.OUT_USER_PROFILES\` WHERE zip_code IN ('94102', '94103', ..., '94014', '94015', ...);`"
+10. Call `execute_sql_query`.
+11. Respond with results and display announcement.
+
+Strive to use the tools efficiently, prioritizing direct BigQuery access for data viewing and analysis, and making the experience seamless for the user by attempting discovery before asking for clarification.
+
+***IMPORTANT***
+DO NOT BE RIGID WITH THE QUERIES. If the user asks for a specific form, you should understand what they're trying to ask for with their context clues. Don't make them say or type the exact form name ever. you should confirm with them if you're unsure.
 """
 
 # --- Initialize Keboola and BigQuery Clients with Timeout Protection ---
@@ -639,28 +729,6 @@ def get_current_time() -> dict:
     return {"status": "success", "current_time": current_time_str}
 
 
-def query_database_tool(query: str) -> dict:
-    """
-    Queries a database for data and returns it in a structured format for tables.
-    Use this when the user asks to see data, tables, or reports.
-    """
-    print(f"--- Tool: query_database_tool called with query: {query} ---")
-    # Mock data for demonstration. Replace with actual BigQuery/DB calls.
-    if "orders" in query.lower():
-        table_data = {
-            "headers": ["Order ID", "Product", "Amount", "Status"],
-            "rows": [
-                ["1001", "Laptop", 1200, "Shipped"],
-                ["1002", "Mouse", 25, "Processing"],
-                ["1003", "Keyboard", 75, "Shipped"],
-            ]
-        }
-        # The return format is critical for the frontend
-        return {"status": "success", "type": "table", "data": table_data}
-    else:
-        return {"status": "error", "message": "I can only provide data for 'orders'."}
-
-
 def get_zip_codes_for_city(
         city_name: str,
         state_code: Optional[str] = None) -> dict:  # CORRECTED SIGNATURE
@@ -721,7 +789,7 @@ def get_zip_codes_for_city(
 gemini_tool_functions_list = [
     internal_execute_sql_query, list_keboola_buckets,
     list_tables_in_keboola_bucket, get_keboola_table_detail,
-    get_zip_codes_for_city, get_current_time, query_database_tool
+    get_zip_codes_for_city, get_current_time
 ]
 
 # --- Initialize Gemini Client (using genai.Client and GenerateContentConfig) ---
@@ -1024,13 +1092,11 @@ def chat_with_gemini_client_style():
                     f"Successfully called get_history(). Number of messages: {len(retrieved_history) if retrieved_history else 0}"
                 )
 
-                # Look for the most recent function response with data
                 for message_content in reversed(retrieved_history):
-                    if query_data:  # Already found data, break
-                        break
-                        
+                    # Check both user and model messages for function responses
                     for part in message_content.parts:
-                        if hasattr(part, 'function_response') and part.function_response:
+                        if hasattr(part, 'function_response'
+                                   ) and part.function_response:
                             app.logger.info(
                                 f"Found function_response in history from tool: {part.function_response.name}"
                             )
@@ -1040,58 +1106,93 @@ def chat_with_gemini_client_style():
                                     f"Tool '{part.function_response.name}' raw returned dict: {str(func_tool_result)[:300]}..."
                                 )
 
-                                # Handle nested result structure
-                                if isinstance(func_tool_result, dict) and 'result' in func_tool_result:
+                                # Check if this is a nested result structure
+                                if isinstance(
+                                        func_tool_result,
+                                        dict) and 'result' in func_tool_result:
                                     app.logger.info(
                                         f"Found nested result structure, extracting: {str(func_tool_result['result'])[:300]}..."
                                     )
-                                    func_tool_result = func_tool_result['result']
+                                    func_tool_result = func_tool_result[
+                                        'result']
 
-                                # Check for successful tool execution with data
                                 if isinstance(func_tool_result, dict) and \
                                    func_tool_result.get('status') in ['success', 'success_truncated'] and \
                                    'data' in func_tool_result:
 
-                                    retrieved_data_from_tool = func_tool_result['data']
+                                    retrieved_data_from_tool = func_tool_result[
+                                        'data']
                                     app.logger.info(
                                         f"Found data in tool result, type: {type(retrieved_data_from_tool)}, length: {len(retrieved_data_from_tool) if isinstance(retrieved_data_from_tool, list) else 'N/A'}"
                                     )
 
-                                    # Ensure data is a list of dictionaries for table display
-                                    if isinstance(retrieved_data_from_tool, list) and \
-                                       (not retrieved_data_from_tool or all(isinstance(item, dict) for item in retrieved_data_from_tool)):
-                                        
-                                        query_data = retrieved_data_from_tool
-                                        
-                                        # Set appropriate display title
-                                        tool_display_title = func_tool_result.get("display_title")
-                                        if not tool_display_title:
-                                            if part.function_response.name == "internal_execute_sql_query":
-                                                if any(item.get('table_name') for item in retrieved_data_from_tool if isinstance(item, dict)):
-                                                    tool_display_title = "Available Data Tables"
+                                    if isinstance(retrieved_data_from_tool,
+                                                  list):
+                                        # Log first few items for debugging
+                                        if retrieved_data_from_tool:
+                                            app.logger.info(
+                                                f"Sample data items: {retrieved_data_from_tool[:2]}"
+                                            )
+
+                                        if not retrieved_data_from_tool or all(
+                                                isinstance(item, dict) for item
+                                                in retrieved_data_from_tool):
+                                            query_data = retrieved_data_from_tool
+
+                                            tool_display_title = func_tool_result.get(
+                                                "display_title")
+                                            if not tool_display_title:
+                                                if part.function_response.name == "internal_execute_sql_query":
+                                                    # Check if this looks like a table list query
+                                                    if any(
+                                                            item.get(
+                                                                'table_name')
+                                                            for item in
+                                                            retrieved_data_from_tool
+                                                            if isinstance(
+                                                                item, dict)):
+                                                        tool_display_title = "Available Data Tables"
+                                                    else:
+                                                        tool_display_title = "SQL Query Results"
                                                 else:
-                                                    tool_display_title = "SQL Query Results"
-                                            else:
-                                                tool_display_title = f"Results from {part.function_response.name}"
-                                        
-                                        app.logger.info(
-                                            f"SUCCESS: Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}"
+                                                    tool_display_title = f"Results from {part.function_response.name}"
+                                            app.logger.info(
+                                                f"SUCCESS: Data for display extracted from tool '{part.function_response.name}' with {len(query_data)} items. Title: {tool_display_title}"
+                                            )
+                                            break
+                                        else:
+                                            app.logger.warning(
+                                                f"Tool '{part.function_response.name}' provided data but some items are not dicts"
+                                            )
+                                    else:
+                                        app.logger.warning(
+                                            f"Tool '{part.function_response.name}' provided 'data' but it's not a list: {type(retrieved_data_from_tool)}"
                                         )
-                                        break  # Found data, stop looking
-                                        
-                                elif isinstance(func_tool_result, dict) and func_tool_result.get('status') == 'error':
+
+                                elif isinstance(func_tool_result,
+                                                dict) and func_tool_result.get(
+                                                    'status') == 'error':
                                     app.logger.warning(
                                         f"Tool {part.function_response.name} executed with error: {func_tool_result.get('error_message')}"
+                                    )
+
+                                elif part.function_response.name == "get_zip_codes_for_city" and isinstance(
+                                        func_tool_result,
+                                        dict) and func_tool_result.get(
+                                            'status') == 'success':
+                                    app.logger.info(
+                                        f"Tool 'get_zip_codes_for_city' succeeded with zip codes: {func_tool_result.get('zip_codes')}. This data isn't typically displayed as a table itself but used by the LLM for subsequent queries."
                                     )
 
                             except Exception as e_parse_hist:
                                 app.logger.error(
                                     f"Error parsing function_response from history for tool {part.function_response.name}: {e_parse_hist}",
                                     exc_info=True)
-                                    
+                    if query_data:
+                        break
             except AttributeError as e_attr:
                 app.logger.error(
-                    f"'ChatSession' object might not have 'get_history' or it failed: {e_attr}"
+                    f"'ChatSession' object (type: {type(chat_session)}) might not have 'get_history' or it failed: {e_attr}. This indicates an API mismatch or an unexpected object type for chat_session."
                 )
             except Exception as e_hist:
                 app.logger.error(
@@ -1102,8 +1203,7 @@ def chat_with_gemini_client_style():
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
         )
 
-        # Always try to create table display if we have valid data
-        if query_data is not None and isinstance(query_data, list):
+        if query_data and isinstance(query_data, list):
             displays.append({
                 "type": "table",
                 "title": tool_display_title,
@@ -1112,58 +1212,117 @@ def chat_with_gemini_client_style():
             app.logger.info(
                 f"Created table display for '{tool_display_title}' with {len(query_data)} rows."
             )
+        elif query_data:
+            app.logger.info(
+                f"Tool returned data but it's not in list format for table display: {query_data}"
+            )
         else:
             app.logger.warning(
-                "No structured query_data extracted from tool calls for display. Attempting fallback strategies."
+                "No structured query_data extracted from tool calls for display. Checking text response for fallback table info."
             )
-            
-            # Enhanced fallback: try to extract and re-execute if we can identify table operations
-            if final_answer and isinstance(final_answer, str):
-                # Look for table references in the AI response
-                import re
-                table_pattern = r'\b(OUT_[A-Z_0-9]+|DIM_[A-Z_0-9]+|FACT_[A-Z_0-9]+|STG_[A-Z_0-9]+)\b'
-                table_matches = re.findall(table_pattern, final_answer, re.IGNORECASE)
-                
-                # Check if response suggests tables were retrieved or listed
-                table_keywords = [
-                    "tables in your", "bigquery workspace", "list of tables", 
-                    "here are the tables", "retrieved all the tables",
-                    "table below", "retrieved the data", "query results",
-                    "sample row from", "displaying", "will be displayed"
-                ]
-                
-                has_table_context = any(phrase in final_answer.lower() for phrase in table_keywords)
-                
-                if has_table_context or table_matches:
-                    app.logger.info(f"Fallback: AI response suggests table data. Found tables: {table_matches}")
-                    
-                    try:
-                        if table_matches:
-                            # Use the first table found for data display
-                            table_name = table_matches[0]
-                            fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
-                            fallback_title = f"Data from {table_name}"
-                            app.logger.info(f"Fallback: Executing query for table '{table_name}'")
-                        else:
-                            # Default to listing tables
-                            fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
-                            fallback_title = "Available Tables"
-                            app.logger.info("Fallback: Listing available tables")
-                        
-                        fallback_result = internal_execute_sql_query(fallback_query)
-                        if fallback_result.get('status') in ['success', 'success_truncated'] and fallback_result.get('data'):
+            if final_answer and isinstance(final_answer, str) and any(
+                    phrase in final_answer.lower() for phrase in [
+                        "tables in your", "bigquery dataset", "list of tables",
+                        "here are the tables", "retrieved all the tables",
+                        "table below", "retrieved the data",
+                        "retrieved the schema", "sample row from"
+                    ]):
+                app.logger.info(
+                    "AI text suggests data/tables were retrieved; attempting fallback display generation."
+                )
+                try:
+                    fallback_query = None
+                    fallback_title = "Query Results"
+                    table_pattern = r'\b(OUT|DIM|FACT|STG)_[A-Z_0-9]+\b'
+                    table_matches = re.findall(table_pattern, final_answer,
+                                               re.IGNORECASE)
+
+                    if table_matches:
+                        table_name = table_matches[0]
+                        fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
+                        fallback_title = f"Data from {table_name} (Fallback)"
+                        app.logger.info(
+                            f"Fallback: Found table name '{table_name}' in AI text, will query."
+                        )
+                    elif any(
+                            phrase in final_answer.lower() for phrase in
+                        ["list of tables", "all tables", "tables available"]):
+                        fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+                        fallback_title = "Available Tables (Fallback)"
+                        app.logger.info(
+                            "Fallback: AI text suggests a table list, will query INFORMATION_SCHEMA."
+                        )
+
+                    if fallback_query:
+                        fallback_result = internal_execute_sql_query(
+                            fallback_query)
+                        if fallback_result.get(
+                                'status') == 'success' and fallback_result.get(
+                                    'data'):
                             displays.append({
                                 "type": "table",
                                 "title": fallback_title,
                                 "content": fallback_result['data']
                             })
-                            app.logger.info(f"Fallback successful: Created display '{fallback_title}' with {len(fallback_result['data'])} rows")
+                            app.logger.info(
+                                f"Fallback query successful, created display '{fallback_title}' with {len(fallback_result['data'])} rows"
+                            )
                         else:
-                            app.logger.warning(f"Fallback query failed: {fallback_result.get('error_message', 'No data returned')}")
-                            
-                    except Exception as e_fallback:
-                        app.logger.error(f"Error during fallback display generation: {e_fallback}", exc_info=True)
-            
+                            app.logger.warning(
+                                f"Fallback query failed or returned no data: {fallback_result.get('error_message', 'No data')}"
+                            )
+                except Exception as e_fallback:
+                    app.logger.error(
+                        f"Error during fallback display generation: {e_fallback}",
+                        exc_info=True)
+
+            if not displays and final_answer and isinstance(
+                    final_answer, str) and any(
+                        phrase in final_answer.lower() for phrase in [
+                            "tables in your", "bigquery dataset",
+                            "list of tables", "here are the tables"
+                        ]):
+                lines = final_answer.split('\n')
+                table_names_from_text = []
+                in_table_list_context = False
+                if "here are the tables" in final_answer.lower(
+                ) or "following tables" in final_answer.lower():
+                    in_table_list_context = True
+
+                for line in lines:
+                    stripped_line = line.strip()
+                    if stripped_line.startswith(('- ', '* ')):
+                        table_name_candidate = stripped_line[2:].strip('`"')
+                        if table_name_candidate and ('.' in table_name_candidate or \
+                           (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in table_name_candidate) or \
+                           re.match(r'^(OUT|DIM|FACT|STG)_[A-Z_0-9]+$', table_name_candidate, re.IGNORECASE)) and \
+                           not any(char in table_name_candidate for char in ['(', ')', ':', '?']):
+                            table_names_from_text.append(table_name_candidate)
+                    elif in_table_list_context and stripped_line and not stripped_line.endswith(
+                            ':'):
+                        if (KBC_WORKSPACE_SCHEMA and KBC_WORKSPACE_SCHEMA in stripped_line) or '`' in stripped_line or \
+                           re.match(r'^(OUT|DIM|FACT|STG)_[A-Z_0-9]+$', stripped_line.strip('`"'), re.IGNORECASE):
+                            table_names_from_text.append(
+                                stripped_line.strip('`"'))
+
+                unique_table_names = sorted(list(set(table_names_from_text)))
+                if unique_table_names:
+                    app.logger.info(
+                        f"Fallback (text parsing): Extracted table names: {unique_table_names}"
+                    )
+                    if not any(
+                            d.get("title") ==
+                            "Identified Data Tables (from text)"
+                            for d in displays):  # Avoid double adding
+                        displays.append({
+                            "type":
+                            "table",
+                            "title":
+                            "Identified Data Tables (from text)",
+                            "content": [{
+                                "Table Name": name
+                            } for name in unique_table_names]
+                        })
         return jsonify({"reply": final_answer, "displays": displays})
 
     except Exception as e:
