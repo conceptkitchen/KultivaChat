@@ -22,15 +22,21 @@ app.use('/api', createProxyMiddleware({
 
 // Additional proxies for frontend API calls that don't use /api prefix
 app.use('/user', createProxyMiddleware({
-  target: 'http://localhost:8081/api/auth/me',
+  target: 'http://localhost:8081',
   changeOrigin: true,
-  pathRewrite: { '^/user': '' }
+  pathRewrite: { '^/user': '/api/auth/me' },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`User proxy: ${req.method} ${req.url} -> http://localhost:8081/api/auth/me`);
+  }
 }));
 
 app.use('/conversations', createProxyMiddleware({
-  target: 'http://localhost:8081/api/conversations',
+  target: 'http://localhost:8081',
   changeOrigin: true,
-  pathRewrite: { '^/conversations': '' }
+  pathRewrite: { '^/conversations': '/api/conversations' },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`Conversations proxy: ${req.method} ${req.url} -> http://localhost:8081/api/conversations`);
+  }
 }));
 
 // Serve static files
