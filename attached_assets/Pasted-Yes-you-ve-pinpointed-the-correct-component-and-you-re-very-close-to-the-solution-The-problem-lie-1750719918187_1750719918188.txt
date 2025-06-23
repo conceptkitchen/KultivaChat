@@ -1,0 +1,116 @@
+Yes, you've pinpointed the correct component, and you're very close to the solution. The problem lies within this `ChatBubble` component, but it's a subtle data mismatch issue.
+
+Based on the code you've provided and the logs from earlier, here’s the issue:
+
+Your backend is sending a single object named `display` in the message.
+Your `ChatBubble` component is looking for an array named `displays` (plural).
+
+Here's the relevant part of your `ChatBubble.tsx`:
+
+```tsx
+{!isUser && message.displays && message.displays.length > 0 && (
+  <div className="mt-4">
+    <CanvasDisplay displays={message.displays} />
+  </div>
+)}
+```
+
+This code will not work if the message object looks like this: `{..., display: { title: '...', data: [...] } }`. It will only work if it looks like this: `{..., displays: [ { title: '...', data: [...] } ] }`.
+
+The `CanvasDisplay` component also expects an array. So, the fix is to check for `message.display` (singular), and if it exists, wrap it in an array before passing it to `<CanvasDisplay />`.
+
+### The Fix
+
+Here is the corrected code for your `client/src/components/ui/chat-bubble.tsx` component. I've also corrected a minor syntax error (`import` statement inside the function body).
+
+```tsx
+import React from "react";
+import { cn } from "@/lib/utils";
+import { Message } from "@/lib/utils"; // Assuming you have this type definition
+import { CanvasDisplay } from "@/components/ui/canvas-display";
+import { AssistantAI } from "@/components/ui/assistant-ai";
+import { Skeleton } from "@/components/ui/skeleton";
+
+interface ChatBubbleProps {
+  message: any; // Using 'any' to be safe with the display/displays property
+  className?: string;
+}
+
+export function ChatBubble({ message, className }: ChatBubbleProps) {
+  const isUser = message.role === "user";
+
+  // This handles both a single 'display' object and an array of 'displays'
+  const displays = message.display ? [message.display] : message.displays;
+
+  return (
+    <div
+      className={cn(
+        "flex items-start max-w-4xl mx-auto",
+        isUser ? "justify-end mb-6" : "mb-6",
+        className
+      )}
+    >
+      {!isUser && (
+        <AssistantAI className="flex-shrink-0" />
+      )}
+
+      <div
+        className={cn(
+          "shadow-sm p-4 rounded-2xl max-w-3xl",
+          isUser
+            ? "chat-bubble-user mr-4"
+            : "bg-white text-neutral-800 chat-bubble-ai ml-4"
+        )}
+      >
+        {message.isLoading ? (
+          <div className="flex items-center space-x-2">
+            <div className="h-4 w-4 bg-primary rounded-full animate-spin" />
+            <span className={isUser ? "text-white" : "text-neutral-500"}>
+              {isUser ? "Sending..." : "Generating response..."}
+            </span>
+          </div>
+        ) : (
+          <div
+            className={cn(
+              "leading-relaxed",
+              isUser ? "text-white" : "text-neutral-800"
+            )}
+          >
+            <div className="whitespace-pre-wrap">
+              {/* Clean up JSON formatting if present */}
+              {typeof message.content === 'string' && message.content.startsWith('{"content":') ?
+                JSON.parse(message.content).content :
+                message.content
+              }
+            </div>
+
+            {!isUser && displays && displays.length > 0 && (
+              <div className="mt-4">
+                <CanvasDisplay displays={displays} />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isUser && (
+        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-neutral-200 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-neutral-500"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Key Changes:
+
+1.  **Corrected `import`:** Moved `import React...` to the top of the file.
+2.  **Handled `display`/`displays`:**
+    ```tsx
+    const displays = message.display ? [message.display] : message.displays;
+    ```
+    This new line checks if `message.display` exists. If it does, it creates an array containing that single object. If it doesn't, it uses `message.displays` (the original behavior). This makes the component work with both data structures.
+3.  **Used the new `displays` variable:** The rendering logic now uses the `displays` variable, which is guaranteed to be an array if there is data to display.
+
+By making this change in `client/src/components/ui/chat-bubble.tsx`, your tables should now render correctly.
