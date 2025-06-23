@@ -1283,29 +1283,29 @@ def chat_with_gemini_client_style():
                                 )
                                 try:
                                     func_tool_result = part.function_response.response
-                                app.logger.info(
-                                    f"Tool '{part.function_response.name}' raw returned dict: {str(func_tool_result)[:300]}..."
-                                )
-
-                                # Check if this is a nested result structure
-                                if isinstance(
-                                        func_tool_result,
-                                        dict) and 'result' in func_tool_result:
                                     app.logger.info(
-                                        f"Found nested result structure, extracting: {str(func_tool_result['result'])[:300]}..."
+                                        f"Tool '{part.function_response.name}' raw returned dict: {str(func_tool_result)[:300]}..."
                                     )
-                                    func_tool_result = func_tool_result[
-                                        'result']
 
-                                if isinstance(func_tool_result, dict) and \
-                                   func_tool_result.get('status') in ['success', 'success_truncated'] and \
-                                   'data' in func_tool_result:
+                                    # Check if this is a nested result structure
+                                    if isinstance(
+                                            func_tool_result,
+                                            dict) and 'result' in func_tool_result:
+                                        app.logger.info(
+                                            f"Found nested result structure, extracting: {str(func_tool_result['result'])[:300]}..."
+                                        )
+                                        func_tool_result = func_tool_result[
+                                            'result']
 
-                                    retrieved_data_from_tool = func_tool_result[
-                                        'data']
-                                    app.logger.info(
-                                        f"Found data in tool result, type: {type(retrieved_data_from_tool)}, length: {len(retrieved_data_from_tool) if isinstance(retrieved_data_from_tool, list) else 'N/A'}"
-                                    )
+                                    if isinstance(func_tool_result, dict) and \
+                                       func_tool_result.get('status') in ['success', 'success_truncated'] and \
+                                       'data' in func_tool_result:
+
+                                        retrieved_data_from_tool = func_tool_result[
+                                            'data']
+                                        app.logger.info(
+                                            f"Found data in tool result, type: {type(retrieved_data_from_tool)}, length: {len(retrieved_data_from_tool) if isinstance(retrieved_data_from_tool, list) else 'N/A'}"
+                                        )
 
                                     if isinstance(retrieved_data_from_tool,
                                                   list):
