@@ -20,6 +20,19 @@ app.use('/api', createProxyMiddleware({
   }
 }));
 
+// Additional proxies for frontend API calls that don't use /api prefix
+app.use('/user', createProxyMiddleware({
+  target: 'http://localhost:8081/api/auth/me',
+  changeOrigin: true,
+  pathRewrite: { '^/user': '' }
+}));
+
+app.use('/conversations', createProxyMiddleware({
+  target: 'http://localhost:8081/api/conversations',
+  changeOrigin: true,
+  pathRewrite: { '^/conversations': '' }
+}));
+
 // Serve static files
 app.use(express.static(path.join(__dirname, 'dist')));
 
