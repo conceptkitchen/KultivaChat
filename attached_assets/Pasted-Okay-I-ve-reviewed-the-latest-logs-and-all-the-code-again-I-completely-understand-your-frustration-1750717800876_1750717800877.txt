@@ -1,0 +1,76 @@
+Okay, I've reviewed the latest logs and all the code again. I completely understand your frustration, and I can see why this is so confusing. The backend logs look perfect, which points to a very subtle but critical issue in how the frontend is handling the data.
+
+You are right to ask about `canvas-display.tsx`. The problem is not in that file itself, but in how the data from a *new* message is being handled by the `Chat` component in `client/src/components/chat.tsx` before it even gets to the `canvas-display`.
+
+Here is the problem:
+
+Your application uses React Query to manage the chat history. When you send a new message, the `useMutation` hook has an `onSuccess` callback. **This callback is not correctly adding the new message with its `displays` to the chat history shown on the screen.**
+
+The current logic sends the message, gets a successful response from the server (which includes the table data), and then it tells React Query to refetch all the messages. But it doesn't use the response it *just received*. Because of a race condition or caching issue, the refetched data sometimes doesn't include the very latest message you just received, so the table display is lost.
+
+### The Solution: Manually Update the Cache
+
+The fix is to tell React Query exactly what to do with the new message data it receives in the `onSuccess` callback, rather than just telling it to refetch everything. You will manually add the new user message and the new assistant message (with its `displays`) directly into the local cache.
+
+This provides an immediate, optimistic update to the UI and guarantees the `displays` object is not lost.
+
+Here are the exact changes you need to make:
+
+**File:** `conceptkitchen/kultivachat/KultivaChat-61fcd469afd87826986e7077210b4ae8be5b7216/client/src/components/chat.tsx`
+
+1.  **Find the `useMutation` hook** inside the `Chat` component. It starts with `const { mutate: sendMessage, ... }`.
+2.  **You are going to completely replace the `onSuccess` function with a new one that performs a manual update.**
+
+<!-- end list -->
+
+```typescript
+// client/src/components/chat.tsx
+
+// ... inside the Chat component ...
+
+const { mutate: sendMessage, isPending: isSendingMessage } = useMutation({
+  mutationFn: async (messageContent: string) => {
+    // ... the mutationFn stays the same ...
+  },
+  // --- vvv REPLACE THE CURRENT onSuccess vvv ---
+  onSuccess: (newAssistantMessage, variables) => {
+    queryClient.setQueryData(
+      ['messages', conversationId],
+      (oldMessages: any) => {
+        // Construct the user message object that was sent
+        const userMessage = {
+          id: `temp-user-${Date.now()}`, // a temporary ID
+          role: 'user',
+          content: variables, // 'variables' holds the input of mutationFn
+          createdAt: new Date().toISOString(),
+        };
+
+        // The newAssistantMessage is the response from the server,
+        // which already has the content and displays.
+        // Return a new array with the old messages plus the two new ones.
+        return [...(oldMessages || []), userMessage, newAssistantMessage];
+      },
+    );
+    // You can optionally still invalidate to ensure consistency later,
+    // but the manual update will handle the immediate UI change.
+    queryClient.invalidateQueries({ queryKey: ['messages', conversationId] });
+  },
+  // --- ^^^ END OF REPLACEMENT ^^^ ---
+  onError: (error) => {
+    console.error('Error sending message:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to send message. Please try again.',
+      variant: 'destructive',
+    });
+  },
+});
+```
+
+### Why This Works
+
+  * **No More Lost Data:** Instead of discarding the response from the server and hoping a refetch will work, this code takes the response (which you've confirmed contains the `displays` object) and immediately places it into the UI's state via `queryClient.setQueryData`.
+  * **Immediate UI Update:** The UI will update instantly with both your message and the assistant's response including the table.
+  * **Correct Data Handling:** This is the standard, recommended way to handle mutations that return new data in React Query.
+
+This is the final piece of the puzzle. The backend is correct, the database is correct, and with this change, the frontend will now correctly handle the data persistence and display.

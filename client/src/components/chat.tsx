@@ -31,31 +31,49 @@ export function Chat({ conversation }: ChatProps) {
   }, [conversation]);
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (message: { conversationId: string; content: string; systemMessage?: string }) => {
-      return await apiRequest("POST", "/api/messages", message);
-    },
-    onSuccess: (response) => {
-      // Update the conversation in the cache
-      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/conversations", conversation.id] 
+    mutationFn: async (content: string) => {
+      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
       });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user' as const,
+        content: variables,
+        timestamp: new Date(),
+      };
+
+      const assistantMessage = {
+        id: data.assistantMessage.id,
+        role: 'assistant' as const,
+        content: data.assistantMessage.content,
+        displays: data.assistantMessage.displays || [],
+        timestamp: new Date(data.assistantMessage.timestamp),
+      };
+
+      console.log(`Table display fix: Assistant message has ${assistantMessage.displays.length} displays`);
+
+      // Immediately update local state with the complete message including displays
+      setMessages(prev => 
+        prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
+      );
+
+      setIsProcessing(false);
     },
     onError: (error) => {
-      // Only show real errors with message text
-      if (error instanceof Error && error.message && 
-          error.message !== '{}' && 
-          error.message !== 'Failed to fetch') {
-        console.error("Actual error sending message:", error);
-        toast({
-          title: "Error",
-          description: "Failed to send message. Please try again.",
-          variant: "destructive",
-        });
-      }
-      // Remove the loading messages
+      console.error("Error sending message:", error);
       setMessages((prev) => prev.filter((msg) => !msg.isLoading));
       setIsProcessing(false);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
     }
   });
 
@@ -96,39 +114,8 @@ export function Chat({ conversation }: ChatProps) {
     
     console.log("Sending message to API:", content);
     
-    try {
-      // Send to API
-      const response = await sendMessageMutation.mutateAsync({
-        conversationId: conversation.id,
-        content,
-      });
-      
-      // Get response data
-      const data = await response.json();
-      
-      // Manually update messages with the response
-      const aiMessage: Message = {
-        id: data.assistantMessage.id,
-        role: "assistant",
-        content: data.assistantMessage.content,
-        displays: data.assistantMessage.displays || [],
-        timestamp: new Date(data.assistantMessage.timestamp),
-      };
-      
-      // Replace loading message with actual response
-      setMessages(prev => 
-        prev.map(msg => msg.isLoading ? aiMessage : msg)
-      );
-      
-      setIsProcessing(false);
-    } catch (error) {
-      // Only log the error but don't show toast
-      console.error("Error occurred:", error);
-      
-      // Remove loading message
-      setMessages(prev => prev.filter(msg => !msg.isLoading));
-      setIsProcessing(false);
-    }
+    // Use the mutation which now handles all the response processing
+    sendMessageMutation.mutate(content);
   };
 
   // Auto-scroll to the bottom whenever messages change or a message is sent
