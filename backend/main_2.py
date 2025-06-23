@@ -834,6 +834,153 @@ def hello():
 def health():
     return jsonify({"status": "healthy", "backend": "running"})
 
+# --- Frontend Compatibility Endpoints ---
+@app.route('/api/user', methods=['GET'])
+def get_user():
+    # Simple mock user for frontend compatibility
+    return jsonify({
+        "id": "user-1",
+        "username": "user",
+        "email": "user@kultivate.ai",
+        "firstName": "Kultivate",
+        "lastName": "User"
+    })
+
+@app.route('/api/conversations', methods=['GET'])
+def get_conversations():
+    # Simple mock conversations list
+    return jsonify([
+        {
+            "id": "conv-1",
+            "title": "New Conversation",
+            "createdAt": "2025-06-23T21:00:00Z",
+            "updatedAt": "2025-06-23T21:00:00Z"
+        }
+    ])
+
+@app.route('/api/conversations', methods=['POST'])
+def create_conversation():
+    # Create a new conversation with generated ID
+    import uuid
+    conv_id = str(uuid.uuid4())
+    return jsonify({
+        "id": conv_id,
+        "title": "New Conversation",
+        "createdAt": "2025-06-23T21:00:00Z",
+        "updatedAt": "2025-06-23T21:00:00Z"
+    })
+
+@app.route('/api/conversations/<conversation_id>/messages', methods=['GET'])
+def get_conversation_messages(conversation_id):
+    # Return empty messages for new conversations
+    return jsonify([])
+
+@app.route('/api/conversations/<conversation_id>/messages', methods=['POST'])
+def send_message_to_conversation(conversation_id):
+    # This endpoint handles the actual chat functionality
+    # Get the request data
+    request_data = request.get_json()
+    if not request_data or 'content' not in request_data:
+        return jsonify({"error": "Missing 'content' in JSON payload."}), 400
+
+    user_content = request_data['content']
+    
+    # Convert to the format expected by the existing chat handler
+    chat_request = {
+        'message': user_content,
+        'conversation_history': []
+    }
+    
+    # Call the existing chat functionality
+    if not gemini_sdk_client or not gemini_generation_config_with_tools:
+        return jsonify({"error": "Chat service not available"}), 500
+    
+    try:
+        # Use existing chat logic but return in frontend-expected format
+        user_message_text = chat_request['message']
+        conversation_history = chat_request.get('conversation_history', [])
+        
+        app.logger.info(f"Received chat message for conversation {conversation_id}: {user_message_text}")
+        
+        # Create chat session (simplified version of existing logic)
+        full_history = []
+        if GEMINI_SDK_AVAILABLE:
+            full_history = [
+                google_genai_types.Content(
+                    role="user",
+                    parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]
+                ),
+                google_genai_types.Content(
+                    role="model", 
+                    parts=[google_genai_types.Part(text="Understood. I am ready to assist you with your Keboola project data. How can I help you?")]
+                )
+            ]
+        
+        chat_session = gemini_sdk_client.chats.create(
+            model='gemini-2.0-flash',
+            config=gemini_generation_config_with_tools,
+            history=full_history
+        )
+        
+        response = chat_session.send_message(user_message_text)
+        
+        # Extract response text
+        final_answer = ""
+        try:
+            final_answer = response.text
+        except ValueError:
+            final_answer = "I apologize, but I encountered an issue processing your request."
+        
+        # Extract any displays from tool responses
+        displays = []
+        if GEMINI_SDK_AVAILABLE:
+            try:
+                retrieved_history = chat_session.get_history()
+                for message_content in reversed(retrieved_history):
+                    for part in message_content.parts:
+                        if hasattr(part, 'function_response') and part.function_response:
+                            func_result = part.function_response.response
+                            if isinstance(func_result, dict):
+                                if func_result.get('display_type') == 'table' and func_result.get('data'):
+                                    displays.append({
+                                        'type': 'table',
+                                        'title': func_result.get('display_title', 'Query Results'),
+                                        'content': func_result['data']
+                                    })
+                            break
+            except Exception as e:
+                app.logger.error(f"Error extracting displays: {e}")
+        
+        # Return in format expected by frontend
+        import uuid
+        user_msg_id = str(uuid.uuid4())
+        assistant_msg_id = str(uuid.uuid4())
+        
+        return jsonify({
+            "userMessage": {
+                "id": user_msg_id,
+                "role": "user",
+                "content": user_content,
+                "timestamp": "2025-06-23T21:00:00Z"
+            },
+            "assistantMessage": {
+                "id": assistant_msg_id,
+                "role": "assistant", 
+                "content": final_answer,
+                "displays": displays,
+                "timestamp": "2025-06-23T21:00:00Z"
+            }
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in conversation message handler: {e}", exc_info=True)
+        return jsonify({"error": "Failed to process message"}), 500
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    # Simple logout endpoint for frontend compatibility
+    return jsonify({"status": "success"})
+
 
 @app.route('/api/list_buckets', methods=['GET'])
 def list_keboola_buckets_endpoint_direct():

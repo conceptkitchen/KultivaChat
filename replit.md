@@ -1,0 +1,119 @@
+# Kultivate AI - System Architecture & Configuration
+
+## Overview
+
+Kultivate AI is a full-stack chat application that combines React frontend with Python Flask backend, providing AI-powered data insights through integration with Google Gemini, Keboola Cloud, and BigQuery. The application serves as an intelligent assistant for data visualization, code generation, and API integration.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript
+- **Styling**: Tailwind CSS with shadcn/ui component library
+- **Routing**: Wouter for client-side routing
+- **State Management**: TanStack Query for server state management
+- **Build Tool**: Vite for development and production builds
+- **UI Components**: Radix UI primitives with custom theming
+
+### Backend Architecture
+- **Primary Server**: Python Flask (port 8081) for AI processing and API integrations
+- **Proxy Server**: Node.js Express (port 5000) for authentication and static file serving
+- **AI Integration**: Google Gemini 2.0 Flash for natural language processing
+- **Data Sources**: Keboola Cloud API and Google BigQuery
+- **Session Management**: PostgreSQL-backed session storage
+
+### Database Layer
+- **Primary Database**: PostgreSQL (configured via Drizzle ORM)
+- **Schema Management**: Drizzle Kit for migrations and schema management
+- **Tables**: Users, sessions, conversations, messages
+- **Session Store**: connect-pg-simple for Express session persistence
+
+## Key Components
+
+### Authentication System
+- **Strategy**: Passport.js with local strategy
+- **Password Security**: Scrypt-based hashing with salt
+- **Session Management**: Express sessions with PostgreSQL store
+- **Protection**: Protected routes with authentication middleware
+
+### AI Processing Pipeline
+- **Primary AI**: Google Gemini 2.0 Flash with function calling
+- **Tools Available**: SQL query execution, Keboola bucket listing, table details, location services
+- **Response Format**: Structured JSON with content and display components
+- **Error Handling**: Comprehensive logging and fallback mechanisms
+
+### Data Integration Layer
+- **Keboola Storage**: API client for data bucket and table operations
+- **BigQuery**: Google Cloud client for SQL query execution
+- **Credentials**: Service account JSON for Google Cloud services
+- **Environment Variables**: Secure configuration for API keys and tokens
+
+### Frontend Components
+- **Chat Interface**: Real-time messaging with typing indicators
+- **Canvas Display**: Multi-format content rendering (text, code, tables, visualizations)
+- **Sidebar Navigation**: Conversation management and history
+- **Authentication UI**: Login/register forms with validation
+
+## Data Flow
+
+1. **User Input**: Message submitted through chat interface
+2. **Authentication**: Express middleware validates user session
+3. **Message Processing**: Content forwarded to Flask backend via internal API
+4. **AI Processing**: Gemini processes message with available tools and context
+5. **Data Retrieval**: Tools execute against Keboola/BigQuery as needed
+6. **Response Generation**: AI formats response with appropriate displays
+7. **Database Storage**: Conversation and messages persisted to PostgreSQL
+8. **UI Update**: Frontend receives structured response and renders components
+
+## External Dependencies
+
+### Required Environment Variables
+- `DATABASE_URL`: PostgreSQL connection string
+- `KBC_API_URL`: Keboola Cloud API endpoint
+- `KBC_STORAGE_TOKEN`: Keboola authentication token
+- `KBC_WORKSPACE_SCHEMA`: BigQuery schema identifier
+- `GOOGLE_APPLICATION_CREDENTIALS`: Path to service account JSON
+- `GEMINI_API_KEY`: Google AI API key
+- `SESSION_SECRET`: Express session encryption key
+
+### Third-Party Services
+- **Google Cloud Platform**: BigQuery data warehouse and AI services
+- **Keboola Cloud**: Data platform for ETL and storage
+- **Neon Database**: Serverless PostgreSQL hosting
+- **Replit Infrastructure**: Development and deployment environment
+
+### Key Libraries
+- **Frontend**: React, Wouter, TanStack Query, Tailwind CSS, Radix UI
+- **Backend**: Flask, Google Generative AI SDK, Keboola API client
+- **Database**: Drizzle ORM, pg (PostgreSQL driver)
+- **Authentication**: Passport.js, express-session, connect-pg-simple
+
+## Deployment Strategy
+
+### Development Environment
+- **Command**: `npm run dev`
+- **Frontend**: Vite dev server with HMR
+- **Backend**: Direct Python execution with auto-reload
+- **Database**: Local PostgreSQL or Neon connection
+
+### Production Environment
+- **Build Process**: `npm run build` compiles React and Node.js server
+- **Startup**: Custom deployment script manages both servers
+- **Port Configuration**: 
+  - Frontend/Proxy: 5000 (external: 80)
+  - Backend API: 8081 (internal only)
+- **Process Management**: Concurrent server execution with health checks
+- **Static Assets**: Express serves compiled React build
+
+### Replit Configuration
+- **Modules**: Node.js 20, PostgreSQL 16, Python 3.11, Web
+- **Deployment Target**: Autoscale with build command
+- **Port Mapping**: External port 80 maps to internal port 5000
+- **Environment**: Production variables configured in Replit secrets
+
+## Changelog
+
+- June 23, 2025. Initial setup
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
