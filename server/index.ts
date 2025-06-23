@@ -98,20 +98,44 @@ function startFlaskServer(): Promise<void> {
 }
 
 // Proxy all /api requests to Flask backend BEFORE authentication
-app.use('/api', createProxyMiddleware({
-  target: 'http://localhost:8081/api',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api': '' // Remove /api prefix since target already includes it
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`Proxying ${req.method} ${req.originalUrl} to http://localhost:8081/api${req.url}`);
-  },
-  onError: (err, req, res) => {
-    console.error('Proxy Error:', err.message);
-    res.status(500).json({ error: 'Backend connection failed' });
+app.use('/api', (req, res, next) => {
+  // Manual proxy implementation to preserve full path
+  const targetUrl = `http://localhost:8081${req.originalUrl}`;
+  console.log(`Manual proxy: ${req.method} ${req.originalUrl} -> ${targetUrl}`);
+  
+  const options = {
+    method: req.method,
+    headers: {
+      ...req.headers,
+      host: 'localhost:8081'
+    }
+  };
+  
+  if (req.body && Object.keys(req.body).length > 0) {
+    options.body = JSON.stringify(req.body);
+    options.headers['content-type'] = 'application/json';
   }
-}));
+  
+  import('node-fetch').then(({ default: fetch }) => {
+    fetch(targetUrl, options)
+      .then(response => {
+        res.status(response.status);
+        return response.text();
+      })
+      .then(data => {
+        try {
+          const json = JSON.parse(data);
+          res.json(json);
+        } catch {
+          res.send(data);
+        }
+      })
+      .catch(error => {
+        console.error('Proxy Error:', error.message);
+        res.status(500).json({ error: 'Backend connection failed' });
+      });
+  });
+});
 
 // Health check
 app.get('/health', (req, res) => {
