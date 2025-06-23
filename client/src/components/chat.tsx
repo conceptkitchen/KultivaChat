@@ -4,7 +4,8 @@ import { ChatBubble, ChatBubbleSkeleton } from "@/components/ui/chat-bubble";
 import { ChatInput } from "@/components/ui/chat-input";
 import { Message, Conversation } from "@/lib/utils";
 import { v4 as uuidv4 } from "uuid";
-
+import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChatProps {
@@ -16,6 +17,7 @@ export function Chat({ conversation }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // For debugging
   console.log("Chat rendering with conversation:", conversation.id);
@@ -28,7 +30,34 @@ export function Chat({ conversation }: ChatProps) {
     }
   }, [conversation]);
 
-
+  const sendMessageMutation = useMutation({
+    mutationFn: async (message: { conversationId: string; content: string; systemMessage?: string }) => {
+      return await apiRequest("POST", "/api/messages", message);
+    },
+    onSuccess: (response) => {
+      // Update the conversation in the cache
+      queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/conversations", conversation.id] 
+      });
+    },
+    onError: (error) => {
+      // Only show real errors with message text
+      if (error instanceof Error && error.message && 
+          error.message !== '{}' && 
+          error.message !== 'Failed to fetch') {
+        console.error("Actual error sending message:", error);
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
+      // Remove the loading messages
+      setMessages((prev) => prev.filter((msg) => !msg.isLoading));
+      setIsProcessing(false);
+    }
+  });
 
   const handleSendMessage = async (content: string) => {
     if (isProcessing) return;
@@ -68,67 +97,23 @@ export function Chat({ conversation }: ChatProps) {
     console.log("Sending message to API:", content);
     
     try {
-      // Send to backend chat API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: content,
-          conversation_history: messages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
-        }),
+      // Send to API
+      const response = await sendMessageMutation.mutateAsync({
+        conversationId: conversation.id,
+        content,
       });
       
+      // Get response data
       const data = await response.json();
       
-      // Handle structured response from backend
-      let aiMessage: Message;
-      let displays: any[] = [];
-      
-      if (data.reply && typeof data.reply === 'object' && data.reply.type === 'table') {
-        // Handle structured table response
-        displays = [{
-          type: 'table',
-          title: 'Query Results',
-          content: data.reply.data.rows.map((row: any[], index: number) => {
-            const rowObj: Record<string, any> = {};
-            data.reply.data.headers.forEach((header: string, headerIndex: number) => {
-              rowObj[header] = row[headerIndex];
-            });
-            return rowObj;
-          })
-        }];
-        
-        aiMessage = {
-          id: uuidv4(),
-          role: "assistant",
-          content: "Here's the data you requested:",
-          displays,
-          timestamp: new Date(),
-        };
-      } else if (data.reply && typeof data.reply === 'object' && data.reply.type === 'text') {
-        // Handle text response
-        aiMessage = {
-          id: uuidv4(),
-          role: "assistant",
-          content: data.reply.data,
-          displays: [],
-          timestamp: new Date(),
-        };
-      } else {
-        // Handle simple string response
-        aiMessage = {
-          id: uuidv4(),
-          role: "assistant",
-          content: typeof data.reply === 'string' ? data.reply : JSON.stringify(data.reply),
-          displays: [],
-          timestamp: new Date(),
-        };
-      }
+      // Manually update messages with the response
+      const aiMessage: Message = {
+        id: data.assistantMessage.id,
+        role: "assistant",
+        content: data.assistantMessage.content,
+        displays: data.assistantMessage.displays || [],
+        timestamp: new Date(data.assistantMessage.timestamp),
+      };
       
       // Replace loading message with actual response
       setMessages(prev => 
@@ -137,6 +122,7 @@ export function Chat({ conversation }: ChatProps) {
       
       setIsProcessing(false);
     } catch (error) {
+      // Only log the error but don't show toast
       console.error("Error occurred:", error);
       
       // Remove loading message
@@ -205,7 +191,7 @@ export function Chat({ conversation }: ChatProps) {
             message={message}
           />
         ))}
-        {isProcessing && <ChatBubbleSkeleton />}
+        {sendMessageMutation.isPending && <ChatBubbleSkeleton />}
       </ScrollArea>
 
       <ChatInput 

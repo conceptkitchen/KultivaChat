@@ -1,109 +1,60 @@
-    You are absolutely right to be furious. I am so sorry. The deployment failed because of a critical error in the code I provided, and the agent's suggestions are a confusing mix of right and wrong that don't solve the core problem.
+# backend/run_flask.py
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from backend.main_2 import main_agent, runner, session_service, APP_NAME, USER_ID
+from google.genai import types
+import logging
 
-    You have been right to push me. My previous fix was incomplete. The error log you just provided gives us the final, missing piece of the puzzle.
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
 
-    Let's cut through the noise. I will tell you exactly what the problem is, why the other agent's advice is mostly wrong, and give you the definitive code that will fix your deployment.
+# Initialize Flask app
+app = Flask(__name__)
+# Be specific with CORS in production for better security
+CORS(app, resources={r"/api/*": {"origins": "*"}}) # Or specify your frontend domain
 
-    ### The Real Root Cause (The `TypeError`)
+@app.route('/api/chat', methods=['POST'])
+async def chat_handler():
+    try:
+        data = request.json
+        if not data or 'message' not in data:
+            logging.warning("Received request with no message.")
+            return jsonify({"error": "Message not provided"}), 400
 
-    The most important error you received is this one:
-    **`'Runner.__init__()' receiving unexpected 'client' keyword argument`**
+        user_message = data['message']
+        session_id = data.get('sessionId', 'default_session')
+        logging.info(f"Received message for session: {session_id}")
 
-    This is the key. It means I gave you code based on a version of the Google ADK library that is different from the one you have installed. My code included a `client=client` parameter when creating the `Runner`, but your version doesn't accept it. **This is my mistake.**
+        # Ensure session exists
+        try:
+            await session_service.get_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
+        except Exception:
+            logging.info(f"Creating new session: {session_id}")
+            await session_service.create_session(app_name=APP_NAME, user_id=USER_ID, session_id=session_id)
 
-    This single error is causing your entire application to crash instantly, which is why it never opens a port and why the startup script fails.
+        content = types.Content(role='user', parts=[types.Part(text=user_message)])
 
-    The other agent's suggestions are wrong because they don't fix this primary error:
-    * Its `ImportError` fix is wrong and re-introduces the circular dependency.
-    * Its suggestion to change the `gunicorn` command is wrong and breaks the frontend build.
+        final_response = "Sorry, I couldn't process your request."
+        events = runner.run(user_id=USER_ID, session_id=session_id, new_message=content)
+        for event in events:
+            if event.is_final_response() and event.content and event.content.parts:
+                # Handle both structured (tool) and text responses
+                part = event.content.parts[0]
+                if part.function_call:
+                    # If the final response is a tool call, we should ideally format it
+                    # For now, we'll send a structured response
+                    final_response = {"type": "tool_call", "data": {"name": part.function_call.name, "args": dict(part.function_call.args)}}
+                elif part.text:
+                    final_response = {"type": "text", "data": part.text}
+                break
+        
+        return jsonify({"reply": final_response})
 
-    ### The Definitive Fix: A 3-Step Plan
+    except Exception as e:
+        logging.error(f"An unhandled error occurred in chat_handler: {e}", exc_info=True)
+        return jsonify({"error": "A critical server error occurred."}), 500
 
-    Here is the final, correct plan. This addresses the real error and incorporates the *only* good suggestions from the other agent.
-
-    #### **Step 1: Fix the Crashing Code in `main_2.py` (The Critical Fix)**
-
-    This is the most important step. We need to remove the `client` parameter that is causing the `TypeError`.
-
-    * **Action:** In `backend/main_2.py`, find the `initialize_services` function and modify the `Runner` initialization.
-
-        * **Find this block:**
-            ```python
-            # This is the old, incorrect code
-            runner = Runner(
-                agent=main_agent,
-                app_name=APP_NAME,
-                session_service=session_service,
-                client=client
-            )
-            ```
-        * **Replace it with this corrected version (the `client=client` line is removed):**
-            ```python
-            # This is the new, correct code
-            runner = Runner(
-                agent=main_agent,
-                app_name=APP_NAME,
-                session_service=session_service
-            )
-            ```
-        * **Reason:** This makes your code compatible with the version of the `google-adk` library you are using and will stop the application from crashing on startup.
-
-    #### **Step 2: Create a Stable, Pinned `requirements.txt`**
-
-    The other agent's suggestion to pin dependencies was good practice. It prevents unexpected updates from breaking your code in the future.
-
-    * **Action:** Replace the entire content of `backend/requirements.txt` with these specific, stable versions.
-
-        ```
-        flask==2.3.3
-        flask-cors==4.0.0
-        gunicorn==21.2.0
-        google-generativeai==0.5.4
-        # The ADK version is critical. We'll use a known stable one.
-        google-adk==1.0.0
-        # Add your other dependencies like kbcstorage and google-cloud-bigquery
-        kbcstorage
-        google-cloud-bigquery
-        ```
-    * **Reason:** This ensures a reproducible and stable environment, locking in the versions that work with our corrected code.
-
-    #### **Step 3: Confirm the Final Configuration Files**
-
-    Let's ensure the startup configuration is perfect and uses the correct port mapping, which was the other good suggestion from the agent.
-
-    * **Action 1:** Open the `.replit` file and ensure it contains the following to correctly map the port Gunicorn uses (8080).
-
-        ```
-        run = "bash production-start.sh"
-
-        [[ports]]
-        localPort = 8080
-        externalPort = 80
-        ```
-
-    * **Action 2:** Confirm your `production-start.sh` script in the root directory is exactly this:
-
-        ```bash
-        #!/bin/bash
-        set -e 
-
-        echo "--- STARTING PRODUCTION BUILD & DEPLOY ---"
-
-        echo "[1/4] Installing frontend dependencies..."
-        cd client && npm install && cd ..
-
-        echo "[2/4] Building production frontend..."
-        cd client && npm run build && cd ..
-
-        echo "[3/4] Installing backend dependencies..."
-        pip install -r backend/requirements.txt
-
-        echo "[4/4] Starting Python Gunicorn server..."
-        exec gunicorn --workers 3 --timeout 120 'backend.run_flask:app' --bind 0.0.0.0:8080
-        ```
-
-    ---
-
-    I am confident that these three targeted steps will resolve all the deployment errors. The `TypeError` was the root cause, and the fix is to remove the `client` parameter from the `Runner` initialization.
-
-    I sincerely apologize again for the immense frustration and the previous incorrect fixes. This plan addresses the true source of the error.
+# This block is for LOCAL DEVELOPMENT ONLY.
+# Gunicorn will be used in production and will NOT run this.
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

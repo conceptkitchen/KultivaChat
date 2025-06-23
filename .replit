@@ -9,15 +9,11 @@ packages = ["sptk"]
 [deployment]
 deploymentTarget = "autoscale"
 build = ["sh", "-c", "npm run build"]
-run = "bash production-start.sh"
+run = ["sh", "-c", "NODE_ENV=production npm run start"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
 
 [[ports]]
 localPort = 8081
