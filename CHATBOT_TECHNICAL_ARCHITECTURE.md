@@ -178,21 +178,314 @@ CREATE TABLE users (
 ### 5. External Data Integration
 
 #### Keboola Cloud Integration
+
+**Overview**: Keboola Cloud serves as the primary data platform that orchestrates ETL processes, data storage, and workspace management. The chatbot integrates with Keboola's Storage API to access data buckets, table metadata, and workspace configurations.
+
+**Authentication & Configuration**:
 ```python
 class KeboolaStorageClient:
     def __init__(self, api_url: str, token: str):
-        self.api_url = api_url
-        self.token = token
+        self.api_url = api_url  # https://connection.us-east4.gcp.keboola.com
+        self.token = token      # Storage API token from Keboola project
         self.session = requests.Session()
         self.session.headers.update({
             'X-StorageApi-Token': token,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'User-Agent': 'Kultivate-AI-Chatbot/1.0'
         })
-    
-    def list_buckets(self):
-        response = self.session.get(f"{self.api_url}/v2/storage/buckets")
-        return response.json()
 ```
+
+**Core API Operations**:
+
+1. **Storage Bucket Management**:
+```python
+def list_buckets(self) -> Dict[str, Any]:
+    """Retrieve all storage buckets in the workspace"""
+    try:
+        response = self.session.get(f"{self.api_url}/v2/storage/buckets")
+        response.raise_for_status()
+        buckets = response.json()
+        
+        return {
+            "status": "success",
+            "buckets": buckets,
+            "count": len(buckets)
+        }
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error": str(e)}
+
+def get_bucket_detail(self, bucket_id: str) -> Dict[str, Any]:
+    """Get detailed information about a specific bucket"""
+    try:
+        response = self.session.get(f"{self.api_url}/v2/storage/buckets/{bucket_id}")
+        response.raise_for_status()
+        bucket_detail = response.json()
+        
+        return {
+            "status": "success",
+            "bucket": bucket_detail,
+            "table_count": len(bucket_detail.get('tables', [])),
+            "size_bytes": bucket_detail.get('sizeBytes', 0)
+        }
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error": str(e)}
+```
+
+2. **Table Operations**:
+```python
+def list_tables_in_bucket(self, bucket_id: str) -> Dict[str, Any]:
+    """List all tables within a specific bucket"""
+    try:
+        response = self.session.get(f"{self.api_url}/v2/storage/buckets/{bucket_id}/tables")
+        response.raise_for_status()
+        tables = response.json()
+        
+        return {
+            "status": "success",
+            "tables": tables,
+            "count": len(tables),
+            "bucket_id": bucket_id
+        }
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error": str(e)}
+
+def get_table_detail(self, table_id: str) -> Dict[str, Any]:
+    """Get comprehensive table metadata including schema and statistics"""
+    try:
+        response = self.session.get(f"{self.api_url}/v2/storage/tables/{table_id}")
+        response.raise_for_status()
+        table_detail = response.json()
+        
+        return {
+            "status": "success",
+            "table": table_detail,
+            "columns": table_detail.get('columns', []),
+            "row_count": table_detail.get('rowsCount', 0),
+            "size_bytes": table_detail.get('dataSizeBytes', 0),
+            "created": table_detail.get('created'),
+            "last_import": table_detail.get('lastImportDate')
+        }
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error": str(e)}
+```
+
+3. **Data Export Operations**:
+```python
+def export_table_data(self, table_id: str, limit: int = 1000) -> Dict[str, Any]:
+    """Export table data with optional row limit"""
+    try:
+        params = {
+            'limit': limit,
+            'format': 'json'
+        }
+        response = self.session.get(
+            f"{self.api_url}/v2/storage/tables/{table_id}/data-preview",
+            params=params
+        )
+        response.raise_for_status()
+        
+        return {
+            "status": "success",
+            "data": response.json(),
+            "table_id": table_id,
+            "row_count": len(response.json())
+        }
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error": str(e)}
+```
+
+**Workspace Integration**:
+```python
+def get_workspace_info(self) -> Dict[str, Any]:
+    """Retrieve workspace configuration and metadata"""
+    try:
+        # Get workspace details from token info
+        response = self.session.get(f"{self.api_url}/v2/storage/tokens/verify")
+        response.raise_for_status()
+        token_info = response.json()
+        
+        workspace_info = {
+            "project_id": token_info.get('owner', {}).get('id'),
+            "project_name": token_info.get('owner', {}).get('name'),
+            "token_description": token_info.get('description'),
+            "permissions": token_info.get('bucketPermissions', []),
+            "expires": token_info.get('expires'),
+            "created": token_info.get('created')
+        }
+        
+        return {
+            "status": "success",
+            "workspace": workspace_info
+        }
+    except requests.exceptions.RequestException as e:
+        return {"status": "error", "error": str(e)}
+```
+
+**Integration with BigQuery Workspace**:
+
+The Keboola Cloud platform automatically provisions BigQuery datasets that mirror the bucket structure:
+
+```python
+# Environment Configuration
+KBC_WORKSPACE_SCHEMA = "WORKSPACE_21894820"  # BigQuery dataset
+GOOGLE_PROJECT_ID = "kbc-use4-839-261b"      # GCP project managed by Keboola
+
+def get_bigquery_table_mapping(self) -> Dict[str, str]:
+    """Map Keboola table IDs to BigQuery table names"""
+    buckets = self.list_buckets()
+    
+    table_mapping = {}
+    if buckets['status'] == 'success':
+        for bucket in buckets['buckets']:
+            bucket_tables = self.list_tables_in_bucket(bucket['id'])
+            if bucket_tables['status'] == 'success':
+                for table in bucket_tables['tables']:
+                    keboola_table_id = table['id']
+                    bigquery_table_name = table['name']  # Transformed table name
+                    
+                    table_mapping[keboola_table_id] = {
+                        "bigquery_name": bigquery_table_name,
+                        "bucket": bucket['id'],
+                        "stage": bucket.get('stage', 'out'),
+                        "full_bigquery_path": f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{bigquery_table_name}`"
+                    }
+    
+    return table_mapping
+```
+
+**Error Handling and Rate Limiting**:
+```python
+import time
+from functools import wraps
+
+def retry_on_rate_limit(max_retries=3, backoff_factor=2):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    result = func(self, *args, **kwargs)
+                    if isinstance(result, dict) and result.get('status') == 'error':
+                        if 'rate limit' in result.get('error', '').lower() and attempt < max_retries - 1:
+                            sleep_time = backoff_factor ** attempt
+                            time.sleep(sleep_time)
+                            continue
+                    return result
+                except requests.exceptions.RequestException as e:
+                    if attempt == max_retries - 1:
+                        return {"status": "error", "error": f"Max retries exceeded: {str(e)}"}
+                    time.sleep(backoff_factor ** attempt)
+            
+            return {"status": "error", "error": "Unexpected error in retry logic"}
+        return wrapper
+    return decorator
+
+# Apply to API methods
+list_buckets = retry_on_rate_limit()(list_buckets)
+get_table_detail = retry_on_rate_limit()(get_table_detail)
+```
+
+**Chatbot Integration with Keboola Tools**:
+
+The chatbot system integrates Keboola operations through AI tools, though the current implementation primarily uses direct BigQuery access for performance:
+
+```python
+# Legacy tool functions (now simplified in current implementation)
+def list_keboola_buckets() -> Dict[str, Any]:
+    """AI tool function to list all Keboola buckets"""
+    try:
+        result = keboola_client.list_buckets()
+        if result['status'] == 'success':
+            bucket_summary = []
+            for bucket in result['buckets']:
+                bucket_summary.append({
+                    "id": bucket['id'],
+                    "stage": bucket.get('stage', 'unknown'),
+                    "name": bucket.get('displayName', bucket['id']),
+                    "table_count": len(bucket.get('tables', [])),
+                    "description": bucket.get('description', 'No description')
+                })
+            
+            return {
+                "status": "success",
+                "message": f"Found {len(bucket_summary)} buckets in workspace",
+                "buckets": bucket_summary
+            }
+        else:
+            return result
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+def get_keboola_table_detail(table_id: str) -> Dict[str, Any]:
+    """AI tool function to get detailed table information"""
+    try:
+        result = keboola_client.get_table_detail(table_id)
+        if result['status'] == 'success':
+            table = result['table']
+            return {
+                "status": "success",
+                "message": f"Table {table_id} has {result['row_count']} rows and {len(result['columns'])} columns",
+                "table_info": {
+                    "id": table['id'],
+                    "name": table.get('displayName', table['name']),
+                    "rows": result['row_count'],
+                    "columns": [col['name'] for col in result['columns']],
+                    "size_mb": round(result['size_bytes'] / (1024*1024), 2),
+                    "last_update": result['last_import']
+                }
+            }
+        else:
+            return result
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+```
+
+**Current Implementation Strategy**:
+
+The chatbot system has evolved to use direct BigQuery access for optimal performance, while maintaining Keboola integration for metadata and workspace management:
+
+1. **Data Queries**: Direct BigQuery SQL execution via `internal_execute_sql_query`
+2. **Table Discovery**: BigQuery INFORMATION_SCHEMA queries for table listings
+3. **Metadata**: Keboola API for business context and data lineage
+4. **Workspace Management**: Keboola API for bucket organization and permissions
+
+**Table Name Resolution**:
+
+The system handles the complex table naming conventions between Keboola and BigQuery:
+
+```python
+# Example table name transformations
+KEBOOLA_TABLE_ID = "out.c-main.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-"
+BIGQUERY_TABLE_NAME = "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-"
+
+# Natural language resolution
+def resolve_table_from_query(user_query: str) -> str:
+    """Resolve user's natural language to actual BigQuery table name"""
+    query_lower = user_query.lower()
+    
+    # Pattern matching for common requests
+    if "undiscovered" in query_lower and "attendees" in query_lower:
+        return "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-"
+    elif "balay" in query_lower or "kreative" in query_lower:
+        return "Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders"
+    elif "vendor" in query_lower and "export" in query_lower:
+        return "Undiscovered-Vendor-Export---Squarespace---All-data-orders"
+    
+    # Fallback to table list query
+    return None
+```
+
+**Data Pipeline Integration**:
+
+Keboola Cloud orchestrates the complete data pipeline that feeds the chatbot:
+
+1. **Data Ingestion**: Keboola extractors pull data from Squarespace, Shopify, and other sources
+2. **Data Transformation**: Keboola transformations clean and structure the data
+3. **BigQuery Sync**: Processed data automatically syncs to BigQuery workspace
+4. **Chatbot Access**: AI queries the BigQuery mirror for real-time analysis
+5. **Metadata Enrichment**: Keboola API provides business context and data lineage
+
+This architecture allows the chatbot to provide intelligent data analysis while maintaining the full data governance and processing capabilities of the Keboola platform.
 
 #### BigQuery Integration
 ```python
@@ -326,34 +619,98 @@ except Exception:
 # Database
 DATABASE_URL=postgresql://username:password@host:port/database
 
-# Keboola Cloud
+# Keboola Cloud Configuration
 KBC_API_URL=https://connection.us-east4.gcp.keboola.com
-KBC_STORAGE_TOKEN=your_keboola_token
-KBC_WORKSPACE_SCHEMA=your_workspace_schema
+KBC_STORAGE_TOKEN=your_keboola_storage_api_token
+KBC_WORKSPACE_SCHEMA=WORKSPACE_21894820
+KBC_WORKSPACE_ID=WORKSPACE_21894820
 
-# Google Cloud
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
-GOOGLE_PROJECT_ID=your-gcp-project-id
-KBC_WORKSPACE_ID=your_workspace_id
+# Google Cloud Platform
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-credentials.json
+GOOGLE_PROJECT_ID=kbc-use4-839-261b
 
-# AI
-GEMINI_API_KEY=your_gemini_api_key
+# AI Services
+GEMINI_API_KEY=your_google_gemini_api_key
 
 # Security
-SESSION_SECRET=your_session_secret
+SESSION_SECRET=your_express_session_secret
+
+# Optional: Backend Configuration
+BACKEND_URL=http://localhost:8081
+NODE_ENV=development|production
 ```
+
+### Keboola Cloud API Authentication
+
+**Storage API Token Setup**:
+1. Navigate to Keboola Cloud project settings
+2. Generate new Storage API token with required permissions:
+   - `storage:read` - Read access to buckets and tables
+   - `storage:write` - Write access for data exports (if needed)
+   - `canReadAllFileUploads` - Access to file storage
+   - `canPurgeTrash` - Maintenance operations
+
+**Token Configuration Example**:
+```json
+{
+  "id": "12345",
+  "description": "Kultivate AI Chatbot Integration",
+  "bucketPermissions": {
+    "out": "read",
+    "in": "read", 
+    "sys": "read"
+  },
+  "expires": null,
+  "canReadAllFileUploads": true,
+  "canPurgeTrash": false
+}
+```
+
+**Workspace Schema Mapping**:
+The `KBC_WORKSPACE_SCHEMA` corresponds to the BigQuery dataset where Keboola automatically syncs all workspace data:
+- Format: `WORKSPACE_{PROJECT_ID}`
+- Example: `WORKSPACE_21894820` for Keboola project ID 21894820
+- BigQuery path: `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}`
 
 ### Service Account Permissions
 
 **Required Google Cloud IAM Roles**:
-- BigQuery Data Viewer
-- BigQuery Job User  
-- BigQuery User
+- BigQuery Data Viewer (for querying workspace tables)
+- BigQuery Job User (for executing SQL queries)
+- BigQuery User (for basic BigQuery access)
+- Service Account Token Creator (if using service account impersonation)
 
-**Keboola Cloud Permissions**:
-- Storage API access
-- Bucket read permissions
-- Table detail access
+**Keboola Cloud API Permissions**:
+- Storage API Token with `storage:read` permission
+- Bucket-level read access for all relevant data buckets:
+  - `out.c-main` - Primary output tables with business data
+  - `in.c-shopify` - E-commerce platform input data  
+  - `in.c-squarespace` - Website and event data
+  - `sys.c-logs` - System logs and metadata (optional)
+- File storage access for data exports and backups
+- Workspace-level read permissions for metadata operations
+
+**Service Account JSON Structure**:
+```json
+{
+  "type": "service_account",
+  "project_id": "kbc-use4-839-261b",
+  "private_key_id": "key-id",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+  "client_email": "service-account@kbc-use4-839-261b.iam.gserviceaccount.com",
+  "client_id": "client-id",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+}
+```
+
+**Keboola-BigQuery Data Sync Configuration**:
+The workspace automatically maintains bidirectional sync between Keboola storage and BigQuery:
+- **Real-time sync**: Data changes in Keboola appear in BigQuery within minutes
+- **Schema preservation**: Column types and constraints maintained across platforms
+- **Table naming**: Keboola table IDs transform to BigQuery-compatible names
+- **Access control**: Service account permissions apply to both platforms
 
 ## Deployment Architecture
 
