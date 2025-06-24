@@ -1299,16 +1299,36 @@ def chat_with_gemini_client_style():
         if not query_data and final_answer and "retrieved" in final_answer.lower() and "rows" in final_answer.lower():
             app.logger.info("Using text analysis fallback for data extraction")
             try:
+                # Extract both table name and row count from AI response
+                import re
+                # Try multiple patterns to extract the row count
+                patterns = [
+                    r'retrieved\s+(\d+)\s+rows',  # "retrieved 30 rows"
+                    r'(\d+)\s+rows',              # "30 rows"
+                    r'first\s+(\d+)',             # "first 30"
+                    r'retrieved\s+(\d+)',         # "retrieved 30"
+                    r'(\d+)\s+records'            # "30 records"
+                ]
+                
+                limit = 10  # default
+                for pattern in patterns:
+                    match = re.search(pattern, final_answer, re.IGNORECASE)
+                    if match:
+                        limit = int(match.group(1))
+                        break
+                        
+                app.logger.info(f"Extracted limit from AI response '{final_answer[:100]}...': {limit}")
+                
                 # Extract table name from AI response and query directly
                 if "Undiscovered-Vendor-Export" in final_answer:
-                    fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
+                    fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT {limit}"
                     fallback_result = internal_execute_sql_query(fallback_query)
                     if fallback_result.get('status') == 'success' and fallback_result.get('data'):
                         query_data = fallback_result['data']
                         tool_display_title = "Undiscovered Vendor Export Data"
                         app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
                 elif "Balay-Kreative" in final_answer:
-                    fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"
+                    fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT {limit}"
                     fallback_result = internal_execute_sql_query(fallback_query)
                     if fallback_result.get('status') == 'success' and fallback_result.get('data'):
                         query_data = fallback_result['data']
