@@ -18,9 +18,6 @@ let flaskServerReady = true;
 
 // Handle conversation messages with database persistence BEFORE general proxy
 app.post('/api/conversations/:id/messages', express.json(), async (req, res) => {
-  if (!flaskServerReady) {
-    return res.status(503).json({ error: 'Backend not ready' });
-  }
 
   try {
     const conversationId = req.params.id;
@@ -80,14 +77,6 @@ app.post('/api/conversations/:id/messages', express.json(), async (req, res) => 
 
 // Proxy other /api requests to Flask backend
 app.use('/api', (req, res, next) => {
-  // If Flask not ready, wait briefly and retry
-  if (!flaskServerReady) {
-    setTimeout(() => {
-      handleProxyRequest(req, res);
-    }, 1000);
-    return;
-  }
-  
   handleProxyRequest(req, res);
 });
 
@@ -150,8 +139,7 @@ async function initializeServer() {
     
     console.log("Authentication and routes configured");
     
-    // Start Flask backend AFTER Node.js is ready
-    await startFlaskServer();
+    console.log("Server initialized. Ready to proxy requests to backend on port 8081.");
     
   } catch (error) {
     console.error("Error setting up server:", error);
@@ -160,18 +148,12 @@ async function initializeServer() {
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('Shutting down servers...');
-  if (flaskProcess) {
-    flaskProcess.kill();
-  }
+  console.log('Shutting down frontend server...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('Shutting down servers...');
-  if (flaskProcess) {
-    flaskProcess.kill();
-  }
+  console.log('Shutting down frontend server...');
   process.exit(0);
 });
 
