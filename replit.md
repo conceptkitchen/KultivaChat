@@ -112,14 +112,16 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
-- **June 24, 2025**: COMPREHENSIVE CHATBOT ARCHITECTURE DOCUMENT CREATED
+- **June 24, 2025**: COMPREHENSIVE CHATBOT ARCHITECTURE DOCUMENT CREATED WITH KEBOOLA INTEGRATION
   - ✅ CREATED: CHATBOT_TECHNICAL_ARCHITECTURE.md with complete technical specifications
   - ✅ DOCUMENTED: Detailed component breakdown covering React frontend, Node.js proxy, Python backend, and AI integration
   - ✅ EXPLAINED: Data flow architecture from user input through Gemini AI to BigQuery data retrieval
   - ✅ DETAILED: Tool system implementation with function calling and error handling mechanisms  
   - ✅ SPECIFIED: Database schema, API contracts, and environment configuration requirements
+  - ✅ ADDED: Comprehensive Keboola Cloud API integration documentation with authentication, bucket operations, table management, and workspace configuration
+  - ✅ DETAILED: Storage API token setup, BigQuery workspace sync, data pipeline integration, and table name resolution strategies
   - ✅ PROVIDED: Step-by-step rebuild instructions for another AI to recreate the entire system
-  - → Complete technical documentation available for system reconstruction and understanding
+  - → Complete technical documentation available for system reconstruction and understanding including full Keboola platform integration
 
 - **June 24, 2025**: PROJECT DOCUMENTATION COMPLETE - Comprehensive overview created
   - ✅ CREATED: Complete PROJECT_OVERVIEW.md with technical architecture, business purpose, and implementation details
