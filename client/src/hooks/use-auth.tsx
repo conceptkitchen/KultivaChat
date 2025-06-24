@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user: SelectUser) => {
       console.log("loginMutation onSuccess called with user:", user);
       queryClient.setQueryData(["/api/user"], user);
-      // Force a page refresh to trigger the routing properly
-      window.location.href = '/';
+      // Navigate to dashboard after successful login
+      window.location.href = '/dashboard';
     },
     onError: (error: Error) => {
       console.error("loginMutation onError called with error:", error);
@@ -63,8 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
-      // Force a page refresh to trigger the routing properly
-      window.location.href = '/';
+      // Navigate to dashboard after successful registration
+      window.location.href = '/dashboard';
     },
     onError: (error: Error) => {
       toast({
@@ -81,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      // Navigate to landing page after logout
+      window.location.href = '/';
     },
     onError: (error: Error) => {
       toast({

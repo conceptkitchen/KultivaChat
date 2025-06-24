@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import ChatPage from "@/pages/chat";
+import LandingPage from "@/pages/landing";
 import { Sidebar, SidebarButton } from "@/components/sidebar";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -14,13 +15,22 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import { LogoutButton } from "@/components/logout-button";
 
-function Router() {
+function PublicRouter() {
   return (
     <Switch>
+      <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+function ProtectedRouter() {
+  return (
+    <Switch>
       <ProtectedRoute path="/settings" component={Home} />
+      <ProtectedRoute path="/dashboard" component={ChatPage} />
       <ProtectedRoute path="/chat/:id" component={ChatPage} />
-      <ProtectedRoute path="/" component={ChatPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -60,17 +70,10 @@ function AuthContent() {
     );
   }
 
-  // BYPASS: Skip authentication check completely for now
-  // if (!user) {
-  //   return (
-  //     <Switch>
-  //       <Route path="/auth" component={AuthPage} />
-  //       <Route>
-  //         <AuthPage />
-  //       </Route>
-  //     </Switch>
-  //   );
-  // }
+  // Show public pages for unauthenticated users
+  if (!user) {
+    return <PublicRouter />;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-neutral-50 text-neutral-700">
@@ -154,7 +157,7 @@ function AuthContent() {
           onNewChat={handleNewChat}
         />
         <main className="flex-1 flex flex-col overflow-hidden">
-          <Router />
+          <ProtectedRouter />
         </main>
       </div>
     </div>
