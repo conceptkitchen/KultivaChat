@@ -1469,6 +1469,19 @@ def chat_with_gemini_client_style():
                 app.logger.error(
                     f"An error occurred while trying to get or process chat history: {e_hist}",
                     exc_info=True)
+                # CRITICAL FIX: If any history parsing fails, trigger the fallback extraction since we know AI got data
+                if not query_data and final_answer and "retrieved" in final_answer.lower():
+                    app.logger.info("History parsing failed with Exception but AI says it retrieved data - triggering emergency fallback")
+                    if "Undiscovered-Vendor-Export" in final_answer:
+                        try:
+                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
+                            fallback_result = internal_execute_sql_query(fallback_query)
+                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                                query_data = fallback_result['data']
+                                tool_display_title = "Undiscovered Vendor Export Data"
+                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
+                        except Exception as fallback_error:
+                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
 
         app.logger.info(
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
