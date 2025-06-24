@@ -854,89 +854,86 @@ def get_user():
 
 @app.route('/api/conversations', methods=['GET'])
 def get_conversations():
-    # Connect to PostgreSQL and fetch actual conversations
+    # Fetch actual conversations from database using SQL execution tool
     try:
-        import psycopg2
+        # Connect to the same database system used by the Node.js server
+        import subprocess
+        import json
         import os
         
-        # Use the same DATABASE_URL as the Node.js server
         database_url = os.getenv('DATABASE_URL')
         if not database_url:
             app.logger.error("DATABASE_URL not found")
-            return jsonify([]), 500
-            
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
+            return jsonify([])
         
-        # Query conversations for user_id 1 (default user)
-        cur.execute("""
-            SELECT id, title, created_at, updated_at 
-            FROM conversations 
-            WHERE user_id = 1 
-            ORDER BY updated_at DESC
-        """)
+        query = "SELECT id, title, created_at, updated_at FROM conversations WHERE user_id = 1 ORDER BY updated_at DESC"
+        
+        # Use psql to execute the query
+        result = subprocess.run([
+            'psql', database_url, '-c', query, '-t', '--csv'
+        ], capture_output=True, text=True)
         
         conversations = []
-        for row in cur.fetchall():
-            conversations.append({
-                "id": row[0],
-                "title": row[1],
-                "createdAt": row[2].isoformat() + "Z" if row[2] else None,
-                "updatedAt": row[3].isoformat() + "Z" if row[3] else None
-            })
-        
-        cur.close()
-        conn.close()
+        if result.returncode == 0 and result.stdout.strip():
+            lines = result.stdout.strip().split('\n')
+            for line in lines:
+                if line.strip():
+                    parts = line.split(',')
+                    if len(parts) >= 4:
+                        conversations.append({
+                            "id": parts[0].strip(),
+                            "title": parts[1].strip(),
+                            "createdAt": parts[2].strip() + "Z" if parts[2].strip() else None,
+                            "updatedAt": parts[3].strip() + "Z" if parts[3].strip() else None
+                        })
         
         app.logger.info(f"Retrieved {len(conversations)} conversations from database")
         return jsonify(conversations)
         
     except Exception as e:
         app.logger.error(f"Error fetching conversations: {e}")
-        return jsonify([]), 500
+        return jsonify([])
 
 @app.route('/api/conversations', methods=['POST'])
 def create_conversation():
-    # Create a new conversation in the database
+    # Create a new conversation in the database using SQL execution
     try:
-        import psycopg2
+        import subprocess
         import uuid
         import os
         from datetime import datetime
         
-        data = request.get_json()
+        data = request.get_json() or {}
         title = data.get('title', 'New Conversation')
         conv_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
         
         database_url = os.getenv('DATABASE_URL')
         if not database_url:
-            app.logger.error("DATABASE_URL not found")
             return jsonify({"error": "Database connection failed"}), 500
-            
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
         
-        # Insert new conversation for user_id 1 (default user)
-        cur.execute("""
-            INSERT INTO conversations (id, user_id, title, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s)
-            RETURNING id, title, created_at, updated_at
-        """, (conv_id, 1, title, datetime.utcnow(), datetime.utcnow()))
+        # SQL query to insert new conversation
+        query = f"INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES ('{conv_id}', 1, '{title.replace(\"'\", \"''\")}', '{now}', '{now}') RETURNING id, title, created_at, updated_at"
         
-        row = cur.fetchone()
-        conn.commit()
-        cur.close()
-        conn.close()
+        # Execute using psql
+        result = subprocess.run([
+            'psql', database_url, '-c', query, '-t', '--csv'
+        ], capture_output=True, text=True)
         
-        conversation = {
-            "id": row[0],
-            "title": row[1],
-            "createdAt": row[2].isoformat() + "Z",
-            "updatedAt": row[3].isoformat() + "Z"
-        }
+        if result.returncode == 0 and result.stdout.strip():
+            parts = result.stdout.strip().split(',')
+            if len(parts) >= 4:
+                conversation = {
+                    "id": parts[0].strip(),
+                    "title": parts[1].strip(),
+                    "createdAt": parts[2].strip() + "Z",
+                    "updatedAt": parts[3].strip() + "Z"
+                }
+                app.logger.info(f"Created new conversation: {conv_id}")
+                return jsonify(conversation)
         
-        app.logger.info(f"Created new conversation: {conv_id}")
-        return jsonify(conversation)
+        app.logger.error(f"Failed to create conversation: {result.stderr}")
+        return jsonify({"error": "Failed to create conversation"}), 500
         
     except Exception as e:
         app.logger.error(f"Error creating conversation: {e}")
@@ -944,61 +941,15 @@ def create_conversation():
 
 @app.route('/api/conversations/<conversation_id>', methods=['GET'])
 def get_conversation(conversation_id):
-    # Fetch specific conversation from database
+    # Fetch specific conversation with messages from database
     try:
-        import psycopg2
-        import os
+        from db_utils import get_conversation_with_messages
         
-        database_url = os.getenv('DATABASE_URL')
-        if not database_url:
-            return jsonify({"error": "Database connection failed"}), 500
-            
-        conn = psycopg2.connect(database_url)
-        cur = conn.cursor()
-        
-        # Query specific conversation
-        cur.execute("""
-            SELECT id, title, created_at, updated_at 
-            FROM conversations 
-            WHERE id = %s AND user_id = 1
-        """, (conversation_id,))
-        
-        row = cur.fetchone()
-        if not row:
-            cur.close()
-            conn.close()
+        conversation = get_conversation_with_messages(conversation_id)
+        if conversation:
+            return jsonify(conversation)
+        else:
             return jsonify({"error": "Conversation not found"}), 404
-            
-        # Fetch messages for this conversation
-        cur.execute("""
-            SELECT id, role, content, displays, timestamp
-            FROM messages 
-            WHERE conversation_id = %s 
-            ORDER BY timestamp ASC
-        """, (conversation_id,))
-        
-        messages = []
-        for msg_row in cur.fetchall():
-            messages.append({
-                "id": msg_row[0],
-                "role": msg_row[1],
-                "content": msg_row[2],
-                "displays": msg_row[3] or [],
-                "timestamp": msg_row[4].isoformat() + "Z" if msg_row[4] else None
-            })
-        
-        conversation = {
-            "id": row[0],
-            "title": row[1],
-            "createdAt": row[2].isoformat() + "Z" if row[2] else None,
-            "updatedAt": row[3].isoformat() + "Z" if row[3] else None,
-            "messages": messages
-        }
-        
-        cur.close()
-        conn.close()
-        
-        return jsonify(conversation)
         
     except Exception as e:
         app.logger.error(f"Error fetching conversation {conversation_id}: {e}")
@@ -1011,25 +962,61 @@ def get_conversation_messages(conversation_id):
 
 @app.route('/api/conversations/<conversation_id>/messages', methods=['POST'])
 def send_message_to_conversation(conversation_id):
-    # This endpoint handles the actual chat functionality
-    # Get the request data
-    request_data = request.get_json()
-    if not request_data or 'content' not in request_data:
-        return jsonify({"error": "Missing 'content' in JSON payload."}), 400
-
-    user_content = request_data['content']
-    
-    # Convert to the format expected by the existing chat handler
-    chat_request = {
-        'message': user_content,
-        'conversation_history': []
-    }
-    
-    # Call the existing chat functionality
-    if not gemini_sdk_client or not gemini_generation_config_with_tools:
-        return jsonify({"error": "Chat service not available"}), 500
-    
+    # This endpoint handles the actual chat functionality with database persistence
     try:
+        import psycopg2
+        import uuid
+        import os
+        from datetime import datetime
+        
+        # Get the request data
+        request_data = request.get_json()
+        if not request_data or 'content' not in request_data:
+            return jsonify({"error": "Missing 'content' in JSON payload."}), 400
+
+        user_content = request_data['content']
+        
+        # Get existing conversation and messages from database
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            return jsonify({"error": "Database connection failed"}), 500
+            
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Verify conversation exists
+        cur.execute("SELECT id FROM conversations WHERE id = %s AND user_id = 1", (conversation_id,))
+        if not cur.fetchone():
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Conversation not found"}), 404
+        
+        # Get conversation history from database
+        cur.execute("""
+            SELECT role, content FROM messages 
+            WHERE conversation_id = %s 
+            ORDER BY timestamp ASC
+        """, (conversation_id,))
+        
+        conversation_history = []
+        for row in cur.fetchall():
+            conversation_history.append({
+                'role': row[0],
+                'content': row[1]
+            })
+        
+        # Convert to the format expected by the existing chat handler
+        chat_request = {
+            'message': user_content,
+            'conversation_history': conversation_history
+        }
+        
+        # Call the existing chat functionality
+        if not gemini_sdk_client or not gemini_generation_config_with_tools:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Chat service not available"}), 500
+        
         # Use existing chat logic but return in frontend-expected format
         user_message_text = chat_request['message']
         conversation_history = chat_request.get('conversation_history', [])
