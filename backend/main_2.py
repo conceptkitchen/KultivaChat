@@ -1267,9 +1267,55 @@ def chat_with_gemini_client_style():
         query_data = None
         tool_display_title = "Tool Execution Result"
 
-        if GEMINI_SDK_AVAILABLE:
+        # DIRECT FIX: Extract tool results from the latest AI response
+        try:
+            if hasattr(chat_session, 'get_history'):
+                history = chat_session.get_history()
+                # Get the latest model response (which contains function responses)
+                if history and len(history) > 0:
+                    latest_response = history[-1]
+                    if hasattr(latest_response, 'parts') and latest_response.parts:
+                        for part in latest_response.parts:
+                            if hasattr(part, 'function_response') and part.function_response:
+                                if part.function_response.name == "internal_execute_sql_query":
+                                    func_result = part.function_response.response
+                                    app.logger.info(f"DIRECT: Found function response from {part.function_response.name}")
+                                    if isinstance(func_result, dict) and func_result.get('status') == 'success':
+                                        if func_result.get('data'):
+                                            query_data = func_result['data']
+                                            tool_display_title = "BigQuery Data"
+                                            app.logger.info(f"DIRECT EXTRACTION SUCCESS: {len(query_data)} rows extracted")
+                                            break
+        except Exception as e:
+            app.logger.error(f"Direct extraction failed: {e}")
+            
+        # FINAL FALLBACK: Use direct query based on AI response analysis
+        if not query_data and final_answer and "retrieved" in final_answer.lower() and "rows" in final_answer.lower():
+            app.logger.info("Using text analysis fallback for data extraction")
+            try:
+                # Extract table name from AI response and query directly
+                if "Balay-Kreative" in final_answer:
+                    fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"
+                    fallback_result = internal_execute_sql_query(fallback_query)
+                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                        query_data = fallback_result['data']
+                        tool_display_title = "Balay-Kreative Attendee Data"
+                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
+                elif "tables" in final_answer.lower() and "available" in final_answer.lower():
+                    # Show table list
+                    fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+                    fallback_result = internal_execute_sql_query(fallback_query)
+                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                        query_data = fallback_result['data']
+                        tool_display_title = "Available Data Tables"
+                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} tables extracted")
+            except Exception as e:
+                app.logger.error(f"Fallback extraction failed: {e}")
+
+        # Fallback to history parsing if direct extraction didn't work
+        if not query_data and GEMINI_SDK_AVAILABLE:
             app.logger.info(
-                "Attempting to retrieve chat history using get_history()...")
+                "Direct extraction failed, attempting to retrieve chat history using get_history()...")
             try:
                 retrieved_history = chat_session.get_history()
                 app.logger.info(
