@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
 
@@ -14,92 +13,8 @@ app.use(express.urlencoded({ extended: false }));
 
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
 
-let flaskProcess: any = null;
-
-// Start Flask backend server and wait for it to be ready
-function startFlaskServer(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const backendPath = path.join(__dirname, '../backend');
-    flaskProcess = spawn('python', ['main_2.py'], {
-      cwd: backendPath,
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    
-    let flaskReady = false;
-    
-    flaskProcess.stdout?.on('data', (data: Buffer) => {
-      const output = data.toString().trim();
-      console.log(`Flask: ${output}`);
-      
-      // Flask is ready when it shows the server running message
-      if (output.includes('Running on http://127.0.0.1:8081') && !flaskReady) {
-        flaskReady = true;
-        flaskServerReady = true; // Set flag for proxy
-        console.log('Flask server is ready');
-        resolve();
-      }
-      
-      // Also check for alternative Flask ready signals
-      if ((output.includes('Starting Flask server') || output.includes('Serving Flask app')) && !flaskReady) {
-        // Give Flask a few seconds to fully initialize
-        setTimeout(() => {
-          if (!flaskReady) {
-            flaskReady = true;
-            console.log('Flask server ready (alternative detection)');
-            resolve();
-          }
-        }, 10000);
-      }
-    });
-    
-    flaskProcess.stderr?.on('data', (data: Buffer) => {
-      const output = data.toString().trim();
-      console.log(`Flask Error: ${output}`);
-      
-      // Also check stderr for the running message
-      if (output.includes('Running on http://127.0.0.1:8081') && !flaskReady) {
-        flaskReady = true;
-        console.log('Flask server is ready');
-        resolve();
-      }
-      
-      // Check for Flask app startup in stderr
-      if ((output.includes('Starting Flask server') || output.includes('Serving Flask app')) && !flaskReady) {
-        setTimeout(() => {
-          if (!flaskReady) {
-            flaskReady = true;
-            console.log('Flask server ready (stderr detection)');
-            resolve();
-          }
-        }, 10000);
-      }
-    });
-    
-    flaskProcess.on('close', (code: number) => {
-      console.log(`Flask process exited with code ${code}`);
-      if (!flaskReady) {
-        reject(new Error(`Flask server failed to start (exit code: ${code})`));
-      }
-    });
-    
-    flaskProcess.on('error', (error: Error) => {
-      console.error('Flask server error:', error);
-      reject(error);
-    });
-    
-    console.log('Starting Flask backend server...');
-    
-    // Timeout in case Flask never signals ready (increased for production)
-    setTimeout(() => {
-      if (!flaskReady) {
-        reject(new Error('Flask server startup timeout'));
-      }
-    }, 120000); // 2 minutes for production initialization
-  });
-}
-
-// Track Flask server readiness
-let flaskServerReady = false;
+// Assume Flask server is running independently on port 8081
+let flaskServerReady = true;
 
 // Handle conversation messages with database persistence BEFORE general proxy
 app.post('/api/conversations/:id/messages', express.json(), async (req, res) => {
