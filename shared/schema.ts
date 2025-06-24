@@ -1,39 +1,29 @@
-import {
-  pgTable,
-  text,
-  varchar,
-  timestamp,
-  jsonb,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
+// Users table
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: varchar("username").unique().notNull(),
+  password: varchar("password").notNull(),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+// Session storage table for authentication
 export const sessions = pgTable(
   "sessions",
   {
     sid: varchar("sid").primaryKey(),
     sess: jsonb("sess").notNull(),
     expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
+  }
 );
-
-// User storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-
 
 export const messages = pgTable("messages", {
   id: text("id").primaryKey(),
@@ -46,7 +36,7 @@ export const messages = pgTable("messages", {
 
 export const conversations = pgTable("conversations", {
   id: text("id").primaryKey(),
-  userId: varchar("user_id").references(() => users.id),
+  userId: integer("user_id").references(() => users.id),
   title: text("title").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow()
@@ -83,24 +73,23 @@ export type Conversation = typeof conversations.$inferSelect & {
   }>;
 };
 
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
 
 // Storage interface types for database and memory storage
 export interface IStorage {
   // User operations
-  // (IMPORTANT) these user operations are mandatory for Replit Auth.
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(userData: InsertUser): Promise<User>;
   
   // Conversation operations
-  getConversations(userId?: string): Promise<Conversation[]>;
-  getConversation(id: string, userId?: string): Promise<Conversation | undefined>;
+  getConversations(userId?: number): Promise<Conversation[]>;
+  getConversation(id: string, userId?: number): Promise<Conversation | undefined>;
   createConversation(conversation: Conversation): Promise<Conversation>;
   updateConversation(conversation: Conversation): Promise<Conversation>;
-  deleteConversation(id: string, userId?: string): Promise<void>;
-  clearConversations(userId?: string): Promise<void>;
+  deleteConversation(id: string, userId?: number): Promise<void>;
+  clearConversations(userId?: number): Promise<void>;
 
   // Session store for authentication
   sessionStore: any;
