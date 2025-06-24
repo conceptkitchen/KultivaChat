@@ -123,55 +123,53 @@ class PythonBackendService {
 
 const backendService = new PythonBackendService();
 
-// --- Fixed API Proxy with Proper Body Handling ---
-app.use('/api', (req, res, next) => {
-  console.log(`[MIDDLEWARE] Received ${req.method} ${req.url}`);
-  console.log(`[MIDDLEWARE] Body:`, req.body);
-  next();
-});
-
-app.use('/api', createProxyMiddleware({
-  target: BACKEND_URL,
-  changeOrigin: true,
-  logLevel: 'debug',
-  // Ensure backend readiness before processing
-  router: (req) => {
-    if (!backendService.isBackendReady()) {
-      console.log('[PROXY] Backend not ready, rejecting request');
-      return null; // This will cause an error
-    }
-    return BACKEND_URL;
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[PROXY] Forwarding ${req.method} ${req.url} to ${BACKEND_URL}${req.url}`);
+// --- Manual API Proxy (Direct Implementation) ---
+app.all('/api/*', async (req, res) => {
+  try {
+    console.log(`[MANUAL PROXY] ${req.method} ${req.url} -> ${BACKEND_URL}${req.url}`);
     
-    // Handle POST/PUT request bodies properly
+    // Ensure backend is ready
+    if (!backendService.isBackendReady()) {
+      return res.status(503).json({ error: 'Backend service unavailable' });
+    }
+
+    const targetUrl = `${BACKEND_URL}${req.url}`;
+    console.log(`[MANUAL PROXY] Target URL: ${targetUrl}`);
+    
+    // Create fetch request
+    const fetchOptions: any = {
+      method: req.method,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    };
+
+    // Add body for POST/PUT requests
     if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
-      const bodyData = JSON.stringify(req.body);
-      console.log(`[PROXY] Sending body:`, bodyData);
-      
-      // Remove any existing content-length
-      proxyReq.removeHeader('content-length');
-      
-      // Set proper headers
-      proxyReq.setHeader('Content-Type', 'application/json');
-      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-      
-      // Write the body
-      proxyReq.write(bodyData);
-      proxyReq.end();
+      fetchOptions.body = JSON.stringify(req.body);
+      console.log(`[MANUAL PROXY] Sending body:`, req.body);
     }
-  },
-  onProxyRes: (proxyRes, req, res) => {
-    console.log(`[PROXY] Response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
-  },
-  onError: (err, req, res) => {
-    console.error('[PROXY] Error:', err.message);
-    if (res && !res.headersSent) {
-      res.status(503).json({ error: 'Backend service unavailable' });
-    }
+
+    // Make the request to backend
+    const response = await fetch(targetUrl, fetchOptions);
+    const data = await response.text();
+    
+    console.log(`[MANUAL PROXY] Response: ${response.status} ${response.statusText}`);
+    
+    // Set response headers
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+    
+    // Send response
+    res.status(response.status).send(data);
+    
+  } catch (error) {
+    console.error('[MANUAL PROXY] Error:', error);
+    res.status(500).json({ error: 'Proxy error', message: error.message });
   }
-}));
+});
 
 // --- Frontend Server Logic ---
 
@@ -180,19 +178,19 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Serve static files from the client's build directory BEFORE fallback
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// For any other route (non-API), serve the React app's index.html file.
+// This is necessary for client-side routing to work correctly.
+app.get('*', (req, res) => {
+  console.log(`[FRONTEND] Serving React app for: ${req.url}`);
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
+
 async function initializeServer() {
   try {
-    // Serve static files from the client's build directory
-    app.use(express.static(path.join(__dirname, '../dist')));
-    
-    // For any other route, serve the React app's index.html file.
-    // This is necessary for client-side routing to work correctly.
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, '../dist/index.html'));
-    });
-    
     console.log("Static file and fallback routes configured.");
-    
   } catch (error) {
     console.error("Error setting up server:", error);
   }
