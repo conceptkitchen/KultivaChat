@@ -49,14 +49,20 @@ class PythonBackendService {
         const output = data.toString();
         console.log('[Backend]', output.trim());
         
-        // Check if backend is ready
-        if (output.includes('Listening at:') || output.includes('Booting worker')) {
+        // Check if backend is ready - look for config completion
+        if (output.includes('Listening at:') || output.includes('Gemini GenerateContentConfig with tools created successfully')) {
           this.isReady = true;
         }
       });
 
       this.backendProcess.stderr?.on('data', (data) => {
-        console.error('[Backend Error]', data.toString().trim());
+        const output = data.toString();
+        console.error('[Backend Error]', output.trim());
+        
+        // Also check stderr for readiness indicators
+        if (output.includes('Listening at:') || output.includes('Gemini GenerateContentConfig with tools created successfully')) {
+          this.isReady = true;
+        }
       });
 
       this.backendProcess.on('exit', (code, signal) => {
@@ -85,11 +91,11 @@ class PythonBackendService {
   }
 
   private async waitForReady(): Promise<void> {
-    const maxWait = 30000; // 30 seconds
+    const maxWait = 60000; // 60 seconds - increased for complete backend initialization
     const start = Date.now();
     
     while (!this.isReady && (Date.now() - start) < maxWait) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
     if (!this.isReady) {
