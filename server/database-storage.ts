@@ -1,5 +1,5 @@
 import { db, pool } from "./db";
-import { type Conversation, type IStorage, conversations, messages, users, type User, type InsertUser } from "@shared/schema";
+import { type Conversation, type IStorage, conversations, messages, users, type User, type UpsertUser } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -16,8 +16,10 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // User operations for authentication
-  async getUser(id: number): Promise<User | undefined> {
+  // User operations
+  // (IMPORTANT) these user operations are mandatory for Replit Auth.
+
+  async getUser(id: string): Promise<User | undefined> {
     try {
       const [user] = await db.select().from(users).where(eq(users.id, id));
       return user;
@@ -27,21 +29,18 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    try {
-      const [user] = await db.select().from(users).where(eq(users.username, username));
-      return user;
-    } catch (error) {
-      console.error("Error fetching user by username:", error);
-      return undefined;
-    }
-  }
-
-  async createUser(userData: InsertUser): Promise<User> {
+  async upsertUser(userData: UpsertUser): Promise<User> {
     try {
       const [user] = await db
         .insert(users)
         .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            ...userData,
+            updatedAt: new Date(),
+          },
+        })
         .returning();
       return user;
     } catch (error) {
