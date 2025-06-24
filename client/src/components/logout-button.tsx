@@ -8,13 +8,12 @@ export function LogoutButton() {
   return (
     <Button
       variant="ghost"
-      size="sm"
+      className="w-full justify-start px-3 py-2 text-neutral-600"
       onClick={() => logoutMutation.mutate()}
       disabled={logoutMutation.isPending}
-      className="flex items-center gap-2 text-neutral-600 hover:text-neutral-800"
     >
-      <LogOut className="w-4 h-4" />
-      Logout
+      <LogOut className="text-neutral-400 mr-2 h-4 w-4" />
+      <span>{logoutMutation.isPending ? "Logging out..." : "Log out"}</span>
     </Button>
   );
 }
