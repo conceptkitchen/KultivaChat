@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { pythonBackend } from './python-backend.js';
+// Removed Python backend manager - using screen-managed Gunicorn instead
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,8 +18,7 @@ const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
 console.log('Kultivate AI Frontend Server listening on port', PORT);
 console.log('Proxying API requests to:', BACKEND_URL);
 
-// --- Backend Management Middleware ---
-app.use('/api', pythonBackend.middleware());
+// Backend now runs persistently via screen-managed Gunicorn
 
 // --- Unified API Proxy ---
 // All requests to /api/* will be forwarded to the backend
