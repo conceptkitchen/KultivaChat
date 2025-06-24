@@ -1,0 +1,159 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+Kultivate AI serving on port 5000
+Authentication and routes configured
+Manual proxy: GET /api/user -> http://localhost:8081/api/user
+Proxy Error: request to http://localhost:8081/api/user failed, reason: connect ECONNREFUSED 127.0.0.1:8081
+Flask Error: INFO:main_2:=== Configuration Check ===
+Flask Error: INFO:main_2:KBC_API_URL: SET
+INFO:main_2:KBC_STORAGE_TOKEN: SET
+INFO:main_2:GOOGLE_APPLICATION_CREDENTIALS: SET
+INFO:main_2:KBC_WORKSPACE_SCHEMA: SET
+INFO:main_2:GEMINI_API_KEY: SET
+INFO:main_2:Attempting to initialize Keboola Storage Client with URL: https://connection.us-east4.gcp.keboola.com
+INFO:main_2:Successfully initialized Keboola Storage Client.
+INFO:main_2:Attempting to initialize Google BigQuery Client using credentials from: /home/runner/workspace/backend/credentials-839-21894808.json
+Flask Error: INFO:main_2:Successfully initialized Google BigQuery Client. Project: kbc-use4-839-261b
+Flask Error: INFO:main_2:Initializing google.genai.Client with API key...
+Flask Error: INFO:main_2:Successfully initialized google.genai.Client.
+Flask Error: INFO:main_2:Defining tools for Gemini: ['internal_execute_sql_query', 'list_keboola_buckets', 'list_tables_in_keboola_bucket', 'get_keboola_table_detail', 'get_zip_codes_for_city', 'get_current_time']
+INFO:main_2:Gemini GenerateContentConfig with tools created successfully.
+Flask Error: INFO:main_2:KBC_API_URL from env: SET
+Flask Error: INFO:main_2:KBC_STORAGE_TOKEN from env: SET
+INFO:main_2:GOOGLE_APPLICATION_CREDENTIALS_PATH from env: SET
+INFO:main_2:KBC_WORKSPACE_SCHEMA from env: SET
+INFO:main_2:GEMINI_API_KEY from env: SET
+Flask Error: INFO:main_2:Starting Flask server on host='0.0.0.0', port=8081
+Flask: Successfully imported 'google.genai' and 'google.genai.types'
+ * Serving Flask app 'main_2'
+ * Debug mode: off
+Flask Error: INFO:werkzeug:WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:8081
+ * Running on http://172.31.128.16:8081
+Flask server is ready
+Flask Error: INFO:werkzeug:Press CTRL+C to quit
+Manual proxy: GET /api/user -> http://localhost:8081/api/user
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:41] "GET /api/user HTTP/1.1" 200 -
+Manual proxy: GET /api/user -> http://localhost:8081/api/user
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:42] "GET /api/user HTTP/1.1" 200 -
+Manual proxy: GET /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:42] "GET /api/conversations HTTP/1.1" 200 -
+Manual proxy: POST /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:42] "POST /api/conversations HTTP/1.1" 200 -
+Manual proxy: POST /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:43] "POST /api/conversations HTTP/1.1" 200 -
+Manual proxy: GET /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:43] "GET /api/conversations HTTP/1.1" 200 -
+Manual proxy: GET /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:43] "GET /api/conversations HTTP/1.1" 200 -
+Manual proxy: GET /api/user -> http://localhost:8081/api/user
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:43] "GET /api/user HTTP/1.1" 200 -
+Manual proxy: GET /api/user -> http://localhost:8081/api/user
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:44] "GET /api/user HTTP/1.1" 200 -
+Manual proxy: GET /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:44] "GET /api/conversations HTTP/1.1" 200 -
+Manual proxy: GET /api/conversations/9e945f20-2e59-4ebf-9d9b-c232e4799974 -> http://localhost:8081/api/conversations/9e945f20-2e59-4ebf-9d9b-c232e4799974
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:44] "GET /api/conversations/9e945f20-2e59-4ebf-9d9b-c232e4799974 HTTP/1.1" 200 -
+Manual proxy: GET /api/conversations/5d471e14-c34f-4a0a-8744-82e4d4f3cbf3 -> http://localhost:8081/api/conversations/5d471e14-c34f-4a0a-8744-82e4d4f3cbf3
+Manual proxy: GET /api/conversations -> http://localhost:8081/api/conversations
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:45] "GET /api/conversations/5d471e14-c34f-4a0a-8744-82e4d4f3cbf3 HTTP/1.1" 200 -
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:45:45] "GET /api/conversations HTTP/1.1" 200 -
+Manual proxy: POST /api/chat -> http://localhost:8081/api/chat
+Flask Error: INFO:main_2:Received user message for Gemini (genai.Client): hi
+Flask Error: INFO:main_2:Conversation history length: 1
+INFO:main_2:History message 0: role='assistant', content='Hello! I'm Kultivate AI, your data assistant. I can help you with:
+
+• Analyzing and visualizing your...'
+Flask Error: INFO:main_2:Created Gemini chat session with full history (3 messages). Sending user message: 'hi'
+Flask Error: INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+Flask Error: INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+Flask Error: INFO:google_genai.models:AFC remote call 1 is done.
+Flask Error: INFO:main_2:Gemini final answer (genai.Client/chat): Hi there! How can I help you with your data today?
+Flask Error: INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 5
+Flask Error: ERROR:main_2:'ChatSession' object (type: <class 'google.genai.chats.Chat'>) might not have 'get_history' or it failed: 'NoneType' object has no attribute 'name'. This indicates an API mismatch or an unexpected object type for chat_session.
+INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+Flask Error: WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:46:06] "POST /api/chat HTTP/1.1" 200 -
+Manual proxy: POST /api/chat -> http://localhost:8081/api/chat
+Flask Error: INFO:main_2:Received user message for Gemini (genai.Client): show me my data tables
+Flask Error: INFO:main_2:Conversation history length: 3
+Flask Error: INFO:main_2:History message 0: role='assistant', content='Hello! I'm Kultivate AI, your data assistant. I can help you with:
+
+• Analyzing and visualizing your...'
+Flask Error: INFO:main_2:History message 1: role='user', content='hi...'
+INFO:main_2:History message 2: role='assistant', content='Hi there! How can I help you with your data today?
+...'
+Flask Error: INFO:main_2:Created Gemini chat session with full history (5 messages). Sending user message: 'show me my data tables'
+Flask Error: INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+Flask Error: INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+Flask Error: INFO:google_genai.models:AFC remote call 1 is done.
+Flask Error: INFO:main_2:Tool Call: internal_execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name;
+Flask Error: INFO:main_2:Tool Call: internal_execute_sql_query executed, returned 64 rows.
+Flask Error: INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+Flask Error: INFO:google_genai.models:AFC remote call 2 is done.
+Flask Error: INFO:main_2:Gemini final answer (genai.Client/chat): Okay, I found a number of tables in your BigQuery workspace. They will be displayed for you in a table below:
+Flask Error: INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 9
+Flask Error: ERROR:main_2:'ChatSession' object (type: <class 'google.genai.chats.Chat'>) might not have 'get_history' or it failed: 'NoneType' object has no attribute 'name'. This indicates an API mismatch or an unexpected object type for chat_session.
+Flask Error: INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+INFO:main_2:Tool Call: internal_execute_sql_query with query: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name
+Flask Error: INFO:main_2:Tool Call: internal_execute_sql_query executed, returned 64 rows.
+Flask Error: INFO:main_2:Force-created display with 64 rows for explicit request
+WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:49:38] "POST /api/chat HTTP/1.1" 200 -
+Manual proxy: POST /api/chat -> http://localhost:8081/api/chat
+Flask Error: INFO:main_2:Received user message for Gemini (genai.Client): show me the data from kapwa gardens vendor
+Flask Error: INFO:main_2:Conversation history length: 5
+Flask Error: INFO:main_2:History message 0: role='assistant', content='Hello! I'm Kultivate AI, your data assistant. I can help you with:
+
+• Analyzing and visualizing your...'
+INFO:main_2:History message 1: role='user', content='hi...'
+Flask Error: INFO:main_2:History message 2: role='assistant', content='Hi there! How can I help you with your data today?
+...'
+INFO:main_2:History message 3: role='user', content='show me my data tables...'
+Flask Error: INFO:main_2:History message 4: role='assistant', content='Here are your available data tables:...'
+Flask Error: INFO:main_2:Created Gemini chat session with full history (7 messages). Sending user message: 'show me the data from kapwa gardens vendor'
+Flask Error: INFO:google_genai.models:AFC is enabled with max remote calls: 10.
+Flask Error: INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+Flask Error: INFO:google_genai.models:AFC remote call 1 is done.
+Flask Error: INFO:main_2:Tool Call: internal_execute_sql_query with query: SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT_DIM_VENDORS_KAPWA_GARDENS` LIMIT 10;
+Flask Error: ERROR:main_2:Tool Call: Error executing BigQuery query for internal_execute_sql_query: 404 Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT_DIM_VENDORS_KAPWA_GARDENS was not found in location us-east4; reason: notFound, message: Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT_DIM_VENDORS_KAPWA_GARDENS was not found in location us-east4
+
+Location: us-east4
+Job ID: 2536f7e1-1f4d-4513-b75a-edcabe3ce1a5
+Traceback (most recent call last):
+  File "/home/runner/workspace/backend/main_2.py", line 506, in internal_execute_sql_query
+    results = query_job.result(timeout=60)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/cloud/bigquery/job/query.py", line 1703, in result
+    while not is_job_done():
+              ^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_unary.py", line 293, in retry_wrapped_func
+    return retry_target(
+           ^^^^^^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_unary.py", line 153, in retry_target
+    _retry_error_helper(
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_base.py", line 212, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/api_core/retry/retry_unary.py", line 144, in retry_target
+    result = target()
+             ^^^^^^^^
+  File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/google/cloud/bigquery/job/query.py", line 1645, in is_job_done
+    raise job_failed_exception
+google.api_core.exceptions.NotFound: 404 Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT_DIM_VENDORS_KAPWA_GARDENS was not found in location us-east4; reason: notFound, message: Not found: Table kbc-use4-839-261b:WORKSPACE_21894820.OUT_DIM_VENDORS_KAPWA_GARDENS was not found in location us-east4
+
+Location: us-east4
+Job ID: 2536f7e1-1f4d-4513-b75a-edcabe3ce1a5
+Flask Error: INFO:httpx:HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent "HTTP/1.1 200 OK"
+Flask Error: INFO:google_genai.models:AFC remote call 2 is done.
+Flask Error: INFO:main_2:Gemini final answer (genai.Client/chat): I tried to retrieve data from the table `OUT_DIM_VENDORS_KAPWA_GARDENS`, but it appears that the table does not exist. Did you have another table in mind, perhaps with a slightly different name, related to Kapwa Gardens vendors? Or could the table be located in a different workspace or project?
+Flask Error: INFO:main_2:Attempting to retrieve chat history using get_history()...
+INFO:main_2:Successfully called get_history(). Number of messages: 11
+Flask Error: ERROR:main_2:'ChatSession' object (type: <class 'google.genai.chats.Chat'>) might not have 'get_history' or it failed: 'NoneType' object has no attribute 'name'. This indicates an API mismatch or an unexpected object type for chat_session.
+INFO:main_2:After history check - query_data type: <class 'NoneType'>, Is None: True, Length (if list): N/A
+Flask Error: WARNING:main_2:No structured query_data extracted from tool calls for display. Checking text response for fallback table info.
+Flask Error: INFO:werkzeug:127.0.0.1 - - [23/Jun/2025 23:50:06] "POST /api/chat HTTP/1.1" 200 -
