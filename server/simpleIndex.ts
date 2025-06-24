@@ -41,7 +41,7 @@ class PythonBackendService {
   }
 }
 
-function startServer() {
+async function startServer() {
   const app = express();
   const pythonBackend = new PythonBackendService();
   
@@ -53,22 +53,12 @@ function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(express.static("dist"));
 
-  // Auth endpoint - always return 401 to trigger landing page
+  // Simple auth check endpoint that always returns 401 (unauthenticated)
   app.get('/api/auth/user', (req, res) => {
     res.status(401).json({ message: "Not authenticated" });
   });
 
-  // Add login route that redirects to Replit auth (placeholder)
-  app.get('/api/login', (req, res) => {
-    res.redirect('https://replit.com/login');
-  });
-
-  // Add logout route
-  app.get('/api/logout', (req, res) => {
-    res.redirect('/');
-  });
-
-  // Proxy for backend API routes (simplified)
+  // Proxy for backend API routes
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/auth/')) {
       return next();
@@ -92,29 +82,16 @@ function startServer() {
     }
 
     fetch(targetUrl, options)
-      .then(async response => {
-        const text = await response.text();
-        try {
-          const data = JSON.parse(text);
-          return { status: response.status, data };
-        } catch (e) {
-          console.error(`[Proxy] Backend returned non-JSON:`, text.substring(0, 100));
-          return { status: 503, data: { error: 'Backend starting up...' } };
-        }
-      })
+      .then(response => response.json().then(data => ({ status: response.status, data })))
       .then(({ status, data }) => res.status(status).json(data))
       .catch(error => {
         console.error(`[Proxy Error]:`, error);
-        res.status(503).json({ error: 'Backend starting up...' });
+        res.status(500).json({ error: 'Backend unavailable' });
       });
   });
 
-  // Serve React app for any non-API routes
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/')) {
-      return next();
-    }
-    console.log(`[FRONTEND] Serving React app for: ${req.path}`);
+  // Serve React app for all other routes
+  app.get('*', (req, res) => {
     res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
   });
 
@@ -123,4 +100,4 @@ function startServer() {
   });
 }
 
-startServer();
+startServer().catch(console.error);

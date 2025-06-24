@@ -43,8 +43,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (user: SelectUser) => {
       console.log("loginMutation onSuccess called with user:", user);
       queryClient.setQueryData(["/api/user"], user);
-      // Navigate to dashboard after successful login
-      window.location.href = '/dashboard';
+      // Force a page refresh to trigger the routing properly
+      window.location.href = '/';
     },
     onError: (error: Error) => {
       console.error("loginMutation onError called with error:", error);
@@ -63,8 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: (user: SelectUser) => {
       queryClient.setQueryData(["/api/user"], user);
-      // Navigate to dashboard after successful registration
-      window.location.href = '/dashboard';
+      // Force a page refresh to trigger the routing properly
+      window.location.href = '/';
     },
     onError: (error: Error) => {
       toast({
@@ -77,29 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/logout", {});
-      if (!response.ok) {
-        throw new Error('Logout failed');
-      }
-      return response.json();
+      await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      console.log('Logout successful - clearing cache and redirecting');
       queryClient.setQueryData(["/api/user"], null);
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
-      // Clear all cached data and navigate to landing page
-      queryClient.clear();
-      // Force a full page reload to ensure clean state
-      setTimeout(() => {
-        console.log('Redirecting to landing page');
-        window.location.replace('/');
-      }, 200);
     },
     onError: (error: Error) => {
-      console.error('Logout error:', error);
       toast({
         title: "Logout failed",
-        description: "Please try again or refresh the page",
+        description: error.message,
         variant: "destructive",
       });
     },
