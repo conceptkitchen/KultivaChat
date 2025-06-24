@@ -988,19 +988,34 @@ def get_conversation(conversation_id):
             lines = msg_result.stdout.strip().split('\n')
             for line in lines:
                 if line.strip():
-                    msg_parts = line.split(',')
-                    if len(msg_parts) >= 5:
+                    # Handle CSV with proper quoting for complex content
+                    parts = []
+                    current_part = ""
+                    in_quotes = False
+                    for char in line:
+                        if char == '"' and not in_quotes:
+                            in_quotes = True
+                        elif char == '"' and in_quotes:
+                            in_quotes = False
+                        elif char == ',' and not in_quotes:
+                            parts.append(current_part.strip('"'))
+                            current_part = ""
+                            continue
+                        current_part += char
+                    parts.append(current_part.strip('"'))
+                    
+                    if len(parts) >= 5:
                         try:
-                            displays = json.loads(msg_parts[3]) if msg_parts[3] and msg_parts[3] != '\\N' else []
+                            displays = json.loads(parts[3]) if parts[3] and parts[3] != '\\N' else []
                         except:
                             displays = []
                         
                         messages.append({
-                            "id": msg_parts[0].strip(),
-                            "role": msg_parts[1].strip(),
-                            "content": msg_parts[2].strip(),
+                            "id": parts[0].strip(),
+                            "role": parts[1].strip(),
+                            "content": parts[2].strip(),
                             "displays": displays,
-                            "timestamp": msg_parts[4].strip() + "Z" if msg_parts[4].strip() != '\\N' else None
+                            "timestamp": parts[4].strip() + "Z" if parts[4].strip() != '\\N' else None
                         })
         
         conversation = {
@@ -1193,14 +1208,14 @@ def send_message_to_conversation(conversation_id):
                 "id": user_msg_id,
                 "role": "user",
                 "content": user_content,
-                "timestamp": "2025-06-23T21:00:00Z"
+                "timestamp": now + "Z"
             },
             "assistantMessage": {
                 "id": assistant_msg_id,
                 "role": "assistant", 
                 "content": final_answer,
                 "displays": displays,
-                "timestamp": "2025-06-23T21:00:00Z"
+                "timestamp": now + "Z"
             }
         })
         
