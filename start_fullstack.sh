@@ -5,16 +5,27 @@
 
 echo "Starting Kultivate AI Full Stack Application..."
 
-# Start Python backend on port 8081
+# Start Python backend on port 8081 in background
 echo "Starting Python Flask backend on port 8081..."
 cd backend
-python main_2.py &
+nohup python -u main_2.py > ../backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID"
 cd ..
 
 # Wait for backend to initialize
-sleep 5
+echo "Waiting for backend to initialize..."
+sleep 8
+
+# Test backend connection
+echo "Testing backend connection..."
+curl -s http://localhost:8081/api/user > /dev/null
+if [ $? -eq 0 ]; then
+    echo "Backend connection successful!"
+else
+    echo "Backend connection failed, checking logs..."
+    tail -10 backend.log
+fi
 
 # Start Node.js frontend/proxy on port 5000
 echo "Starting Node.js frontend/proxy on port 5000..."
@@ -28,5 +39,10 @@ echo "Frontend (Node.js): http://localhost:5000"
 echo "Backend (Python): http://localhost:8081"
 echo "Press Ctrl+C to stop all services"
 
-# Wait for processes
-wait $BACKEND_PID $FRONTEND_PID
+# Monitor backend process
+while kill -0 $BACKEND_PID 2>/dev/null; do
+    sleep 5
+done
+
+echo "Backend process terminated, cleaning up..."
+kill $FRONTEND_PID 2>/dev/null || true
