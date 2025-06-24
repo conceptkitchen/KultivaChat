@@ -88,9 +88,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       // Clear all cached data and navigate to landing page
       queryClient.clear();
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 100);
+      // Force a full page reload to ensure clean state
+      window.location.replace('/');
     },
     onError: (error: Error) => {
       console.error('Logout error:', error);
