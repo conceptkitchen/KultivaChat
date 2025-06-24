@@ -111,6 +111,8 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert Keboola Data Analyst Assistant
 
 4. **NEVER say "table not found"** - if fuzzy search returns tables, pick the best match and query it directly.
 
+5. **BE DECISIVE**: When user says "undiscovered events" and you find tables with "undiscovered", immediately pick the most relevant one and show the data. Do NOT ask "Did you want to see..." or "which date" - just pick the first/best match and show it.
+
 **Your absolute priority for data retrieval and answering questions about specific table contents is the transformed tables available in the Google BigQuery workspace (`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.TABLE_NAME`).**
 
 When users ask about:
@@ -1537,7 +1539,14 @@ def chat_with_gemini_client_style():
                 app.logger.info(f"Extracted limit from AI response '{final_answer[:100]}...': {limit}")
                 
                 # Extract table name from AI response and query directly
-                if "Undiscovered-Vendor-Export" in final_answer:
+                if "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-" in final_answer:
+                    fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-` LIMIT {limit}"
+                    fallback_result = internal_execute_sql_query(fallback_query)
+                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                        query_data = fallback_result['data']
+                        tool_display_title = "Undiscovered Attendees Export Data"
+                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
+                elif "Undiscovered-Vendor-Export" in final_answer:
                     fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT {limit}"
                     fallback_result = internal_execute_sql_query(fallback_query)
                     if fallback_result.get('status') == 'success' and fallback_result.get('data'):
@@ -1709,7 +1718,17 @@ def chat_with_gemini_client_style():
                 # CRITICAL FIX: If any history parsing fails, trigger the fallback extraction since we know AI got data
                 if not query_data and final_answer and "retrieved" in final_answer.lower():
                     app.logger.info("History parsing failed with Exception but AI says it retrieved data - triggering emergency fallback")
-                    if "Undiscovered-Vendor-Export" in final_answer:
+                    if "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-" in final_answer:
+                        try:
+                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-` LIMIT 10"
+                            fallback_result = internal_execute_sql_query(fallback_query)
+                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                                query_data = fallback_result['data']
+                                tool_display_title = "Undiscovered Attendees Export Data"
+                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
+                        except Exception as fallback_error:
+                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
+                    elif "Undiscovered-Vendor-Export" in final_answer:
                         try:
                             fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
                             fallback_result = internal_execute_sql_query(fallback_query)
