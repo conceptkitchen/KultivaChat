@@ -51,7 +51,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get all conversations for a specific user, or all conversations if userId is not provided
-  async getConversations(userId?: number): Promise<Conversation[]> {
+  async getConversations(userId?: string): Promise<Conversation[]> {
     try {
       const query = userId 
         ? db.select().from(conversations).where(eq(conversations.userId, userId)).orderBy(desc(conversations.updatedAt))
@@ -87,7 +87,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getConversation(id: string, userId?: number): Promise<Conversation | undefined> {
+  async getConversation(id: string, userId?: string): Promise<Conversation | undefined> {
     try {
       // If userId is provided, ensure the conversation belongs to the user
       const query = userId
@@ -189,7 +189,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteConversation(id: string, userId?: number): Promise<void> {
+  async deleteConversation(id: string, userId?: string): Promise<void> {
     try {
       // If userId is provided, ensure the conversation belongs to the user before deleting
       if (userId) {
@@ -213,7 +213,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async clearConversations(userId?: number): Promise<void> {
+  async clearConversations(userId?: string): Promise<void> {
     try {
       if (userId) {
         // Get all conversation IDs for this user

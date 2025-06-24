@@ -1,8 +1,10 @@
-import express from "express";
+import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import { spawn, ChildProcess } from 'child_process';
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import { storage } from "./storage";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
