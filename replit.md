@@ -112,6 +112,16 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 24, 2025**: COMPREHENSIVE DATA DISCOVERY ARCHITECTURE DOCUMENTED
+  - ✅ CREATED: DATA_DISCOVERY_ARCHITECTURE.md explaining how table information is collected from BigQuery and Keboola
+  - ✅ DOCUMENTED: Dual-source data discovery system combining Keboola Storage API with BigQuery INFORMATION_SCHEMA
+  - ✅ EXPLAINED: Complete fuzzy matching algorithm for natural language to table name resolution
+  - ✅ DETAILED: BigQuery table discovery using INFORMATION_SCHEMA queries with metadata extraction
+  - ✅ SPECIFIED: Keboola bucket-based organization, table listing, and detailed schema retrieval
+  - ✅ PROVIDED: Table name mapping system handling complex naming conventions between platforms
+  - ✅ DOCUMENTED: Performance optimization with caching, parallel discovery, and error handling fallbacks
+  - → Complete data discovery documentation available showing how 64+ tables are identified and accessed
+
 - **June 24, 2025**: COMPREHENSIVE TOOL ARCHITECTURE DOCUMENTATION CREATED
   - ✅ CREATED: TOOL_ARCHITECTURE_DOCUMENTATION.md with complete technical specifications for how tools are built and work
   - ✅ DOCUMENTED: Detailed tool system architecture including registration, execution, and response processing
