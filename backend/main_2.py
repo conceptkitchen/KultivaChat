@@ -1203,20 +1203,10 @@ def send_message_to_conversation(conversation_id):
         
         app.logger.info(f"Final response - displays count: {len(displays)}, displays: {displays}")
         
+        # Return only the assistant response - frontend handles user message display
         return jsonify({
-            "userMessage": {
-                "id": user_msg_id,
-                "role": "user",
-                "content": user_content,
-                "timestamp": now + "Z"
-            },
-            "assistantMessage": {
-                "id": assistant_msg_id,
-                "role": "assistant", 
-                "content": final_answer,
-                "displays": displays,
-                "timestamp": now + "Z"
-            }
+            "reply": final_answer,
+            "displays": displays
         })
         
     except Exception as e:

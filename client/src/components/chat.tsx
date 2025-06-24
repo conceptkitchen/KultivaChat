@@ -27,6 +27,9 @@ export function Chat({ conversation }: ChatProps) {
     if (conversation && conversation.messages) {
       setMessages(conversation.messages);
       console.log("Updated messages from conversation:", conversation.messages.length);
+    } else {
+      // Start with empty messages for new conversations
+      setMessages([]);
     }
   }, [conversation]);
 
@@ -49,25 +52,20 @@ export function Chat({ conversation }: ChatProps) {
       // Fix: Check for singular 'display' object from backend and convert to array
       const displays = data.display ? [data.display] : (data.displays || []);
 
-      const userMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user' as const,
-        content: variables,
-        timestamp: new Date(),
-      };
-
+      // Only create assistant message - user message was already added locally
       const assistantMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant' as const,
         content: data.reply || data.final_answer || "No response",
-        displays: displays, // Use the corrected displays variable
+        displays: displays,
         timestamp: new Date(),
       };
 
       console.log('Creating assistant message with displays:', assistantMessage.displays.length);
 
+      // Remove loading message and add only the assistant response
       setMessages(prev => 
-        prev.filter(msg => !msg.isLoading).concat([userMessage, assistantMessage])
+        prev.filter(msg => !msg.isLoading).concat([assistantMessage])
       );
 
       setIsProcessing(false);
@@ -88,18 +86,14 @@ export function Chat({ conversation }: ChatProps) {
   const handleSendMessage = async (content: string) => {
     if (isProcessing) return;
     
-    // STRICT duplicate check
-    if (messages.some(msg => msg.role === "user" && msg.content === content)) {
-      toast({
-        title: "Duplicate message",
-        description: "You've already sent this message",
-      });
+    // Prevent duplicate messages
+    if (messages.some(msg => msg.role === "user" && msg.content === content && !msg.isLoading)) {
       return;
     }
     
     setIsProcessing(true);
     
-    // Create new message objects with fixed IDs
+    // Create user message
     const userMessage: Message = {
       id: uuidv4(),
       role: "user",
@@ -107,7 +101,7 @@ export function Chat({ conversation }: ChatProps) {
       timestamp: new Date(),
     };
     
-    // Add AI "loading" message
+    // Add loading message for AI response
     const loadingMessage: Message = {
       id: uuidv4(),
       role: "assistant",
@@ -116,13 +110,12 @@ export function Chat({ conversation }: ChatProps) {
       isLoading: true,
     };
     
-    // Add to local messages only - don't use server data
-    const updatedMessages = [...messages, userMessage, loadingMessage];
-    setMessages(updatedMessages);
+    // Add both messages immediately
+    setMessages(prev => [...prev, userMessage, loadingMessage]);
     
     console.log("Sending message to API:", content);
     
-    // Use the mutation which now handles all the response processing
+    // Send to backend
     sendMessageMutation.mutate(content);
   };
 
