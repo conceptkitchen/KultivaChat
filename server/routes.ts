@@ -15,10 +15,11 @@ const conversationSchema = z.object({
   title: z.string()
 });
 
-// Authentication middleware - temporarily bypass for development
+// Authentication middleware
 const isAuthenticated = (req: any, res: any, next: any) => {
-  // Mock user for development - bypass authentication
-  req.user = { id: 1, username: 'user', email: 'user@kultivate.ai' };
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
   next();
 };
 
