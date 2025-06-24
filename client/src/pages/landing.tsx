@@ -4,12 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, BarChart3, Database, MessageSquare, Zap, Shield, Users } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LandingPage() {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
 
   const handleGetStarted = () => {
-    navigate("/auth");
+    if (user) {
+      navigate("/dashboard");
+    } else {
+      navigate("/auth");
+    }
   };
 
   const features = [
@@ -78,12 +84,25 @@ export default function LandingPage() {
               </h1>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" onClick={() => navigate("/auth")}>
-                Log In
-              </Button>
-              <Button onClick={handleGetStarted} className="bg-gradient-to-r from-blue-600 to-indigo-600">
-                Get Started
-              </Button>
+              {user ? (
+                <>
+                  <Button variant="ghost" onClick={() => navigate("/dashboard")}>
+                    Dashboard
+                  </Button>
+                  <Button onClick={handleGetStarted} className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                    Open App
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="ghost" onClick={() => navigate("/auth")}>
+                    Log In
+                  </Button>
+                  <Button onClick={handleGetStarted} className="bg-gradient-to-r from-blue-600 to-indigo-600">
+                    Get Started
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -111,7 +130,7 @@ export default function LandingPage() {
               onClick={handleGetStarted}
               className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 py-3"
             >
-              Start Analyzing Data
+              {user ? "Open Dashboard" : "Start Analyzing Data"}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <Button variant="outline" size="lg" className="text-lg px-8 py-3">
@@ -221,7 +240,7 @@ export default function LandingPage() {
             onClick={handleGetStarted}
             className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
           >
-            Get Started Today
+            {user ? "Open Dashboard" : "Get Started Today"}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>

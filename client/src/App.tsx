@@ -28,6 +28,8 @@ function PublicRouter() {
 function ProtectedRouter() {
   return (
     <Switch>
+      <Route path="/" component={LandingPage} />
+      <Route path="/auth" component={AuthPage} />
       <ProtectedRoute path="/settings" component={Home} />
       <ProtectedRoute path="/dashboard" component={ChatPage} />
       <ProtectedRoute path="/chat/:id" component={ChatPage} />
@@ -39,7 +41,7 @@ function ProtectedRouter() {
 function AuthContent() {
   const { user, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
 
   const createConversationMutation = useMutation({
     mutationFn: async () => {
@@ -73,6 +75,11 @@ function AuthContent() {
   // Show public pages for unauthenticated users
   if (!user) {
     return <PublicRouter />;
+  }
+
+  // Check if user is on landing page - show without chat interface
+  if (location === '/' || location === '/auth') {
+    return <ProtectedRouter />;
   }
 
   return (
