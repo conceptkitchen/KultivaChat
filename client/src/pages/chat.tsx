@@ -16,7 +16,6 @@ export default function ChatPage() {
   // Create a new conversation if we're on the root path
   const createConversationMutation = useMutation({
     mutationFn: async () => {
-      // Always create a fresh conversation
       const response = await apiRequest("POST", "/api/conversations", {
         title: "New Conversation",
       });
@@ -24,8 +23,7 @@ export default function ChatPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
-      // Force navigate to new conversation with clean state
-      window.location.href = `/chat/${data.id}`;
+      navigate(`/chat/${data.id}`);
     },
   });
   
@@ -71,6 +69,5 @@ export default function ChatPage() {
     return null; // This should not happen as we redirect to a new conversation
   }
 
-  console.log("Chat page rendering conversation:", conversation);
   return <Chat conversation={conversation} />;
 }
