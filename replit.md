@@ -112,11 +112,12 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
-- **June 24, 2025**: BACKEND PERSISTENCE ISSUE - Server not staying alive when backgrounded
-  - Backend Flask server initializes correctly on port 8081 with all architectural improvements
+- **June 24, 2025**: FIXED - Backend persistence using Gunicorn production server
+  - Replaced Flask development server with Gunicorn production WSGI server
+  - Backend now runs persistently on port 8081 with proper process management
   - Frontend proxy middleware configured for http://localhost:8081
-  - Issue: Python process terminates when backgrounded, causing 504 Gateway Timeout errors
-  - Implementing proper nohup background process management to maintain persistent backend service
+  - Gunicorn handles worker processes and automatic restarts properly
+  - "New Chat" button functionality restored with stable backend connection
 
 - **June 24, 2025**: COMPLETE ARCHITECTURE REFACTOR - Fully decoupled and streamlined system
   - CRITICAL FIX: Simplified AI toolset by removing unused Keboola bucket tools (list_keboola_buckets, list_tables_in_keboola_bucket, get_keboola_table_detail)

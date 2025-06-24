@@ -5,13 +5,13 @@
 
 echo "Starting Kultivate AI Full Stack Application..."
 
-# Start Python backend on port 8081 using proper nohup approach
-echo "Starting Python Flask backend on port 8081..."
+# Start Python backend on port 8081 using Gunicorn production server
+echo "Starting Python backend with Gunicorn on port 8081..."
 cd backend
-nohup python -u main_2.py > ../backend.log 2>&1 </dev/null &
+gunicorn --bind 0.0.0.0:8081 main_2:app > ../backend.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID" > ../backend.pid
-echo "Backend PID $BACKEND_PID saved to backend.pid"
+echo "Gunicorn backend PID $BACKEND_PID saved to backend.pid"
 cd ..
 
 # Wait for backend to initialize
