@@ -613,32 +613,90 @@ except Exception:
 
 ## Environment Configuration
 
-### Required Environment Variables
+### Required Environment Variables and Private Keys
+
+**CRITICAL SECURITY NOTE**: All private keys and tokens must be stored securely in environment variables or Replit Secrets, never in code files.
 
 ```bash
-# Database
+# Database Connection
 DATABASE_URL=postgresql://username:password@host:port/database
+# Example: postgresql://postgres:secretpassword@localhost:5432/kultivate_ai
 
 # Keboola Cloud Configuration
 KBC_API_URL=https://connection.us-east4.gcp.keboola.com
-KBC_STORAGE_TOKEN=your_keboola_storage_api_token
+KBC_STORAGE_TOKEN=1234567890abcdef1234567890abcdef12345678
 KBC_WORKSPACE_SCHEMA=WORKSPACE_21894820
 KBC_WORKSPACE_ID=WORKSPACE_21894820
 
 # Google Cloud Platform
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account-credentials.json
+GOOGLE_APPLICATION_CREDENTIALS=/home/runner/workspace/backend/credentials-839-21894808.json
 GOOGLE_PROJECT_ID=kbc-use4-839-261b
 
-# AI Services
-GEMINI_API_KEY=your_google_gemini_api_key
+# Google AI/Gemini
+GEMINI_API_KEY=AIzaSyABC123def456GHI789jkl012MNO345pqr
+# Get from: https://aistudio.google.com/app/apikey
 
-# Security
-SESSION_SECRET=your_express_session_secret
+# Express Session Security
+SESSION_SECRET=your-super-secure-random-session-secret-minimum-32-characters
+# Generate with: openssl rand -base64 32
 
 # Optional: Backend Configuration
 BACKEND_URL=http://localhost:8081
 NODE_ENV=development|production
 ```
+
+### Private Key and Credential Requirements
+
+**1. Keboola Cloud Storage API Token**
+- **Location**: KBC_STORAGE_TOKEN environment variable
+- **Format**: 40-character hexadecimal string
+- **Permissions Required**:
+  - `storage:read` for all buckets
+  - `canReadAllFileUploads` for file access
+- **How to Generate**:
+  1. Log into Keboola Cloud project
+  2. Navigate to Settings → API Tokens
+  3. Create new token with description "Kultivate AI Integration"
+  4. Copy the generated token immediately (only shown once)
+
+**2. Google Cloud Service Account JSON**
+- **Location**: File path specified in GOOGLE_APPLICATION_CREDENTIALS
+- **File**: `backend/credentials-839-21894808.json`
+- **Required IAM Roles**:
+  - BigQuery Data Viewer
+  - BigQuery Job User
+  - BigQuery User
+- **How to Generate**:
+  1. Go to Google Cloud Console → IAM & Admin → Service Accounts
+  2. Create new service account or use existing
+  3. Add required BigQuery roles
+  4. Generate JSON key and download
+  5. Place in backend directory with secure file permissions
+
+**3. Google Gemini API Key**
+- **Location**: GEMINI_API_KEY environment variable
+- **Format**: AIzaSy... (starts with AIzaSy)
+- **How to Generate**:
+  1. Visit https://aistudio.google.com/app/apikey
+  2. Create new API key or use existing
+  3. Ensure Gemini API is enabled in your project
+  4. Copy the generated key
+
+**4. PostgreSQL Database Credentials**
+- **Location**: DATABASE_URL environment variable
+- **Format**: postgresql://username:password@host:port/database
+- **Requirements**:
+  - Full read/write access to database
+  - Ability to create tables and indexes
+  - Connection pooling support
+
+**5. Express Session Secret**
+- **Location**: SESSION_SECRET environment variable
+- **Requirements**: 
+  - Minimum 32 characters
+  - Cryptographically random
+  - Unique per deployment
+- **Generate with**: `openssl rand -base64 32`
 
 ### Keboola Cloud API Authentication
 
@@ -695,15 +753,51 @@ The `KBC_WORKSPACE_SCHEMA` corresponds to the BigQuery dataset where Keboola aut
 {
   "type": "service_account",
   "project_id": "kbc-use4-839-261b",
-  "private_key_id": "key-id",
-  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
-  "client_email": "service-account@kbc-use4-839-261b.iam.gserviceaccount.com",
-  "client_id": "client-id",
+  "private_key_id": "a1b2c3d4e5f6789012345678901234567890abcd",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC...[PRIVATE_KEY_DATA]...==\n-----END PRIVATE KEY-----\n",
+  "client_email": "kultivate-ai-service@kbc-use4-839-261b.iam.gserviceaccount.com",
+  "client_id": "123456789012345678901",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "universe_domain": "googleapis.com"
 }
 ```
+
+**Critical Private Key Security Requirements**:
+
+1. **File Permissions**: Service account JSON must have restricted permissions
+   ```bash
+   chmod 600 backend/credentials-839-21894808.json
+   chown app:app backend/credentials-839-21894808.json
+   ```
+
+2. **Never Commit to Git**: Add to .gitignore
+   ```gitignore
+   backend/credentials-*.json
+   backend/.env
+   .env
+   ```
+
+3. **Secure Storage in Production**:
+   - Use Replit Secrets for environment variables
+   - Upload service account JSON via secure file upload
+   - Enable automatic secret rotation if available
+
+4. **Access Logging**: Monitor service account usage in Google Cloud Console
+   - Check IAM audit logs for unauthorized access
+   - Set up alerts for unusual BigQuery usage patterns
+
+**Default Authentication Configuration**:
+- **Admin Username**: admin
+- **Admin Password**: admin123 (CHANGE IN PRODUCTION)
+- **Password Hash**: Generated using scrypt with salt
+- **Session Duration**: 24 hours (configurable)
+
+**Backup and Recovery Keys**:
+- Database backup encryption key (if using encrypted backups)
+- SSL/TLS certificates for HTTPS (in production)
+- Additional service account keys for failover scenarios
 
 **Keboola-BigQuery Data Sync Configuration**:
 The workspace automatically maintains bidirectional sync between Keboola storage and BigQuery:
@@ -795,13 +889,59 @@ app.logger.error(f"Error in AI processing: {str(e)}", exc_info=True)
 
 To recreate this system, implement components in this order:
 
+### Phase 1: Credential Setup and Security
+1. **Generate Service Account JSON**:
+   - Create Google Cloud service account with BigQuery permissions
+   - Download JSON credentials file
+   - Place in `backend/credentials-839-21894808.json`
+   - Set secure file permissions (600)
+
+2. **Obtain Keboola Storage Token**:
+   - Access Keboola Cloud project settings
+   - Generate Storage API token with read permissions
+   - Document token ID and expiration date
+
+3. **Generate Gemini API Key**:
+   - Visit Google AI Studio
+   - Create new API key with Gemini access
+   - Test key with simple API call
+
+4. **Setup Environment Variables**:
+   ```bash
+   export DATABASE_URL="postgresql://..."
+   export KBC_STORAGE_TOKEN="..."
+   export GEMINI_API_KEY="..."
+   export SESSION_SECRET="$(openssl rand -base64 32)"
+   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
+   ```
+
+### Phase 2: Database and Backend
 1. **Database Setup**: Create PostgreSQL with schema from `shared/schema.ts`
 2. **Backend Core**: Implement Flask app with Gemini integration
 3. **Tool System**: Add BigQuery and Keboola client implementations  
-4. **Proxy Server**: Create Node.js proxy with backend process management
-5. **Frontend**: Build React chat interface with TanStack Query
-6. **Authentication**: Integrate Passport.js authentication system
-7. **Deployment**: Configure dual-server architecture with health checks
+4. **Test Connectivity**: Verify all API connections work
+
+### Phase 3: Application Layer
+1. **Proxy Server**: Create Node.js proxy with backend process management
+2. **Frontend**: Build React chat interface with TanStack Query
+3. **Authentication**: Integrate Passport.js authentication system
+4. **End-to-End Testing**: Verify complete chat flow
+
+### Phase 4: Production Deployment
+1. **Security Hardening**: Change default passwords, enable HTTPS
+2. **Secret Management**: Move all credentials to secure environment
+3. **Monitoring**: Setup logging and error tracking
+4. **Deployment**: Configure dual-server architecture with health checks
+
+### Security Checklist Before Deployment
+- [ ] All default passwords changed
+- [ ] Service account JSON has minimal required permissions
+- [ ] Keboola token has read-only access where possible
+- [ ] SESSION_SECRET is cryptographically random
+- [ ] Database connection uses SSL
+- [ ] HTTPS enabled for frontend
+- [ ] Credentials never committed to version control
+- [ ] Regular security updates scheduled
 
 Each component is modular and can be developed independently, with clear interfaces defined by the API contracts documented above.
 
