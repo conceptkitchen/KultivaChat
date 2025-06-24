@@ -52,6 +52,7 @@ class PythonBackendService {
         // Check if backend is ready - look for config completion
         if (output.includes('Listening at:') || output.includes('Gemini GenerateContentConfig with tools created successfully')) {
           this.isReady = true;
+          console.log('Backend marked as ready!');
         }
       });
 
@@ -62,6 +63,7 @@ class PythonBackendService {
         // Also check stderr for readiness indicators
         if (output.includes('Listening at:') || output.includes('Gemini GenerateContentConfig with tools created successfully')) {
           this.isReady = true;
+          console.log('Backend marked as ready from stderr!');
         }
       });
 
@@ -122,11 +124,12 @@ const backendService = new PythonBackendService();
 // Middleware to ensure backend is ready
 app.use('/api', async (req, res, next) => {
   if (!backendService.isBackendReady()) {
-    console.log('Backend not ready, attempting to start...');
-    try {
-      await backendService.start();
-    } catch (error) {
-      console.error('Failed to start backend:', error);
+    console.log('Backend not ready, waiting for startup...');
+    // Wait a bit longer for backend to fully initialize
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    if (!backendService.isBackendReady()) {
+      console.error('Backend still not ready after waiting');
       return res.status(503).json({ error: 'Backend service unavailable' });
     }
   }
@@ -138,15 +141,23 @@ app.use('/api', async (req, res, next) => {
 app.use('/api', createProxyMiddleware({
   target: BACKEND_URL,
   changeOrigin: true,
-  logLevel: 'silent',
-  // Ensure request body is forwarded correctly
+  logLevel: 'debug',
+  pathRewrite: {
+    '^/api': '/api' // Keep the /api prefix
+  },
   onProxyReq: (proxyReq, req, res) => {
-    if (req.body && Object.keys(req.body).length) {
+    console.log(`Proxying ${req.method} ${req.url} to ${BACKEND_URL}${req.url}`);
+    
+    // Handle request body for POST/PUT requests
+    if (req.body && (req.method === 'POST' || req.method === 'PUT')) {
       const bodyData = JSON.stringify(req.body);
-      proxyReq.setHeader('Content-Type','application/json');
+      proxyReq.setHeader('Content-Type', 'application/json');
       proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
       proxyReq.write(bodyData);
     }
+  },
+  onProxyRes: (proxyRes, req, res) => {
+    console.log(`Proxy response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
   },
   onError: (err, req, res) => {
     console.error('Proxy error for', req.url, ':', err.message);
