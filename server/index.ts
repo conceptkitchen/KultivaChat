@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { registerRoutes } from "./routes";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,140 +10,52 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Load ports from environment variables with defaults
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
+const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
 
-// Assume Flask server is running independently on port 8081
-let flaskServerReady = true;
-
-// Handle conversation messages with database persistence BEFORE general proxy
-app.post('/api/conversations/:id/messages', express.json(), async (req, res) => {
-
-  try {
-    const conversationId = req.params.id;
-    const { content } = req.body;
-
-    console.log(`Processing message for conversation ${conversationId}: ${content}`);
-
-    // Call Flask backend for AI processing
-    const { default: fetch } = await import('node-fetch');
-    const backendResponse = await fetch('http://localhost:8081/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: content,
-        conversation_history: []
-      })
-    });
-
-    if (!backendResponse.ok) {
-      throw new Error(`Backend responded with ${backendResponse.status}`);
+// --- Unified API Proxy ---
+// All requests to /api/* will be forwarded to the backend
+app.use('/api', createProxyMiddleware({
+  target: BACKEND_URL,
+  changeOrigin: true,
+  // Ensure request body is forwarded correctly
+  onProxyReq: (proxyReq, req, res) => {
+    if (req.body && Object.keys(req.body).length) {
+      const bodyData = JSON.stringify(req.body);
+      proxyReq.setHeader('Content-Type','application/json');
+      proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      proxyReq.write(bodyData);
     }
-
-    const backendResult = await backendResponse.json();
-    console.log('Backend response:', JSON.stringify(backendResult, null, 2));
-
-    // Extract assistant message and displays from backend response
-    const assistantContent = backendResult.reply || backendResult.final_answer || "No response";
-    const displays = backendResult.displays || [];
-
-    console.log(`Extracted displays: ${displays.length} items`);
-
-    // Create response in the format expected by frontend
-    const response = {
-      userMessage: {
-        id: `user-${Date.now()}`,
-        role: 'user',
-        content: content,
-        timestamp: new Date().toISOString()
-      },
-      assistantMessage: {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant', 
-        content: assistantContent,
-        displays: displays,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    console.log(`Sending response with ${displays.length} displays`);
-    res.json(response);
-
-  } catch (error) {
-    console.error('Message processing error:', error);
-    res.status(500).json({ error: 'Failed to process message' });
   }
-});
+}));
 
-// Proxy other /api requests to Flask backend
-app.use('/api', (req, res, next) => {
-  handleProxyRequest(req, res);
-});
-
-function handleProxyRequest(req: any, res: any) {
-  const targetUrl = `http://localhost:8081${req.originalUrl}`;
-  console.log(`Manual proxy: ${req.method} ${req.originalUrl} -> ${targetUrl}`);
-  
-  const options = {
-    method: req.method,
-    headers: {
-      ...req.headers,
-      host: 'localhost:8081'
-    }
-  };
-  
-  if (req.body && Object.keys(req.body).length > 0) {
-    options.body = JSON.stringify(req.body);
-    options.headers['content-type'] = 'application/json';
-  }
-  
-  import('node-fetch').then(({ default: fetch }) => {
-    fetch(targetUrl, options)
-      .then(response => {
-        res.status(response.status);
-        return response.text();
-      })
-      .then(data => {
-        try {
-          const json = JSON.parse(data);
-          res.json(json);
-        } catch {
-          res.send(data);
-        }
-      })
-      .catch(error => {
-        console.error('Proxy Error:', error.message);
-        res.status(500).json({ error: 'Backend connection failed' });
-      });
-  });
-}
+// --- Frontend Server Logic ---
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Setup authentication and routes
 async function initializeServer() {
   try {
-    // Register non-API routes with authentication (if needed)
-    // await registerRoutes(app);
-    
-    // Serve static files from client dist directory
+    // Serve static files from the client's build directory
     app.use(express.static(path.join(__dirname, '../dist')));
     
-    // Serve React app for all other routes
+    // For any other route, serve the React app's index.html file.
+    // This is necessary for client-side routing to work correctly.
     app.get('*', (req, res) => {
       res.sendFile(path.join(__dirname, '../dist/index.html'));
     });
     
-    console.log("Authentication and routes configured");
-    
-    console.log("Server initialized. Ready to proxy requests to backend on port 8081.");
+    console.log("Static file and fallback routes configured.");
     
   } catch (error) {
     console.error("Error setting up server:", error);
   }
 }
+
+// --- Server Startup ---
 
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
@@ -158,6 +69,7 @@ process.on('SIGINT', () => {
 });
 
 app.listen(PORT, "0.0.0.0", async () => {
-  console.log(`Kultivate AI serving on port ${PORT}`);
+  console.log(`Kultivate AI Frontend Server listening on port ${PORT}`);
+  console.log(`Proxying API requests to: ${BACKEND_URL}`);
   await initializeServer();
 });
