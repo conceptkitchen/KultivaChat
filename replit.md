@@ -112,6 +112,16 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 24, 2025**: ARCHITECTURE IMPROVEMENTS - Follow instructions fixes implemented
+  - CRITICAL FIX: Simplified AI toolset by removing unused Keboola bucket tools (list_keboola_buckets, list_tables_in_keboola_bucket, get_keboola_table_detail)
+  - AI now exclusively uses internal_execute_sql_query for data retrieval, eliminating tool selection confusion
+  - Decoupled configuration from logic by introducing environment variables GOOGLE_PROJECT_ID and KBC_WORKSPACE_ID
+  - Updated system instruction prompt to use dynamic f-string formatting with configurable project/workspace IDs
+  - Decoupled frontend and backend processes - Node.js server no longer spawns Python backend as child process
+  - Backend and frontend now run as independent services for better scalability and maintainability
+  - Removed misleading TOOLS.md documentation that didn't match actual implementation
+  - Streamlined gemini_tool_functions_list to only include essential tools: internal_execute_sql_query, get_zip_codes_for_city, get_current_time
+
 - **June 24, 2025**: FINAL FIX - AI table querying and data display fully operational
   - CRITICAL FIX: Resolved AI's incorrect table name guessing (was trying non-existent tables like OUT_DIM_VENDORS_KAPWA_GARDENS)
   - Updated AI instructions to use actual BigQuery table names with special characters (e.g., "Balay-Kreative---attendees---all-orders")
