@@ -15,17 +15,7 @@ import { ProtectedRoute } from "@/lib/protected-route";
 import AuthPage from "@/pages/auth-page";
 import { LogoutButton } from "@/components/logout-button";
 
-function PublicRouter() {
-  return (
-    <Switch>
-      <Route path="/" component={LandingPage} />
-      <Route path="/auth" component={AuthPage} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
-
-function ProtectedRouter() {
+function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
@@ -72,14 +62,14 @@ function AuthContent() {
     );
   }
 
-  // Show public pages for unauthenticated users
-  if (!user) {
-    return <PublicRouter />;
+  // If user is on landing page or auth page, show minimal layout
+  if (location === '/' || location === '/auth') {
+    return <AppRouter />;
   }
 
-  // Check if user is on landing page - show without chat interface
-  if (location === '/' || location === '/auth') {
-    return <ProtectedRouter />;
+  // For other authenticated routes, show full chat interface
+  if (!user) {
+    return <AppRouter />;
   }
 
   return (
@@ -164,7 +154,7 @@ function AuthContent() {
           onNewChat={handleNewChat}
         />
         <main className="flex-1 flex flex-col overflow-hidden">
-          <ProtectedRouter />
+          <AppRouter />
         </main>
       </div>
     </div>
