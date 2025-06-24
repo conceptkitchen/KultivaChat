@@ -77,17 +77,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("POST", "/api/logout");
+      const response = await apiRequest("POST", "/api/logout", {});
+      if (!response.ok) {
+        throw new Error('Logout failed');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
-      // Navigate to landing page after logout
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      // Clear all cached data and navigate to landing page
+      queryClient.clear();
       window.location.href = '/';
     },
     onError: (error: Error) => {
+      console.error('Logout error:', error);
       toast({
         title: "Logout failed",
-        description: error.message,
+        description: "Please try again or refresh the page",
         variant: "destructive",
       });
     },
