@@ -2,6 +2,11 @@
 
 ## Current System Credential Locations
 
+**Confirmed System Configuration**:
+- **Google Project ID**: `kbc-use4-839-261b`
+- **Workspace ID**: `WORKSPACE_21894820`
+- **Service Account**: `kbc-use4-ws-21894820@kbc-use4-839-261b.iam.gserviceaccount.com`
+
 **Replit Environment Variables** (accessible via Replit Secrets):
 ```bash
 # Check current values with:
@@ -9,8 +14,8 @@ echo $DATABASE_URL
 echo $KBC_STORAGE_TOKEN  
 echo $GEMINI_API_KEY
 echo $SESSION_SECRET
-echo $GOOGLE_PROJECT_ID
-echo $KBC_WORKSPACE_ID
+echo "GOOGLE_PROJECT_ID=kbc-use4-839-261b"
+echo "KBC_WORKSPACE_ID=WORKSPACE_21894820"
 ```
 
 **File-Based Credentials**:
@@ -27,8 +32,14 @@ echo "DATABASE_URL=$DATABASE_URL" > migration_env_backup.txt
 echo "KBC_STORAGE_TOKEN=$KBC_STORAGE_TOKEN" >> migration_env_backup.txt
 echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> migration_env_backup.txt
 echo "SESSION_SECRET=$SESSION_SECRET" >> migration_env_backup.txt
+
+# Extract Google Project ID from service account file
+GOOGLE_PROJECT_ID=$(grep -o '"project_id":"[^"]*"' backend/credentials-839-21894820.json | cut -d'"' -f4)
 echo "GOOGLE_PROJECT_ID=$GOOGLE_PROJECT_ID" >> migration_env_backup.txt
-echo "KBC_WORKSPACE_ID=$KBC_WORKSPACE_ID" >> migration_env_backup.txt
+echo "KBC_WORKSPACE_ID=WORKSPACE_21894820" >> migration_env_backup.txt
+echo "KBC_WORKSPACE_SCHEMA=WORKSPACE_21894820" >> migration_env_backup.txt
+
+echo "✓ Google Project ID detected: $GOOGLE_PROJECT_ID"
 ```
 
 ### 2. Extract Service Account JSON
