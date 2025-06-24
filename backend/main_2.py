@@ -1492,9 +1492,9 @@ def chat_with_gemini_client_style():
         query_data = None
         tool_display_title = "Tool Execution Result"
 
-        # CRITICAL FIX: Extract tool results from the actual response object
+        # CRITICAL FIX: Extract tool results from response and chat history
         try:
-            # Look for function call results in the response parts
+            # First try: Look for function call results in the response parts
             if hasattr(response, 'parts') and response.parts:
                 app.logger.info(f"Response has {len(response.parts)} parts")
                 for i, part in enumerate(response.parts):
@@ -1508,10 +1508,11 @@ def chat_with_gemini_client_style():
                         if func_name == 'internal_execute_sql_query' and isinstance(func_result, dict):
                             if func_result.get('status') == 'success' and func_result.get('data'):
                                 query_data = func_result['data']
-                                app.logger.info(f"Successfully extracted query data: {len(query_data)} rows")
+                                tool_display_title = "SQL Query Results"
+                                app.logger.info(f"Successfully extracted query data from response: {len(query_data)} rows")
                                 break
             
-            # Fallback: Try to get history and extract from there
+            # Second try: Extract from chat history
             if not query_data and hasattr(chat_session, 'get_history'):
                 app.logger.info("No data in response parts, trying history extraction...")
                 history = chat_session.get_history()
@@ -1532,62 +1533,47 @@ def chat_with_gemini_client_style():
         except Exception as e:
             app.logger.error(f"Direct extraction failed: {e}")
             
-        # FINAL FALLBACK: Use direct query based on AI response analysis
-        if not query_data and final_answer and "retrieved" in final_answer.lower() and "rows" in final_answer.lower():
-            app.logger.info("Using text analysis fallback for data extraction")
+        # CRITICAL FIX: Emergency reconstruction when AI mentions retrieved data
+        if not query_data and final_answer and ("retrieved" in final_answer.lower() and ("rows" in final_answer.lower() or "table" in final_answer.lower())):
+            app.logger.info("AI mentions retrieved data but extraction failed - attempting emergency reconstruction")
             try:
-                # Extract both table name and row count from AI response
                 import re
-                # Try multiple patterns to extract the row count
-                patterns = [
-                    r'retrieved\s+(\d+)\s+rows',  # "retrieved 30 rows"
-                    r'(\d+)\s+rows',              # "30 rows"
-                    r'first\s+(\d+)',             # "first 30"
-                    r'retrieved\s+(\d+)',         # "retrieved 30"
-                    r'(\d+)\s+records'            # "30 records"
-                ]
                 
-                limit = 10  # default
-                for pattern in patterns:
-                    match = re.search(pattern, final_answer, re.IGNORECASE)
-                    if match:
-                        limit = int(match.group(1))
-                        break
+                # Parse AI response for specific table names and row counts
+                limit_match = re.search(r'(\d+)\s+rows', final_answer)
+                limit = int(limit_match.group(1)) if limit_match else 10
+                
+                # Emergency patterns for common tables mentioned in AI responses
+                emergency_tables = {
+                    '2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors': 'Undiscovered SF Vendor Data',
+                    'Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-': 'Undiscovered Attendees Export',
+                    'Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders': 'Balay-Kreative Attendees',
+                    'Undiscovered-Vendor-Export---Squarespace---All-data-orders': 'Undiscovered Vendor Export'
+                }
+                
+                for table_name, display_title in emergency_tables.items():
+                    if table_name in final_answer or table_name.lower() in final_answer.lower():
+                        emergency_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT {limit}"
+                        app.logger.info(f"Emergency reconstruction for {table_name}: {emergency_query}")
                         
-                app.logger.info(f"Extracted limit from AI response '{final_answer[:100]}...': {limit}")
+                        emergency_result = internal_execute_sql_query(emergency_query)
+                        if emergency_result.get('status') == 'success' and emergency_result.get('data'):
+                            query_data = emergency_result['data']
+                            tool_display_title = display_title
+                            app.logger.info(f"EMERGENCY RECONSTRUCTION SUCCESS: {len(query_data)} rows extracted from {table_name}")
+                            break
                 
-                # Extract table name from AI response and query directly
-                if "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-" in final_answer:
-                    fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-` LIMIT {limit}"
-                    fallback_result = internal_execute_sql_query(fallback_query)
-                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                        query_data = fallback_result['data']
-                        tool_display_title = "Undiscovered Attendees Export Data"
-                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
-                elif "Undiscovered-Vendor-Export" in final_answer:
-                    fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT {limit}"
-                    fallback_result = internal_execute_sql_query(fallback_query)
-                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                        query_data = fallback_result['data']
-                        tool_display_title = "Undiscovered Vendor Export Data"
-                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
-                elif "Balay-Kreative" in final_answer:
-                    fallback_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT {limit}"
-                    fallback_result = internal_execute_sql_query(fallback_query)
-                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                        query_data = fallback_result['data']
-                        tool_display_title = "Balay-Kreative Attendee Data"
-                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
-                elif "tables" in final_answer.lower() and "available" in final_answer.lower():
-                    # Show table list
+                # If no specific table found, check for table list requests
+                if not query_data and ("tables" in final_answer.lower() or "available" in final_answer.lower()):
                     fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
                     fallback_result = internal_execute_sql_query(fallback_query)
                     if fallback_result.get('status') == 'success' and fallback_result.get('data'):
                         query_data = fallback_result['data']
                         tool_display_title = "Available Data Tables"
-                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} tables extracted")
+                        app.logger.info(f"TABLE LIST RECONSTRUCTION: {len(query_data)} tables extracted")
+                        
             except Exception as e:
-                app.logger.error(f"Fallback extraction failed: {e}")
+                app.logger.error(f"Emergency reconstruction failed: {e}")
 
         # Fallback to history parsing if direct extraction didn't work
         if not query_data and GEMINI_SDK_AVAILABLE:
@@ -1761,17 +1747,19 @@ def chat_with_gemini_client_style():
             f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
         )
 
-        # Create displays array only for explicit data requests
+        # FINAL STEP: Create displays from extracted data
         displays = []
         
-        # Create displays if we have valid query_data from tool calls
+        # Create display if we successfully extracted query data
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
                 "type": "table", 
-                "title": tool_display_title,
+                "title": tool_display_title or "Query Results",
                 "content": query_data
             })
-            app.logger.info(f"Created display from query_data with {len(query_data)} rows")
+            app.logger.info(f"DISPLAY CREATED: {len(query_data)} rows in '{tool_display_title}'")
+        else:
+            app.logger.warning(f"NO DISPLAY CREATED: query_data={type(query_data)}, length={len(query_data) if isinstance(query_data, list) else 'N/A'}")
                 
         # Only force create display for explicit table requests
         explicit_table_keywords = [
