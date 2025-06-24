@@ -1,5 +1,5 @@
 import { db, pool } from "./db";
-import { type Conversation, type IStorage, conversations, messages, users, type User, type UpsertUser } from "@shared/schema";
+import { type Conversation, type IStorage, conversations, messages, users, type User, type InsertUser } from "@shared/schema";
 import { eq, desc, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -16,10 +16,8 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  // User operations
-  // (IMPORTANT) these user operations are mandatory for Replit Auth.
-
-  async getUser(id: string): Promise<User | undefined> {
+  // User operations for authentication
+  async getUser(id: number): Promise<User | undefined> {
     try {
       const [user] = await db.select().from(users).where(eq(users.id, id));
       return user;
@@ -29,18 +27,21 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    try {
+      const [user] = await db.select().from(users).where(eq(users.username, username));
+      return user;
+    } catch (error) {
+      console.error("Error fetching user by username:", error);
+      return undefined;
+    }
+  }
+
+  async createUser(userData: InsertUser): Promise<User> {
     try {
       const [user] = await db
         .insert(users)
         .values(userData)
-        .onConflictDoUpdate({
-          target: users.id,
-          set: {
-            ...userData,
-            updatedAt: new Date(),
-          },
-        })
         .returning();
       return user;
     } catch (error) {
@@ -50,7 +51,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Get all conversations for a specific user, or all conversations if userId is not provided
-  async getConversations(userId?: string): Promise<Conversation[]> {
+  async getConversations(userId?: number): Promise<Conversation[]> {
     try {
       const query = userId 
         ? db.select().from(conversations).where(eq(conversations.userId, userId)).orderBy(desc(conversations.updatedAt))
@@ -86,7 +87,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getConversation(id: string, userId?: string): Promise<Conversation | undefined> {
+  async getConversation(id: string, userId?: number): Promise<Conversation | undefined> {
     try {
       // If userId is provided, ensure the conversation belongs to the user
       const query = userId
@@ -188,7 +189,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async deleteConversation(id: string, userId?: string): Promise<void> {
+  async deleteConversation(id: string, userId?: number): Promise<void> {
     try {
       // If userId is provided, ensure the conversation belongs to the user before deleting
       if (userId) {
@@ -212,7 +213,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async clearConversations(userId?: string): Promise<void> {
+  async clearConversations(userId?: number): Promise<void> {
     try {
       if (userId) {
         // Get all conversation IDs for this user
