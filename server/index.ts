@@ -53,9 +53,19 @@ function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(express.static("dist"));
 
-  // Simple auth endpoint that returns 401 (shows landing page)
+  // Auth endpoint - always return 401 to trigger landing page
   app.get('/api/auth/user', (req, res) => {
-    res.status(401).json({ message: "Not authenticated - showing landing page" });
+    res.status(401).json({ message: "Not authenticated" });
+  });
+
+  // Add login route that redirects to Replit auth (placeholder)
+  app.get('/api/login', (req, res) => {
+    res.redirect('https://replit.com/login');
+  });
+
+  // Add logout route
+  app.get('/api/logout', (req, res) => {
+    res.redirect('/');
   });
 
   // Proxy for backend API routes (simplified)
@@ -82,11 +92,20 @@ function startServer() {
     }
 
     fetch(targetUrl, options)
-      .then(response => response.json().then(data => ({ status: response.status, data })))
+      .then(async response => {
+        const text = await response.text();
+        try {
+          const data = JSON.parse(text);
+          return { status: response.status, data };
+        } catch (e) {
+          console.error(`[Proxy] Backend returned non-JSON:`, text.substring(0, 100));
+          return { status: 503, data: { error: 'Backend starting up...' } };
+        }
+      })
       .then(({ status, data }) => res.status(status).json(data))
       .catch(error => {
         console.error(`[Proxy Error]:`, error);
-        res.status(500).json({ error: 'Backend unavailable' });
+        res.status(503).json({ error: 'Backend starting up...' });
       });
   });
 
