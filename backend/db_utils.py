@@ -1,23 +1,4 @@
-import os
-import json
-import requests
-import logging
-from datetime import datetime
-
-logger = logging.getLogger(__name__)
-
-def execute_sql_via_api(query):
-    """Execute SQL using the execute_sql_tool via HTTP API"""
-    try:
-        # Use internal API to execute SQL
-        response = requests.post('http://localhost:5000/api/sql', json={'query': query})
-        if response.status_code == 200:
-            return response.json()
-        else:
-            raise Exception(f"SQL API returned {response.status_code}: {response.text}")
-    except Exception as e:
-        logger.error(f"SQL execution error: {e}")
-        raise
+# This file is no longer needed - backend now uses direct psql commands
 
 def get_conversations():
     """Fetch all conversations from database"""
