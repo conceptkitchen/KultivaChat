@@ -215,12 +215,13 @@ app.listen(PORT, "0.0.0.0", async () => {
   console.log(`Kultivate AI Frontend Server listening on port ${PORT}`);
   console.log(`Proxying API requests to: ${BACKEND_URL}`);
   
-  // Start the Python backend
+  // Start the Python backend first, then Node.js will wait for it via wait-on
   try {
     await backendService.start();
     console.log('Backend service started successfully');
   } catch (error) {
     console.error('Failed to start backend service:', error);
+    process.exit(1); // Exit if backend fails to start
   }
   
   await initializeServer();
