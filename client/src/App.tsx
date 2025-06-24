@@ -1,26 +1,26 @@
-import { useState } from "react";
-import { Switch, Route, useLocation } from "wouter";
-import { queryClient } from "./lib/queryClient";
+import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
+import Landing from "@/pages/landing";
+import Dashboard from "@/pages/dashboard";
 import ChatPage from "@/pages/chat";
-import { Sidebar, SidebarButton } from "@/components/sidebar";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { AuthProvider, useAuth } from "@/hooks/use-auth";
-import { ProtectedRoute } from "@/lib/protected-route";
-import AuthPage from "@/pages/auth-page";
-import { LogoutButton } from "@/components/logout-button";
+import { useAuth } from "@/hooks/useAuth";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <Switch>
-      <Route path="/auth" component={AuthPage} />
-      <ProtectedRoute path="/settings" component={Home} />
-      <ProtectedRoute path="/chat/:id" component={ChatPage} />
-      <ProtectedRoute path="/" component={ChatPage} />
+      {isLoading || !isAuthenticated ? (
+        <Route path="/" component={Landing} />
+      ) : (
+        <>
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/chat/:id" component={ChatPage} />
+          <Route path="/" component={Dashboard} />
+        </>
+      )}
       <Route component={NotFound} />
     </Switch>
   );
@@ -158,17 +158,6 @@ function AuthContent() {
         </main>
       </div>
     </div>
-  );
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <TooltipProvider>
-        <AuthContent />
-        <Toaster />
-      </TooltipProvider>
-    </AuthProvider>
   );
 }
 
