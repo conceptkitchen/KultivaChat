@@ -13,7 +13,29 @@ import { apiRequest } from "@/lib/queryClient";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import AuthPage from "@/pages/auth-page";
-import { LogoutButton } from "@/components/logout-button";
+import { LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+function HeaderLogoutButton() {
+  const { logoutMutation } = useAuth();
+  
+  return (
+    <Button 
+      variant="ghost" 
+      size="sm"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        logoutMutation.mutate();
+      }}
+      disabled={logoutMutation.isPending}
+      className="text-neutral-600 hover:text-neutral-800"
+      type="button"
+    >
+      <LogOut className="w-4 h-4" />
+    </Button>
+  );
+}
 
 function AppRouter() {
   return (
@@ -142,7 +164,7 @@ function AuthContent() {
                 <circle cx="12" cy="7" r="4"></circle>
               </svg>
             </div>
-            <LogoutButton />
+            <HeaderLogoutButton />
           </div>
         </div>
       </header>
