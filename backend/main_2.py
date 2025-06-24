@@ -1492,11 +1492,29 @@ def chat_with_gemini_client_style():
         query_data = None
         tool_display_title = "Tool Execution Result"
 
-        # DIRECT FIX: Extract tool results from the latest AI response
+        # CRITICAL FIX: Extract tool results from the actual response object
         try:
-            if hasattr(chat_session, 'get_history'):
+            # Look for function call results in the response parts
+            if hasattr(response, 'parts') and response.parts:
+                app.logger.info(f"Response has {len(response.parts)} parts")
+                for i, part in enumerate(response.parts):
+                    app.logger.info(f"Part {i}: {type(part)} - {hasattr(part, 'function_response')}")
+                    if hasattr(part, 'function_response') and part.function_response:
+                        func_name = part.function_response.name
+                        func_result = part.function_response.response
+                        app.logger.info(f"Found function response: {func_name} with result keys: {list(func_result.keys()) if isinstance(func_result, dict) else 'Not a dict'}")
+                        
+                        # Extract data from internal_execute_sql_query responses
+                        if func_name == 'internal_execute_sql_query' and isinstance(func_result, dict):
+                            if func_result.get('status') == 'success' and func_result.get('data'):
+                                query_data = func_result['data']
+                                app.logger.info(f"Successfully extracted query data: {len(query_data)} rows")
+                                break
+            
+            # Fallback: Try to get history and extract from there
+            if not query_data and hasattr(chat_session, 'get_history'):
+                app.logger.info("No data in response parts, trying history extraction...")
                 history = chat_session.get_history()
-                # Get the latest model response (which contains function responses)
                 if history and len(history) > 0:
                     latest_response = history[-1]
                     if hasattr(latest_response, 'parts') and latest_response.parts:
