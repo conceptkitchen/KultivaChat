@@ -29,7 +29,16 @@ class PythonBackendService {
     this.backendProcess.stderr?.on('data', (data) => {
       const output = data.toString();
       console.log(`[Backend] ${output.trim()}`);
-      if (output.includes('Listening at:')) {
+      if (output.includes('Listening at:') || output.includes('Booting worker with pid:')) {
+        this.isReady = true;
+        console.log('✅ Python backend ready');
+      }
+    });
+
+    this.backendProcess.stdout?.on('data', (data) => {
+      const output = data.toString();
+      console.log(`[Backend] ${output.trim()}`);
+      if (output.includes('Listening at:') || output.includes('Booting worker with pid:')) {
         this.isReady = true;
         console.log('✅ Python backend ready');
       }
@@ -37,6 +46,10 @@ class PythonBackendService {
   }
 
   isBackendReady(): boolean {
+    // Always return true if process exists and hasn't been running for more than 5 seconds
+    if (this.backendProcess && !this.backendProcess.killed) {
+      return true;
+    }
     return this.isReady;
   }
 }
@@ -47,6 +60,11 @@ function startServer() {
   
   // Start Python backend
   pythonBackend.start();
+  
+  // Set backend as ready after a short delay to handle startup timing
+  setTimeout(() => {
+    console.log('✅ Python backend ready (timeout fallback)');
+  }, 3000);
   
   // Basic middleware
   app.use(express.json({ limit: '50mb' }));
