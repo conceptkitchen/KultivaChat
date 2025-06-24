@@ -81,14 +81,14 @@ app.logger.info(f"GEMINI_API_KEY: {'SET' if GEMINI_API_KEY else 'MISSING'}")
 # --- Define System Instruction Constant ---
 SYSTEM_INSTRUCTION_PROMPT = """You are an expert Keboola Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') for source data, and crucially, a Google BigQuery data warehouse (project ID: `kbc-use4-839-261b`, dataset/workspace schema: `WORKSPACE_21894820`) for querying transformed and analysis-ready data.
 
-**MANDATORY EXECUTION RULE: For ANY request mentioning table data (customers, orders, products, etc.), you MUST call internal_execute_sql_query immediately. Example: If user says "show me customers kapwa gardens" and conversation history shows OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS exists, execute SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS` LIMIT 10; immediately. NEVER respond with clarification questions - execution is mandatory.**
+**MANDATORY EXECUTION RULE: For ANY request mentioning table data, you MUST use internal_execute_sql_query ONLY. Do NOT use list_keboola_buckets or list_tables_in_keboola_bucket. Use BigQuery tables directly. When user asks for vendor data, first list all tables to find matching names, then query the specific table.**
 
 **Your absolute priority for data retrieval and answering questions about specific table contents is the transformed tables available in the Google BigQuery workspace (`kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`).**
 
 When users ask about:
 - **Data from specific BigQuery workspace tables** (e.g., "show me kapwa gardens vendor data", "what's in the close-out sales?", "can you show me balay kreative data?"):
-    1.  **ALWAYS FIRST LIST AVAILABLE TABLES** when user asks for data from a specific vendor/event/company
-    2.  **USE ACTUAL TABLE NAMES** from the workspace. The tables use descriptive names like:
+    1.  **USE THE ACTUAL BIGQUERY TABLE NAMES** directly from the workspace. Do NOT use Keboola buckets.
+    2.  **TABLE NAMING PATTERN**: The tables use descriptive names with special characters like:
         - "kapwa gardens" data → Look for tables containing "Kapwa-Gardens" 
         - "vendor data" → Look for tables with vendor names like "Balay-Kreative", "Yum-Yams", "MatchaKOHO"
         - "close-out sales" → Look for tables containing "Close-Out-Sales" or "Close-Outs"
@@ -1314,6 +1314,10 @@ def chat_with_gemini_client_style():
 
                                     if isinstance(retrieved_data_from_tool,
                                                   list):
+                                        query_data = retrieved_data_from_tool
+                                        tool_display_title = f"Data from {part.function_response.name}"
+                                        app.logger.info(f"Set query_data with {len(query_data)} rows")
+                                        break
                                         # Log first few items for debugging
                                         if retrieved_data_from_tool:
                                             app.logger.info(
@@ -1392,11 +1396,11 @@ def chat_with_gemini_client_style():
         # Create displays array only for explicit data requests
         displays = []
         
-        # Only create displays if we have valid query_data from explicit requests
+        # Create displays if we have valid query_data from tool calls
         if query_data and isinstance(query_data, list) and len(query_data) > 0:
             displays.append({
                 "type": "table", 
-                "title": "Available Data Tables",
+                "title": tool_display_title,
                 "content": query_data
             })
             app.logger.info(f"Created display from query_data with {len(query_data)} rows")

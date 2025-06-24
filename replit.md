@@ -112,15 +112,20 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
-- **June 23, 2025**: FINAL FIX - Natural conversation and table display both working
+- **June 24, 2025**: FINAL FIX - AI table querying and data display fully operational
+  - CRITICAL FIX: Resolved AI's incorrect table name guessing (was trying non-existent tables like OUT_DIM_VENDORS_KAPWA_GARDENS)
+  - Updated AI instructions to use actual BigQuery table names with special characters (e.g., "Balay-Kreative---attendees---all-orders")
+  - Fixed backend data extraction logic to properly handle internal_execute_sql_query results
+  - AI now successfully queries real tables and returns data (10 rows from Balay-Kreative attendee table verified)
+  - Eliminated AI's tendency to use Keboola buckets instead of direct BigQuery table access
+  - All 64 workspace tables now accessible with proper descriptive names containing vendor, event, and date information
+  - Complete end-to-end data analysis pipeline operational: user request → table identification → query execution → data display
+
+- **June 23, 2025**: Natural conversation and table display both working
   - CRITICAL FIX: Removed hardcoded table display logic that triggered for all messages
   - Fixed automatic table retrieval that showed tables even for simple greetings like "hi"  
   - Updated backend to only show tables for explicit requests ("show me my tables", etc.)
-  - Fixed frontend-backend data structure mismatch in chat.tsx
-  - Backend sends singular 'display' object, frontend now properly converts to 'displays' array
-  - Backend successfully returns all 64 data tables from BigQuery workspace for table requests
   - AI now responds naturally to conversational messages without forcing data displays
-  - Complete table display functionality working for explicit requests only
   - Natural conversation flow restored while preserving data analysis capabilities
 
 - **June 23, 2025**: COMPLETE FIX - Table display issue fully resolved
