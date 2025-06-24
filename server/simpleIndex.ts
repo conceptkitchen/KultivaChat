@@ -1,21 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
-import { fileURLToPath } from 'url';
 import { spawn, ChildProcess } from 'child_process';
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { storage } from "./storage";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Load ports from environment variables with defaults
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
+console.log('Kultivate AI Frontend Server starting on port', PORT);
 
-console.log('Kultivate AI Frontend Server listening on port', PORT);
-console.log('Proxying API requests to:', BACKEND_URL);
-
-// Python Backend Service (simplified)
+// Python Backend Service
 class PythonBackendService {
   private backendProcess: ChildProcess | null = null;
   private isReady = false;
@@ -51,7 +41,7 @@ class PythonBackendService {
   }
 }
 
-function startServer() {
+async function startServer() {
   const app = express();
   const pythonBackend = new PythonBackendService();
   
@@ -62,13 +52,13 @@ function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(express.static("dist"));
-  
-  // Simple auth endpoint that returns 401 (shows landing page)
+
+  // Simple auth check endpoint that always returns 401 (unauthenticated)
   app.get('/api/auth/user', (req, res) => {
-    res.status(401).json({ message: "Not authenticated - showing landing page" });
+    res.status(401).json({ message: "Not authenticated" });
   });
 
-  // Proxy for backend API routes (simplified)
+  // Proxy for backend API routes
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/auth/')) {
       return next();
@@ -100,17 +90,13 @@ function startServer() {
       });
   });
 
-  // Serve React app for any non-API routes
-  app.get('*', (req, res, next) => {
-    if (req.path.startsWith('/api/')) {
-      return next();
-    }
-    console.log(`[FRONTEND] Serving React app for: ${req.path}`);
+  // Serve React app for all other routes
+  app.get('*', (req, res) => {
     res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
   });
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Kultivate AI serving on port ${PORT}`);
+    console.log(`✅ Kultivate AI serving on port ${PORT}`);
   });
 }
 

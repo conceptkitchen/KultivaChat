@@ -9,7 +9,8 @@ import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
 if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
+  console.warn("Environment variable REPLIT_DOMAINS not provided - auth will be disabled");
+  // Don't throw error, just disable auth
 }
 
 const getOidcConfig = memoize(
@@ -67,6 +68,11 @@ async function upsertUser(
 }
 
 export async function setupAuth(app: Express) {
+  if (!process.env.REPLIT_DOMAINS) {
+    console.log("Skipping Replit auth setup - domains not configured");
+    return;
+  }
+
   app.set("trust proxy", 1);
   app.use(getSession());
   app.use(passport.initialize());
@@ -128,6 +134,11 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  if (!process.env.REPLIT_DOMAINS) {
+    // Auth disabled, return 401 for all protected routes
+    return res.status(401).json({ message: "Authentication not configured" });
+  }
+
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {
