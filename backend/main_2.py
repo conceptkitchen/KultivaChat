@@ -1300,7 +1300,14 @@ def chat_with_gemini_client_style():
             app.logger.info("Using text analysis fallback for data extraction")
             try:
                 # Extract table name from AI response and query directly
-                if "Balay-Kreative" in final_answer:
+                if "Undiscovered-Vendor-Export" in final_answer:
+                    fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
+                    fallback_result = internal_execute_sql_query(fallback_query)
+                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                        query_data = fallback_result['data']
+                        tool_display_title = "Undiscovered Vendor Export Data"
+                        app.logger.info(f"FALLBACK SUCCESS: {len(query_data)} rows extracted via direct query")
+                elif "Balay-Kreative" in final_answer:
                     fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"
                     fallback_result = internal_execute_sql_query(fallback_query)
                     if fallback_result.get('status') == 'success' and fallback_result.get('data'):
@@ -1331,10 +1338,9 @@ def chat_with_gemini_client_style():
                 for message_content in reversed(retrieved_history):
                     # Check both user and model messages for function responses
                     # FIX: Add a check for message_content and message_content.parts to prevent TypeError
-                    if message_content and message_content.parts:
+                    if message_content and hasattr(message_content, 'parts') and message_content.parts:
                         for part in message_content.parts:
-                            if hasattr(part, 'function_response'
-                                   ) and part.function_response:
+                            if hasattr(part, 'function_response') and part.function_response and hasattr(part.function_response, 'name'):
                                 app.logger.info(
                                 f"Found function_response in history from tool: {part.function_response.name}"
                             )
@@ -1436,6 +1442,29 @@ def chat_with_gemini_client_style():
                 app.logger.error(
                     f"'ChatSession' object (type: {type(chat_session)}) might not have 'get_history' or it failed: {e_attr}. This indicates an API mismatch or an unexpected object type for chat_session."
                 )
+                # CRITICAL FIX: If history parsing fails, trigger the fallback extraction since we know AI got data
+                if not query_data and final_answer and "retrieved" in final_answer.lower():
+                    app.logger.info("History parsing failed but AI says it retrieved data - triggering emergency fallback")
+                    if "Undiscovered-Vendor-Export" in final_answer:
+                        try:
+                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
+                            fallback_result = internal_execute_sql_query(fallback_query)
+                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                                query_data = fallback_result['data']
+                                tool_display_title = "Undiscovered Vendor Export Data"
+                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
+                        except Exception as fallback_error:
+                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
+                    elif "Balay-Kreative" in final_answer:
+                        try:
+                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"
+                            fallback_result = internal_execute_sql_query(fallback_query)
+                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                                query_data = fallback_result['data']
+                                tool_display_title = "Balay-Kreative Attendee Data"
+                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
+                        except Exception as fallback_error:
+                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
             except Exception as e_hist:
                 app.logger.error(
                     f"An error occurred while trying to get or process chat history: {e_hist}",
