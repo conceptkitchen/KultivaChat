@@ -112,7 +112,7 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
-- **June 24, 2025**: COMPREHENSIVE CHATBOT ARCHITECTURE DOCUMENT CREATED WITH KEBOOLA INTEGRATION
+- **June 24, 2025**: COMPREHENSIVE CHATBOT ARCHITECTURE DOCUMENT WITH COMPLETE CREDENTIAL SPECIFICATIONS
   - ✅ CREATED: CHATBOT_TECHNICAL_ARCHITECTURE.md with complete technical specifications
   - ✅ DOCUMENTED: Detailed component breakdown covering React frontend, Node.js proxy, Python backend, and AI integration
   - ✅ EXPLAINED: Data flow architecture from user input through Gemini AI to BigQuery data retrieval
@@ -120,8 +120,10 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
   - ✅ SPECIFIED: Database schema, API contracts, and environment configuration requirements
   - ✅ ADDED: Comprehensive Keboola Cloud API integration documentation with authentication, bucket operations, table management, and workspace configuration
   - ✅ DETAILED: Storage API token setup, BigQuery workspace sync, data pipeline integration, and table name resolution strategies
-  - ✅ PROVIDED: Step-by-step rebuild instructions for another AI to recreate the entire system
-  - → Complete technical documentation available for system reconstruction and understanding including full Keboola platform integration
+  - ✅ DOCUMENTED: Complete private key and credential requirements including Keboola Storage tokens, Google service account JSON, Gemini API keys, database credentials, and session secrets
+  - ✅ SPECIFIED: Security requirements, file permissions, credential generation steps, and production hardening checklist
+  - ✅ PROVIDED: Step-by-step rebuild instructions with security-first approach for another AI to recreate the entire system
+  - → Complete technical documentation available for system reconstruction including all required credentials and security configurations
 
 - **June 24, 2025**: PROJECT DOCUMENTATION COMPLETE - Comprehensive overview created
   - ✅ CREATED: Complete PROJECT_OVERVIEW.md with technical architecture, business purpose, and implementation details
