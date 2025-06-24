@@ -8,8 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+
+// CRITICAL: Parse JSON bodies BEFORE proxy middleware
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Load ports from environment variables with defaults
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
@@ -121,21 +123,41 @@ class PythonBackendService {
 
 const backendService = new PythonBackendService();
 
-// --- Fixed API Proxy ---
-// All requests to /api/* will be forwarded to the backend with proper body forwarding
+// --- Fixed API Proxy with Proper Body Handling ---
+app.use('/api', (req, res, next) => {
+  console.log(`[MIDDLEWARE] Received ${req.method} ${req.url}`);
+  console.log(`[MIDDLEWARE] Body:`, req.body);
+  next();
+});
+
 app.use('/api', createProxyMiddleware({
   target: BACKEND_URL,
   changeOrigin: true,
   logLevel: 'debug',
-  // Critical: Ensure the proxy handles request bodies correctly
+  // Ensure backend readiness before processing
+  router: (req) => {
+    if (!backendService.isBackendReady()) {
+      console.log('[PROXY] Backend not ready, rejecting request');
+      return null; // This will cause an error
+    }
+    return BACKEND_URL;
+  },
   onProxyReq: (proxyReq, req, res) => {
-    console.log(`[PROXY] ${req.method} ${req.url} -> ${BACKEND_URL}${req.url}`);
+    console.log(`[PROXY] Forwarding ${req.method} ${req.url} to ${BACKEND_URL}${req.url}`);
     
-    // For POST/PUT requests, ensure the body is properly forwarded
+    // Handle POST/PUT request bodies properly
     if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
       const bodyData = JSON.stringify(req.body);
+      console.log(`[PROXY] Sending body:`, bodyData);
+      
+      // Remove any existing content-length
+      proxyReq.removeHeader('content-length');
+      
+      // Set proper headers
       proxyReq.setHeader('Content-Type', 'application/json');
       proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
+      
+      // Write the body
       proxyReq.write(bodyData);
       proxyReq.end();
     }
@@ -144,9 +166,9 @@ app.use('/api', createProxyMiddleware({
     console.log(`[PROXY] Response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
   },
   onError: (err, req, res) => {
-    console.error('[PROXY] Error for', req.url, ':', err.message);
+    console.error('[PROXY] Error:', err.message);
     if (res && !res.headersSent) {
-      res.status(504).json({ error: 'Gateway Timeout' });
+      res.status(503).json({ error: 'Backend service unavailable' });
     }
   }
 }));
