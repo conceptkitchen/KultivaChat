@@ -40,47 +40,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <div className="h-10 w-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <svg 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  width="20" 
-                  height="20" 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2.5" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="text-white"
-                >
-                  <path d="M3 3v5h5"></path>
-                  <path d="M3 9l9-6 9 6v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                  <path d="M9 21v-6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6"></path>
-                </svg>
-              </div>
-              <h1 className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Kultivate AI
-              </h1>
-            </div>
-            <div className="flex items-center">
-              <button 
-                onClick={() => window.location.href = '/'}
-                className="text-gray-600 hover:text-gray-900 font-medium"
-              >
-                Back to Home
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-      
-      <div className="flex items-center justify-center px-4 py-20">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-gray-900">Kultivate AI</CardTitle>
@@ -203,7 +163,6 @@ export default function AuthPage() {
           </Tabs>
         </CardContent>
       </Card>
-      </div>
     </div>
   );
 }

@@ -122,15 +122,7 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.json({ status: "success" });
-    });
-  });
-
-  // Handle GET requests to logout by redirecting to POST
-  app.get("/api/logout", (req, res) => {
-    res.status(405).json({ 
-      error: "Method Not Allowed", 
-      message: "Please use the logout button instead of navigating directly to this URL" 
+      res.sendStatus(200);
     });
   });
 

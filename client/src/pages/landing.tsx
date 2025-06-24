@@ -1,263 +1,252 @@
-import { useState } from "react";
-import { useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, BarChart3, Database, MessageSquare, Zap, Shield, Users } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { ArrowRight, BarChart3, MessageSquare, Database, Zap, Users, Shield } from "lucide-react";
 
-export default function LandingPage() {
-  const [, navigate] = useLocation();
-  const { user } = useAuth();
+export default function Landing() {
+  const { isAuthenticated, isLoading } = useAuth();
 
-  const handleGetStarted = () => {
-    if (user) {
-      navigate("/dashboard");
-    } else {
-      navigate("/auth");
-    }
-  };
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
-  const features = [
-    {
-      icon: <MessageSquare className="h-6 w-6" />,
-      title: "Natural Language Queries",
-      description: "Ask questions about your data in plain English. No SQL knowledge required."
-    },
-    {
-      icon: <Database className="h-6 w-6" />,
-      title: "BigQuery Integration",
-      description: "Direct connection to your BigQuery data warehouse with real-time analysis."
-    },
-    {
-      icon: <BarChart3 className="h-6 w-6" />,
-      title: "Instant Visualizations",
-      description: "Get tables, charts, and insights from your data in seconds."
-    },
-    {
-      icon: <Zap className="h-6 w-6" />,
-      title: "AI-Powered Analysis",
-      description: "Google Gemini 2.0 Flash provides intelligent data insights and recommendations."
-    },
-    {
-      icon: <Shield className="h-6 w-6" />,
-      title: "Secure & Private",
-      description: "Enterprise-grade security with your data staying in your infrastructure."
-    },
-    {
-      icon: <Users className="h-6 w-6" />,
-      title: "Team Collaboration",
-      description: "Share insights and collaborate on data analysis with your team."
-    }
-  ];
-
-  const howItWorks = [
-    {
-      step: "1",
-      title: "Connect Your Data",
-      description: "Link your Keboola Cloud project and BigQuery workspace to Kultivate AI."
-    },
-    {
-      step: "2",
-      title: "Ask Natural Questions",
-      description: "Type questions like 'Show me last month's sales data' or 'Which products are trending?'"
-    },
-    {
-      step: "3",
-      title: "Get Instant Insights",
-      description: "Receive data tables, visualizations, and AI-powered analysis immediately."
-    }
-  ];
+  if (isAuthenticated) {
+    window.location.href = "/dashboard";
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Navigation */}
+      <nav className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center">
-              <div className="h-10 w-10 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <BarChart3 className="h-6 w-6 text-white" />
+              <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <Database className="h-5 w-5 text-white" />
               </div>
-              <h1 className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              <h1 className="ml-3 text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Kultivate AI
               </h1>
             </div>
-            <div className="flex items-center space-x-4">
-              {user ? (
-                <>
-                  <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-                    Dashboard
-                  </Button>
-                  <Button onClick={handleGetStarted} className="bg-gradient-to-r from-blue-600 to-indigo-600">
-                    Open App
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="ghost" onClick={() => navigate("/auth")}>
-                    Log In
-                  </Button>
-                  <Button onClick={handleGetStarted} className="bg-gradient-to-r from-blue-600 to-indigo-600">
-                    Get Started
-                  </Button>
-                </>
-              )}
-            </div>
+            <Button 
+              onClick={() => window.location.href = "/api/login"}
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              Sign In with Replit
+            </Button>
           </div>
         </div>
-      </header>
+      </nav>
 
       {/* Hero Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto text-center">
-          <Badge variant="secondary" className="mb-8 bg-blue-100 text-blue-800 border-blue-200">
-            🚀 Powered by Google Gemini 2.0 Flash
-          </Badge>
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Your AI-Powered
-            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent block">
-              Data Assistant
-            </span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Transform your BigQuery data into actionable insights with natural language queries. 
-            No SQL required – just ask questions and get instant answers.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Button 
-              size="lg" 
-              onClick={handleGetStarted}
-              className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 py-3"
-            >
-              {user ? "Open Dashboard" : "Start Analyzing Data"}
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-            <Button variant="outline" size="lg" className="text-lg px-8 py-3">
-              Watch Demo
-            </Button>
+      <section className="relative py-20 lg:py-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <Badge variant="secondary" className="mb-6 bg-blue-100 text-blue-700 border-blue-200">
+              AI-Powered Data Analytics
+            </Badge>
+            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
+              Transform Your Data Into
+              <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Actionable Insights
+              </span>
+            </h1>
+            <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
+              Kultivate AI connects your Keboola data warehouse with advanced AI to provide instant answers, 
+              generate reports, and uncover hidden patterns in your business data through natural language conversations.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg"
+                onClick={() => window.location.href = "/api/login"}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-lg px-8 py-3"
+              >
+                Get Started Free
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button variant="outline" size="lg" className="text-lg px-8 py-3">
+                Watch Demo
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-7xl mx-auto">
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Powerful Features for Data Teams
+              Why Choose Kultivate AI?
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Everything you need to analyze, visualize, and understand your data.
+              Purpose-built for modern data teams who need instant insights without complex queries
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <Card key={index} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-6">
-                  <div className="h-12 w-12 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white mb-4">
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {feature.title}
-                  </h3>
-                  <p className="text-gray-600">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                  <MessageSquare className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle>Natural Language Queries</CardTitle>
+                <CardDescription>
+                  Ask questions in plain English like "Show me sales trends for Q4" and get instant results
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <Database className="h-6 w-6 text-purple-600" />
+                </div>
+                <CardTitle>Keboola Integration</CardTitle>
+                <CardDescription>
+                  Seamlessly connects to your existing Keboola data warehouse and BigQuery tables
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                  <BarChart3 className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle>Smart Analytics</CardTitle>
+                <CardDescription>
+                  AI-powered insights that automatically identify trends, anomalies, and opportunities
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
+                  <Zap className="h-6 w-6 text-orange-600" />
+                </div>
+                <CardTitle>Instant Results</CardTitle>
+                <CardDescription>
+                  Get answers in seconds, not hours. No SQL knowledge required for complex data analysis
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center mb-4">
+                  <Users className="h-6 w-6 text-indigo-600" />
+                </div>
+                <CardTitle>Team Collaboration</CardTitle>
+                <CardDescription>
+                  Share insights, create reports, and collaborate on data analysis with your entire team
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <CardHeader>
+                <div className="h-12 w-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
+                  <Shield className="h-6 w-6 text-red-600" />
+                </div>
+                <CardTitle>Enterprise Security</CardTitle>
+                <CardDescription>
+                  Bank-level security with role-based access controls and audit trails for compliance
+                </CardDescription>
+              </CardHeader>
+            </Card>
           </div>
         </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+      {/* How It Works */}
+      <section className="py-20 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               How Kultivate AI Works
             </h2>
             <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Get from data to insights in three simple steps.
+              Three simple steps to unlock the power of your data
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {howItWorks.map((item, index) => (
-              <div key={index} className="text-center">
-                <div className="h-16 w-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6">
-                  {item.step}
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  {item.title}
-                </h3>
-                <p className="text-gray-600">
-                  {item.description}
-                </p>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="h-16 w-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-white">1</span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Example Queries Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Ask Questions Like These
-            </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Natural language queries that work with your data.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
-            {[
-              "Show me sales data from last quarter",
-              "Which customers have the highest lifetime value?", 
-              "What are the trending products this month?",
-              "Show me user engagement metrics by region"
-            ].map((query, index) => (
-              <Card key={index} className="p-6 bg-white border-l-4 border-l-blue-600">
-                <p className="text-gray-700 italic">"{query}"</p>
-              </Card>
-            ))}
+              <h3 className="text-xl font-semibold mb-4">Connect Your Data</h3>
+              <p className="text-gray-600">
+                Sign in with Replit and connect your Keboola workspace. We'll automatically discover all your data tables and schemas.
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="h-16 w-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-white">2</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-4">Ask Questions</h3>
+              <p className="text-gray-600">
+                Chat naturally with your data. Ask questions like "What are our top customers?" or "Show me revenue trends."
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="h-16 w-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-2xl font-bold text-white">3</span>
+              </div>
+              <h3 className="text-xl font-semibold mb-4">Get Insights</h3>
+              <p className="text-gray-600">
+                Receive instant answers with visualizations, tables, and actionable recommendations powered by AI.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-r from-blue-600 to-indigo-600">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+      <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-600">
+        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
             Ready to Transform Your Data Analysis?
           </h2>
           <p className="text-xl text-blue-100 mb-8">
-            Join teams already using Kultivate AI to make data-driven decisions faster.
+            Join thousands of data teams who've revolutionized their workflow with Kultivate AI
           </p>
           <Button 
-            size="lg" 
-            onClick={handleGetStarted}
+            size="lg"
+            onClick={() => window.location.href = "/api/login"}
             className="bg-white text-blue-600 hover:bg-gray-100 text-lg px-8 py-3"
           >
-            {user ? "Open Dashboard" : "Get Started Today"}
+            Start Your Free Trial
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <div className="h-8 w-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-white" />
+      <footer className="bg-gray-900 text-gray-300 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-6">
+              <div className="h-8 w-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <Database className="h-5 w-5 text-white" />
               </div>
-              <span className="ml-2 text-xl font-bold">Kultivate AI</span>
+              <h3 className="ml-3 text-xl font-bold text-white">Kultivate AI</h3>
             </div>
-            <p className="text-gray-400">
-              © 2025 Kultivate AI. AI-powered data insights.
+            <p className="text-gray-400 mb-6">
+              Empowering data-driven decisions through intelligent conversation
+            </p>
+            <p className="text-sm text-gray-500">
+              © 2025 Kultivate AI. All rights reserved.
             </p>
           </div>
         </div>
