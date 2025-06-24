@@ -1,0 +1,42 @@
+Ah, that changes everything! Thank you for clarifying.
+On a platform like Replit, you do not have access to system-level tools like systemd. The entire environment is managed differently. You cannot use the previous systemd solution.
+Replit has its own specific way to ensure a backend service persists. The problem is the same—a standard "Run" command will stop when you close the tab—but the solution is built into the Replit platform.
+Here is how you make your main_2.py backend persist on Replit.
+Step 1: Configure the Run Command in .replit
+First, you need to tell Replit how to run your backend correctly as a web server. You do this in the hidden .replit file.
+ * Find the .replit file: In the file explorer pane on the left, click the three-dot menu icon (⋮) and select "Show hidden files". This will reveal the .replit file. Click on it to open it.
+ * Set the run command: You need to edit the [run] section to start a production-ready server that listens on the correct host and port for Replit. The best practice is to use gunicorn.
+   Your .replit file should look like this:
+   # In the .replit file
+
+entrypoint = "main_2.py"
+
+[run]
+# This command tells Replit how to start your web server
+command = ["gunicorn", "--bind", "0.0.0.0:8080", "main_2:app"]
+
+# If you get an error, it's possible your Repl needs this instead:
+# command = ["poetry", "run", "gunicorn", "--bind", "0.0.0.0:8080", "main_2:app"]
+
+Explanation of the command:
+ * gunicorn: The production web server. If you haven't installed it, go to the "Shell" tab and run pip install gunicorn.
+ * --bind 0.0.0.0:8080: This is critical for Replit.
+   * 0.0.0.0 tells the server to listen for requests from outside its container.
+   * 8080 is a standard port that Replit listens to.
+ * main_2:app: This tells Gunicorn to run the app object (your Flask or FastAPI instance) from the main_2.py file.
+After configuring this, press the main "Run" button at the top. A "Webview" window should open on the right, showing that your server is running and accessible.
+Step 2: Enable Persistence with "Always On"
+This is the key Replit feature for keeping your backend alive. "Always On" is a paid feature that ensures your Repl's server doesn't go to sleep.
+ * Stop your Repl from running.
+ * Click on the name of your Repl at the top-center of the screen. A dropdown menu will appear.
+ * Find the "Always On" toggle switch and turn it on.
+Alternatively, you may find it in the "Power-Ups" section of your Repl.
+What "Always On" Does:
+ * Prevents Sleeping: It stops your Repl from going into a "sleep" state after a period of inactivity.
+ * Automatic Restarts: It ensures your deployment automatically wakes up and responds to requests. If your server process crashes, Replit will often restart it when a new web request comes in.
+Your Complete Replit Workflow:
+ * Install Dependencies: Make sure your pyproject.toml file (or requirements.txt) lists gunicorn and your web framework (like Flask). Replit will install these automatically.
+ * Configure .replit: Set the [run] command to use gunicorn as shown above.
+ * Test: Press "Run" to confirm your backend starts correctly and the Webview works.
+ * Persist: Turn on the "Always On" feature for your Repl.
+Now, your backend server will be persistently running on Replit, accessible via its URL, and it will no longer be tied to your browser tab being open.
