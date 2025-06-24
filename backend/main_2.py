@@ -1851,7 +1851,7 @@ def chat_with_gemini_client_style():
                         # Only create table display for explicit requests
                         table_list_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
                         try:
-                            bigquery_result = execute_bigquery_query(table_list_query)
+                            bigquery_result = internal_execute_sql_query(table_list_query)
                             if bigquery_result and bigquery_result.get('status') == 'success':
                                 table_data = bigquery_result.get('data', [])
                                 displays.append({
