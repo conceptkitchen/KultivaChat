@@ -46,11 +46,15 @@ class PythonBackendService {
   }
 
   isBackendReady(): boolean {
-    // Always return true if process exists and hasn't been running for more than 5 seconds
+    // Always return true if process exists and hasn't been killed
     if (this.backendProcess && !this.backendProcess.killed) {
       return true;
     }
     return this.isReady;
+  }
+
+  setReady(): void {
+    this.isReady = true;
   }
 }
 
@@ -61,9 +65,10 @@ function startServer() {
   // Start Python backend
   pythonBackend.start();
   
-  // Set backend as ready after a short delay to handle startup timing
+  // Force backend ready state after short delay for startup timing
   setTimeout(() => {
-    console.log('✅ Python backend ready (timeout fallback)');
+    pythonBackend.setReady();
+    console.log('✅ Python backend ready (forced ready state)');
   }, 3000);
   
   // Basic middleware
@@ -96,7 +101,7 @@ function startServer() {
       return res.status(503).json({ error: 'Backend starting up...' });
     }
 
-    const targetUrl = `http://localhost:8081${req.path}`;
+    const targetUrl = `http://localhost:8081/api${req.path.startsWith('/api') ? req.path.substring(4) : req.path}`;
     const options: RequestInit = {
       method: req.method,
       headers: {
@@ -109,21 +114,24 @@ function startServer() {
       options.body = JSON.stringify(req.body);
     }
 
+    console.log(`[Proxy] ${req.method} ${req.path} -> ${targetUrl}`);
+    
     fetch(targetUrl, options)
       .then(async response => {
         const text = await response.text();
+        console.log(`[Proxy] Backend response: ${response.status} ${text.substring(0, 200)}...`);
         try {
           const data = JSON.parse(text);
           return { status: response.status, data };
         } catch (e) {
           console.error(`[Proxy] Backend returned non-JSON:`, text.substring(0, 100));
-          return { status: 503, data: { error: 'Backend starting up...' } };
+          return { status: response.status, data: { error: 'Invalid response format', raw: text.substring(0, 500) } };
         }
       })
       .then(({ status, data }) => res.status(status).json(data))
       .catch(error => {
         console.error(`[Proxy Error]:`, error);
-        res.status(503).json({ error: 'Backend starting up...' });
+        res.status(503).json({ error: 'Backend connection failed', details: error.message });
       });
   });
 
