@@ -121,49 +121,32 @@ class PythonBackendService {
 
 const backendService = new PythonBackendService();
 
-// Middleware to ensure backend is ready
-app.use('/api', async (req, res, next) => {
-  if (!backendService.isBackendReady()) {
-    console.log('Backend not ready, waiting for startup...');
-    // Wait a bit longer for backend to fully initialize
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    if (!backendService.isBackendReady()) {
-      console.error('Backend still not ready after waiting');
-      return res.status(503).json({ error: 'Backend service unavailable' });
-    }
-  }
-  next();
-});
-
-// --- Unified API Proxy ---
-// All requests to /api/* will be forwarded to the backend
+// --- Fixed API Proxy ---
+// All requests to /api/* will be forwarded to the backend with proper body forwarding
 app.use('/api', createProxyMiddleware({
   target: BACKEND_URL,
   changeOrigin: true,
   logLevel: 'debug',
-  pathRewrite: {
-    '^/api': '/api' // Keep the /api prefix
-  },
+  // Critical: Ensure the proxy handles request bodies correctly
   onProxyReq: (proxyReq, req, res) => {
-    console.log(`Proxying ${req.method} ${req.url} to ${BACKEND_URL}${req.url}`);
+    console.log(`[PROXY] ${req.method} ${req.url} -> ${BACKEND_URL}${req.url}`);
     
-    // Handle request body for POST/PUT requests
-    if (req.body && (req.method === 'POST' || req.method === 'PUT')) {
+    // For POST/PUT requests, ensure the body is properly forwarded
+    if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
       const bodyData = JSON.stringify(req.body);
       proxyReq.setHeader('Content-Type', 'application/json');
       proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
       proxyReq.write(bodyData);
+      proxyReq.end();
     }
   },
   onProxyRes: (proxyRes, req, res) => {
-    console.log(`Proxy response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
+    console.log(`[PROXY] Response: ${proxyRes.statusCode} for ${req.method} ${req.url}`);
   },
   onError: (err, req, res) => {
-    console.error('Proxy error for', req.url, ':', err.message);
-    if (res && typeof res.writeHead === 'function') {
-      res.writeHead(504, {'Content-Type': 'text/plain'});
-      res.end('Gateway Timeout');
+    console.error('[PROXY] Error for', req.url, ':', err.message);
+    if (res && !res.headersSent) {
+      res.status(504).json({ error: 'Gateway Timeout' });
     }
   }
 }));
