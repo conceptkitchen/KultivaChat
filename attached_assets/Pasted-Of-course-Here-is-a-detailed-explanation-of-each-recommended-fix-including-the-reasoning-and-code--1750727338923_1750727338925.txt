@@ -1,0 +1,204 @@
+Of course. Here is a detailed explanation of each recommended fix, including the reasoning and code changes required.
+
+-----
+
+### 1\. Simplify the Agent's Toolset
+
+This change simplifies the agent's logic and removes potential points of failure. By providing only the essential tools, we make the agent more reliable and its behavior more predictable.
+
+**Explanation for the Developer:**
+
+The `SYSTEM_INSTRUCTION_PROMPT` explicitly forbids the agent from using Keboola Storage bucket tools (`list_keboola_buckets`, etc.) for data analysis. However, these tools are still included in its available toolset (`gemini_tool_functions_list`). This creates a contradiction where the agent might, despite instructions, choose the wrong tool and fail. We need to remove these unused tools to eliminate this failure path. The agent should exclusively use `internal_execute_sql_query` for all data discovery and retrieval via BigQuery's `INFORMATION_SCHEMA`.
+
+**Required Code Change:**
+
+In `backend/main_2.py`, find the `gemini_tool_functions_list` and update it as follows.
+
+**Before:**
+
+```python
+# In backend/main_2.py
+
+gemini_tool_functions_list = [
+    internal_execute_sql_query, list_keboola_buckets,
+    list_tables_in_keboola_bucket, get_keboola_table_detail,
+    get_zip_codes_for_city, get_current_time
+]
+```
+
+**After:**
+
+```python
+# In backend/main_2.py
+
+gemini_tool_functions_list = [
+    internal_execute_sql_query,
+    get_zip_codes_for_city,
+    get_current_time
+]
+```
+
+### 2\. Remove Misleading Documentation
+
+This is a repository maintenance task that improves clarity for the development team.
+
+**Explanation for the Developer:**
+
+The file `attached_assets/TOOLS.md` documents a comprehensive set of Keboola MCP tools. However, our agent does **not** use them; it uses the custom Python functions defined in `main_2.py`. This discrepancy between documentation and implementation will cause confusion for anyone maintaining the project.
+
+**Required Action:**
+
+This does not require a code change, but a file system change.
+
+```bash
+# In your terminal, from the root of the repository
+rm attached_assets/TOOLS.md
+```
+
+### 3\. Decouple Configuration from Logic
+
+This change makes the application more flexible and portable by removing hardcoded configuration values from the core logic.
+
+**Explanation for the Developer:**
+
+The BigQuery project ID (`kbc-use4-839-261b`) and dataset ID (`WORKSPACE_21894820`) are hardcoded directly into the `SYSTEM_INSTRUCTION_PROMPT`. This makes it difficult to run the agent against a different environment (e.g., a staging or development database) without modifying the source code. These values should be treated as configuration and loaded from environment variables.
+
+**Required Code Change:**
+
+In `backend/main_2.py`, make the following modifications.
+
+**Step 1: Load IDs from Environment Variables**
+Add these lines near the top of the file where other environment variables are loaded.
+
+```python
+# In backend/main_2.py, near the other os.environ.get calls
+
+# Add these new lines
+GOOGLE_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID', 'kbc-use4-839-261b')
+KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_ID', 'WORKSPACE_21894820')
+
+# ... (rest of the environment variable loading)
+```
+
+**Step 2: Update the System Prompt**
+Modify the `SYSTEM_INSTRUCTION_PROMPT` to be a formatted f-string that uses these new variables.
+
+```python
+# In backend/main_2.py
+
+# Notice the 'f' before the triple quotes
+SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert Keboola Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') for source data, and crucially, a Google BigQuery data warehouse (project ID: `{GOOGLE_PROJECT_ID}`, dataset/workspace schema: `{KBC_WORKSPACE_ID}`) for querying transformed and analysis-ready data.
+
+**MANDATORY EXECUTION RULE: For ANY request mentioning table data, you MUST use internal_execute_sql_query ONLY. Do NOT use list_keboola_buckets or list_tables_in_keboola_bucket. Use BigQuery tables directly. When user asks for vendor data, first list all tables to find matching names, then query the specific table.**
+
+**Your absolute priority for data retrieval and answering questions about specific table contents is the transformed tables available in the Google BigQuery workspace (`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.TABLE_NAME`).**
+
+When users ask about:
+- **Data from specific BigQuery workspace tables** (e.g., "show me kapwa gardens vendor data", "what's in the close-out sales?", "can you show me balay kreative data?"):
+    1.  **USE THE ACTUAL BIGQUERY TABLE NAMES** directly from the workspace. Do NOT use Keboola buckets.
+    ...
+    4.  Use the format: `SELECT * FROM \`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.\` + actual table name + \` LIMIT 10;`
+        IMPORTANT: Table names contain special characters and must be wrapped in backticks exactly as shown in the table list
+    ...
+- **Complex Analytical Questions and Reporting**
+    ...
+        a.  Use `execute_sql_query` with `SELECT table_name FROM \`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES\`;` to list all tables in the BigQuery workspace.
+    ...
+        d.  For these selected candidate tables, **you MUST retrieve their schemas** to identify correct column names and types. Use `execute_sql_query` with `SELECT table_name, column_name, data_type FROM \`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name IN ('TABLE1_CANDIDATE', 'TABLE2_CANDIDATE');`.
+...
+"""
+```
+
+### 4\. Decouple Frontend and Backend Processes
+
+This is an architectural change to align with standard practices for scalable and maintainable web applications.
+
+**Explanation for the Developer:**
+
+The current Node.js server in `server/index.ts` directly starts the Python backend as a child process using `spawn`. This creates a monolithic service that is difficult to manage, scale, and deploy. The frontend and backend should be two independent services that communicate over HTTP. The Node.js server's only job should be to serve the frontend static files and proxy API calls to the backend, which is assumed to be running independently.
+
+**Required Code Change:**
+
+**Step 1: Remove Process Spawning from `server/index.ts`**
+The entire `startFlaskServer` function and any related variables (`flaskProcess`, `flaskServerReady`) should be deleted.
+
+```typescript
+// In server/index.ts
+
+// DELETE this entire block of code
+/*
+let flaskProcess: any = null;
+
+function startFlaskServer(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const backendPath = path.join(__dirname, '../backend');
+    flaskProcess = spawn('python', ['main_2.py'], {
+      cwd: backendPath,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    // ... all the listener and timeout logic ...
+  });
+}
+
+let flaskServerReady = false;
+*/
+```
+
+**Step 2: Simplify Server Initialization**
+The `initializeServer` function should no longer call `startFlaskServer`.
+
+**Before:**
+
+```typescript
+// In server/index.ts
+async function initializeServer() {
+  try {
+    // ...
+    await startFlaskServer();
+  } catch (error) {
+    console.error("Error setting up server:", error);
+  }
+}
+```
+
+**After:**
+
+```typescript
+// In server/index.ts
+async function initializeServer() {
+  try {
+    // Register non-API routes...
+    // Serve static files...
+    // etc.
+    // The call to startFlaskServer() is now removed.
+    console.log("Server initialized. Ready to proxy requests to backend on port 8081.");
+  } catch (error) {
+    console.error("Error setting up server:", error);
+  }
+}
+```
+
+**New Operational Requirement:**
+
+With this change, the frontend and backend must be started as two separate processes.
+
+1.  **Terminal 1 - Start Backend:**
+
+    ```bash
+    cd /path/to/your/project/backend
+    # Set environment variables if needed
+    export GOOGLE_PROJECT_ID=kbc-use4-839-261b
+    export KBC_WORKSPACE_ID=WORKSPACE_21894820
+    # ... other secrets ...
+    python main_2.py
+    ```
+
+2.  **Terminal 2 - Start Frontend:**
+
+    ```bash
+    cd /path/to/your/project
+    # Use the appropriate command from your package.json, e.g.,
+    npm run dev
+    # or
+    npm start
+    ```
