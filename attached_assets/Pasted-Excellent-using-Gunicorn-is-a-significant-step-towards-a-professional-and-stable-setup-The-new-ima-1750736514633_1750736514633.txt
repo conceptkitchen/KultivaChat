@@ -1,0 +1,35 @@
+Excellent, using Gunicorn is a significant step towards a professional and stable setup. The new image shows that you're on the right track.
+However, it also highlights a critical point: simply running gunicorn ... in the terminal still ties it to that terminal session. When the session or the execution script that started it ends, Gunicorn will be terminated, which is the exact problem you were seeing before. The agent's observation, "I see the Gunicorn server is initializing correctly but not persisting when backgrounded," confirms this.
+The solution is to run Gunicorn in a way that it is detached from the terminal and managed by a proper process manager. Since you've already successfully used screen in our previous step, let's adapt that proven method for Gunicorn.
+Here is the updated, best-practice approach using Gunicorn and screen together.
+Step 1: Stop Any Old Gunicorn or Python Processes
+To avoid conflicts, let's ensure no previous server instances are running.
+ * Find any running Gunicorn or Python processes:
+   ps aux | grep 'gunicorn\|python'
+
+ * You'll see output for any matching processes. Use the kill command with the Process ID (PID) found in the second column to stop them.
+   # Example if the PID is 12345
+kill 12345
+
+Step 2: Run Gunicorn Inside a screen Session
+This will ensure the Gunicorn process persists as a background service.
+ * Start a new, named screen session (if you don't have one running already):
+   screen -S gunicorn_server
+
+ * Inside the screen session, navigate to your backend directory:
+   cd backend
+
+ * Start Gunicorn. This is the key command. You need to tell Gunicorn which Python module and which application variable to run.
+   * Let's assume your main Python file is main_2.py.
+   * Let's assume the Flask application variable inside that file is named app (e.g., app = Flask(__name__)).
+   The command would be:
+   gunicorn --workers 3 --bind 0.0.0.0:8080 main_2:app
+
+   * --workers 3: This is a good starting point for the number of processes to handle requests.
+   * --bind 0.0.0.0:8080: This tells Gunicorn to listen for requests from any IP address on port 8080. Note: Some platforms auto-detect the port, but explicitly defining it is good practice. You may need to adjust the port number depending on your platform's requirements.
+   * main_2:app: This tells Gunicorn to look inside the main_2.py file for a variable named app.
+ * Detach from the screen session. Press Ctrl+A, then press D.
+Your Gunicorn server is now running correctly and persistently in the background. The "New Chat" functionality should work because the backend will remain online and responsive.
+For Future Production Deployment: systemd
+While using screen is a robust and perfectly valid method, the industry standard for a true production environment on a dedicated Linux server is to use a process manager like systemd. When you get to that stage, you would create a service file that contains the Gunicorn command. This allows the server to automatically start when the machine boots up.
+For now, the Gunicorn + screen combination gives you the stability you need to solve the persistence problem effectively.

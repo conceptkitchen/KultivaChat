@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from 'url';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { pythonBackend } from './python-backend.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,11 +15,18 @@ app.use(express.urlencoded({ extended: false }));
 const PORT = parseInt(process.env.PORT ?? "5000", 10);
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8081';
 
+console.log('Kultivate AI Frontend Server listening on port', PORT);
+console.log('Proxying API requests to:', BACKEND_URL);
+
+// --- Backend Management Middleware ---
+app.use('/api', pythonBackend.middleware());
+
 // --- Unified API Proxy ---
 // All requests to /api/* will be forwarded to the backend
 app.use('/api', createProxyMiddleware({
   target: BACKEND_URL,
   changeOrigin: true,
+  logLevel: 'silent',
   // Ensure request body is forwarded correctly
   onProxyReq: (proxyReq, req, res) => {
     if (req.body && Object.keys(req.body).length) {
@@ -26,6 +34,13 @@ app.use('/api', createProxyMiddleware({
       proxyReq.setHeader('Content-Type','application/json');
       proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
       proxyReq.write(bodyData);
+    }
+  },
+  onError: (err, req, res) => {
+    console.error('Proxy error for', req.url, ':', err.message);
+    if (res && typeof res.writeHead === 'function') {
+      res.writeHead(504, {'Content-Type': 'text/plain'});
+      res.end('Gateway Timeout');
     }
   }
 }));
