@@ -873,6 +873,10 @@ def get_conversations():
             'psql', database_url, '-c', query, '-t', '--csv'
         ], capture_output=True, text=True)
         
+        app.logger.info(f"Get conversations - return code: {result.returncode}")
+        app.logger.info(f"Get conversations - stdout: {result.stdout}")
+        app.logger.info(f"Get conversations - stderr: {result.stderr}")
+        
         conversations = []
         if result.returncode == 0 and result.stdout.strip():
             lines = result.stdout.strip().split('\n')
@@ -912,16 +916,26 @@ def create_conversation():
         if not database_url:
             return jsonify({"error": "Database connection failed"}), 500
         
-        # SQL query to insert new conversation
-        query = f"INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES ('{conv_id}', 1, '{title.replace(\"'\", \"''\")}', '{now}', '{now}') RETURNING id, title, created_at, updated_at"
+        # SQL query to insert new conversation - escape single quotes properly
+        escaped_title = title.replace("'", "''")
+        query = f"INSERT INTO conversations (id, user_id, title, created_at, updated_at) VALUES ('{conv_id}', 1, '{escaped_title}', '{now}', '{now}') RETURNING id, title, created_at, updated_at;"
+        
+        app.logger.info(f"Executing SQL: {query}")
         
         # Execute using psql
         result = subprocess.run([
             'psql', database_url, '-c', query, '-t', '--csv'
         ], capture_output=True, text=True)
         
+        app.logger.info(f"psql return code: {result.returncode}")
+        app.logger.info(f"psql stdout: {result.stdout}")
+        app.logger.info(f"psql stderr: {result.stderr}")
+        
         if result.returncode == 0 and result.stdout.strip():
-            parts = result.stdout.strip().split(',')
+            lines = result.stdout.strip().split('\n')
+            # Take first line which contains the data, ignore INSERT statement
+            data_line = lines[0] if lines else ""
+            parts = data_line.split(',')
             if len(parts) >= 4:
                 conversation = {
                     "id": parts[0].strip(),
@@ -932,7 +946,7 @@ def create_conversation():
                 app.logger.info(f"Created new conversation: {conv_id}")
                 return jsonify(conversation)
         
-        app.logger.error(f"Failed to create conversation: {result.stderr}")
+        app.logger.error(f"Failed to create conversation - return code: {result.returncode}, stderr: {result.stderr}")
         return jsonify({"error": "Failed to create conversation"}), 500
         
     except Exception as e:
@@ -943,13 +957,61 @@ def create_conversation():
 def get_conversation(conversation_id):
     # Fetch specific conversation with messages from database
     try:
-        from db_utils import get_conversation_with_messages
+        import subprocess
+        import os
         
-        conversation = get_conversation_with_messages(conversation_id)
-        if conversation:
-            return jsonify(conversation)
-        else:
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            return jsonify({"error": "Database connection failed"}), 500
+        
+        # First get conversation details
+        conv_query = f"SELECT id, title, created_at, updated_at FROM conversations WHERE id = '{conversation_id}' AND user_id = 1"
+        conv_result = subprocess.run([
+            'psql', database_url, '-c', conv_query, '-t', '--csv'
+        ], capture_output=True, text=True)
+        
+        if conv_result.returncode != 0 or not conv_result.stdout.strip():
             return jsonify({"error": "Conversation not found"}), 404
+        
+        conv_parts = conv_result.stdout.strip().split(',')
+        if len(conv_parts) < 4:
+            return jsonify({"error": "Conversation not found"}), 404
+        
+        # Get messages for this conversation
+        msg_query = f"SELECT id, role, content, displays, timestamp FROM messages WHERE conversation_id = '{conversation_id}' ORDER BY timestamp ASC"
+        msg_result = subprocess.run([
+            'psql', database_url, '-c', msg_query, '-t', '--csv'
+        ], capture_output=True, text=True)
+        
+        messages = []
+        if msg_result.returncode == 0 and msg_result.stdout.strip():
+            lines = msg_result.stdout.strip().split('\n')
+            for line in lines:
+                if line.strip():
+                    msg_parts = line.split(',')
+                    if len(msg_parts) >= 5:
+                        try:
+                            displays = json.loads(msg_parts[3]) if msg_parts[3] and msg_parts[3] != '\\N' else []
+                        except:
+                            displays = []
+                        
+                        messages.append({
+                            "id": msg_parts[0].strip(),
+                            "role": msg_parts[1].strip(),
+                            "content": msg_parts[2].strip(),
+                            "displays": displays,
+                            "timestamp": msg_parts[4].strip() + "Z" if msg_parts[4].strip() != '\\N' else None
+                        })
+        
+        conversation = {
+            "id": conv_parts[0].strip(),
+            "title": conv_parts[1].strip(),
+            "createdAt": conv_parts[2].strip() + "Z" if conv_parts[2].strip() != '\\N' else None,
+            "updatedAt": conv_parts[3].strip() + "Z" if conv_parts[3].strip() != '\\N' else None,
+            "messages": messages
+        }
+        
+        return jsonify(conversation)
         
     except Exception as e:
         app.logger.error(f"Error fetching conversation {conversation_id}: {e}")
@@ -1075,10 +1137,32 @@ def send_message_to_conversation(conversation_id):
             except Exception as e:
                 app.logger.error(f"Error extracting displays: {e}")
         
-        # Return in format expected by frontend
-        import uuid
+        # Save messages to database and return in frontend format
         user_msg_id = str(uuid.uuid4())
         assistant_msg_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat()
+        
+        # Save user message to database
+        escaped_user_content = user_content.replace("'", "''")
+        user_msg_query = f"INSERT INTO messages (id, conversation_id, role, content, timestamp) VALUES ('{user_msg_id}', '{conversation_id}', 'user', '{escaped_user_content}', '{now}')"
+        subprocess.run(['psql', database_url, '-c', user_msg_query], capture_output=True)
+        
+        # Save assistant message to database
+        escaped_final_answer = final_answer.replace("'", "''")
+        displays_json = json.dumps(displays).replace("'", "''")
+        assistant_msg_query = f"INSERT INTO messages (id, conversation_id, role, content, displays, timestamp) VALUES ('{assistant_msg_id}', '{conversation_id}', 'assistant', '{escaped_final_answer}', '{displays_json}', '{now}')"
+        subprocess.run(['psql', database_url, '-c', assistant_msg_query], capture_output=True)
+        
+        # Update conversation updated_at timestamp
+        update_conv_query = f"UPDATE conversations SET updated_at = '{now}' WHERE id = '{conversation_id}'"
+        subprocess.run(['psql', database_url, '-c', update_conv_query], capture_output=True)
+        
+        # Update conversation title if it's the first user message
+        if len(conversation_history) == 0:  # This was the first message
+            title = user_content[:30] + "..." if len(user_content) > 30 else user_content
+            escaped_title = title.replace("'", "''")
+            title_query = f"UPDATE conversations SET title = '{escaped_title}' WHERE id = '{conversation_id}'"
+            subprocess.run(['psql', database_url, '-c', title_query], capture_output=True)
         
         # Only create display for explicit table requests, not casual mentions
         app.logger.info(f"Pre-emergency check: displays={len(displays)}, user_message='{user_message_text}', final_answer preview='{final_answer[:50] if final_answer else 'None'}'")
