@@ -854,37 +854,155 @@ def get_user():
 
 @app.route('/api/conversations', methods=['GET'])
 def get_conversations():
-    # Simple mock conversations list
-    return jsonify([
-        {
-            "id": "conv-1",
-            "title": "New Conversation",
-            "createdAt": "2025-06-23T21:00:00Z",
-            "updatedAt": "2025-06-23T21:00:00Z"
-        }
-    ])
+    # Connect to PostgreSQL and fetch actual conversations
+    try:
+        import psycopg2
+        import os
+        
+        # Use the same DATABASE_URL as the Node.js server
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            app.logger.error("DATABASE_URL not found")
+            return jsonify([]), 500
+            
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Query conversations for user_id 1 (default user)
+        cur.execute("""
+            SELECT id, title, created_at, updated_at 
+            FROM conversations 
+            WHERE user_id = 1 
+            ORDER BY updated_at DESC
+        """)
+        
+        conversations = []
+        for row in cur.fetchall():
+            conversations.append({
+                "id": row[0],
+                "title": row[1],
+                "createdAt": row[2].isoformat() + "Z" if row[2] else None,
+                "updatedAt": row[3].isoformat() + "Z" if row[3] else None
+            })
+        
+        cur.close()
+        conn.close()
+        
+        app.logger.info(f"Retrieved {len(conversations)} conversations from database")
+        return jsonify(conversations)
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching conversations: {e}")
+        return jsonify([]), 500
 
 @app.route('/api/conversations', methods=['POST'])
 def create_conversation():
-    # Create a new conversation with generated ID
-    import uuid
-    conv_id = str(uuid.uuid4())
-    return jsonify({
-        "id": conv_id,
-        "title": "New Conversation",
-        "createdAt": "2025-06-23T21:00:00Z",
-        "updatedAt": "2025-06-23T21:00:00Z"
-    })
+    # Create a new conversation in the database
+    try:
+        import psycopg2
+        import uuid
+        import os
+        from datetime import datetime
+        
+        data = request.get_json()
+        title = data.get('title', 'New Conversation')
+        conv_id = str(uuid.uuid4())
+        
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            app.logger.error("DATABASE_URL not found")
+            return jsonify({"error": "Database connection failed"}), 500
+            
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Insert new conversation for user_id 1 (default user)
+        cur.execute("""
+            INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING id, title, created_at, updated_at
+        """, (conv_id, 1, title, datetime.utcnow(), datetime.utcnow()))
+        
+        row = cur.fetchone()
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        conversation = {
+            "id": row[0],
+            "title": row[1],
+            "createdAt": row[2].isoformat() + "Z",
+            "updatedAt": row[3].isoformat() + "Z"
+        }
+        
+        app.logger.info(f"Created new conversation: {conv_id}")
+        return jsonify(conversation)
+        
+    except Exception as e:
+        app.logger.error(f"Error creating conversation: {e}")
+        return jsonify({"error": "Failed to create conversation"}), 500
 
 @app.route('/api/conversations/<conversation_id>', methods=['GET'])
 def get_conversation(conversation_id):
-    # Return the conversation details
-    return jsonify({
-        "id": conversation_id,
-        "title": "New Conversation",
-        "createdAt": "2025-06-23T21:00:00Z",
-        "updatedAt": "2025-06-23T21:00:00Z"
-    })
+    # Fetch specific conversation from database
+    try:
+        import psycopg2
+        import os
+        
+        database_url = os.getenv('DATABASE_URL')
+        if not database_url:
+            return jsonify({"error": "Database connection failed"}), 500
+            
+        conn = psycopg2.connect(database_url)
+        cur = conn.cursor()
+        
+        # Query specific conversation
+        cur.execute("""
+            SELECT id, title, created_at, updated_at 
+            FROM conversations 
+            WHERE id = %s AND user_id = 1
+        """, (conversation_id,))
+        
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return jsonify({"error": "Conversation not found"}), 404
+            
+        # Fetch messages for this conversation
+        cur.execute("""
+            SELECT id, role, content, displays, timestamp
+            FROM messages 
+            WHERE conversation_id = %s 
+            ORDER BY timestamp ASC
+        """, (conversation_id,))
+        
+        messages = []
+        for msg_row in cur.fetchall():
+            messages.append({
+                "id": msg_row[0],
+                "role": msg_row[1],
+                "content": msg_row[2],
+                "displays": msg_row[3] or [],
+                "timestamp": msg_row[4].isoformat() + "Z" if msg_row[4] else None
+            })
+        
+        conversation = {
+            "id": row[0],
+            "title": row[1],
+            "createdAt": row[2].isoformat() + "Z" if row[2] else None,
+            "updatedAt": row[3].isoformat() + "Z" if row[3] else None,
+            "messages": messages
+        }
+        
+        cur.close()
+        conn.close()
+        
+        return jsonify(conversation)
+        
+    except Exception as e:
+        app.logger.error(f"Error fetching conversation {conversation_id}: {e}")
+        return jsonify({"error": "Failed to fetch conversation"}), 500
 
 @app.route('/api/conversations/<conversation_id>/messages', methods=['GET'])
 def get_conversation_messages(conversation_id):
