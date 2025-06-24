@@ -146,16 +146,7 @@ export function Sidebar({ isOpen, onClose, onNewChat }: SidebarProps) {
               <Trash2 className="text-neutral-400 mr-2 h-4 w-4" />
               <span>Clear conversations</span>
             </Button>
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start px-3 py-2 text-neutral-600"
-              onClick={() => {
-                window.location.href = "/api/logout";
-              }}
-            >
-              <LogOut className="text-neutral-400 mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </Button>
+            <LogoutButton />
           </div>
         </div>
       </aside>
