@@ -84,12 +84,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return response.json();
     },
     onSuccess: () => {
+      console.log('Logout successful - clearing cache and redirecting');
       queryClient.setQueryData(["/api/user"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       // Clear all cached data and navigate to landing page
       queryClient.clear();
       // Force a full page reload to ensure clean state
-      window.location.replace('/');
+      setTimeout(() => {
+        console.log('Redirecting to landing page');
+        window.location.replace('/');
+      }, 200);
     },
     onError: (error: Error) => {
       console.error('Logout error:', error);

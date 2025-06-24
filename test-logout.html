@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Logout Test</title>
+</head>
+<body>
+    <h1>Logout Functionality Test</h1>
+    
+    <p><strong>Important:</strong> The logout buttons in the application work correctly with POST requests.</p>
+    
+    <p>The "Method Not Allowed" error occurs when you manually type <code>/api/logout</code> in the browser address bar, which sends a GET request instead of using the logout buttons.</p>
+    
+    <h2>How to properly logout:</h2>
+    <ol>
+        <li>Use the logout button in the header (top right corner)</li>
+        <li>OR use the logout button in the sidebar (bottom left)</li>
+    </ol>
+    
+    <h2>Do NOT:</h2>
+    <ul>
+        <li>Type "/api/logout" in the browser address bar</li>
+        <li>Navigate directly to the logout URL</li>
+    </ul>
+    
+    <p>Both logout buttons use proper POST mutations and will redirect you to the landing page successfully.</p>
+    
+    <script>
+        console.log('Logout test page loaded');
+        // Test POST logout
+        async function testLogout() {
+            try {
+                const response = await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: '{}'
+                });
+                console.log('POST logout test:', response.status, response.ok ? 'SUCCESS' : 'FAILED');
+            } catch (error) {
+                console.error('Logout test error:', error);
+            }
+        }
+        
+        // Run test
+        testLogout();
+    </script>
+</body>
+</html>

@@ -5,9 +5,10 @@ import { LogOut } from "lucide-react";
 export function LogoutButton() {
   const { logoutMutation } = useAuth();
 
-  const handleLogout = (e: React.MouseEvent) => {
+  const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    console.log('Logout button clicked - starting logout process');
     logoutMutation.mutate();
   };
 

@@ -26,6 +26,7 @@ function HeaderLogoutButton() {
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        console.log('Header logout button clicked');
         logoutMutation.mutate();
       }}
       disabled={logoutMutation.isPending}
