@@ -23,11 +23,25 @@ All API endpoints support credential injection, allowing external applications t
 
 ## API Endpoints
 
-### 1. Natural Language Data Query
+### 1. Intelligent Query Router
 
 **Endpoint:** `POST /api/v1/data/query`
 
-Transform natural language questions into intelligent data responses with actual table displays.
+**Smart API that automatically determines the best processing method** - routes table discovery, direct SQL, or AI analysis based on query content.
+
+#### How It Works
+
+The intelligent router analyzes your query and automatically selects the optimal processing method:
+
+- **Table Discovery:** Queries like "show me tables", "list tables" → Routes to table listing
+- **Direct SQL:** Queries starting with SELECT, CREATE, INSERT → Routes to SQL execution  
+- **Natural Language AI:** Business questions → Routes through Gemini AI processing
+
+#### Benefits
+
+- **Single Endpoint:** Use one API for all query types
+- **Automatic Optimization:** No need to choose which endpoint to call
+- **Route Transparency:** Response shows which method was used and why
 
 #### Request Format
 ```json
@@ -40,11 +54,12 @@ Transform natural language questions into intelligent data responses with actual
 }
 ```
 
-#### Response Format
+#### Intelligent Router Response Format
 ```json
 {
   "success": true,
   "query": "Show me Balay Kreative customer analytics", 
+  "route_used": "nlp",
   "response": "I found your Balay Kreative customer data! Here are the analytics:",
   "data": [
     {
@@ -57,13 +72,6 @@ Transform natural language questions into intelligent data responses with actual
           "revenue": 1250,
           "signup_date": "2024-06-15",
           "campaign_source": "Google Ads"
-        },
-        {
-          "customer_id": "124", 
-          "customer_name": "Sarah Johnson",
-          "revenue": 890,
-          "signup_date": "2024-06-14",
-          "campaign_source": "Facebook"
         }
       ]
     }
@@ -71,6 +79,8 @@ Transform natural language questions into intelligent data responses with actual
   "timestamp": "2025-06-25T19:30:00.000Z"
 }
 ```
+
+**Note:** The `route_used` field shows which processing method was automatically selected: `"tables"`, `"sql"`, or `"nlp"`.
 
 #### Supported Query Types
 
