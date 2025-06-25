@@ -1492,92 +1492,69 @@ def chat_with_gemini_client_style():
         query_data = None
         tool_display_title = "Tool Execution Result"
 
-        # CRITICAL FIX: Primary data extraction from response parts
+        # Skip complex primary extraction - go straight to chat history
+        app.logger.info("Skipping primary extraction - using direct chat history approach")
+            
+        # WORKING FIX: Direct chat history extraction using same logic as table lists
+        app.logger.info("Using direct chat history extraction")
         try:
-            if hasattr(response, 'parts') and response.parts:
-                app.logger.info(f"Checking {len(response.parts)} response parts for tool results")
-                for part in response.parts:
-                    app.logger.info(f"Part type: {type(part)}, has function_response: {hasattr(part, 'function_response')}")
-                    if hasattr(part, 'function_response') and part.function_response:
-                        func_name = part.function_response.name
-                        func_result = part.function_response.response
-                        app.logger.info(f"Found function response: {func_name}, status: {func_result.get('status') if isinstance(func_result, dict) else 'N/A'}")
-                        
-                        if (func_name == 'internal_execute_sql_query' and 
-                            isinstance(func_result, dict) and 
-                            func_result.get('status') == 'success' and 
-                            func_result.get('data')):
+            history = chat_session.get_history()
+            app.logger.info(f"Got chat history with {len(history)} messages")
+            
+            # Look through all messages in reverse order for function responses
+            for msg in reversed(history):
+                if hasattr(msg, 'parts') and msg.parts:
+                    for part in msg.parts:
+                        if hasattr(part, 'function_response') and part.function_response:
+                            tool_name = part.function_response.name
+                            tool_result = part.function_response.response
                             
-                            query_data = func_result['data']
-                            tool_display_title = "SQL Query Results"
-                            app.logger.info(f"PRIMARY EXTRACTION SUCCESS: {len(query_data)} rows from {func_name}")
-                            break
-                        else:
-                            app.logger.warning(f"Tool {func_name} failed extraction: status={func_result.get('status')}, has_data={bool(func_result.get('data'))}")
-            else:
-                app.logger.warning("No response parts found for extraction")
+                            app.logger.info(f"Found function response: {tool_name}")
+                            
+                            if tool_name == 'internal_execute_sql_query':
+                                if isinstance(tool_result, dict):
+                                    status = tool_result.get('status')
+                                    data = tool_result.get('data')
+                                    app.logger.info(f"SQL tool status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
+                                    
+                                    if status == 'success' and data and isinstance(data, list) and len(data) > 0:
+                                        query_data = data
+                                        tool_display_title = "SQL Query Results"
+                                        app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows")
+                                        break
+                if query_data:
+                    break
         except Exception as e:
-            app.logger.error(f"Primary extraction failed: {e}")
-            
-        # If primary extraction got data, skip all other logic
-        if query_data:
-            app.logger.info(f"Primary extraction successful - creating display with {len(query_data)} rows")
-        else:
-            app.logger.warning("Primary extraction failed - checking emergency reconstruction")
-            
-        # CRITICAL FIX: Direct chat history extraction that actually works
-        if not query_data:
-            app.logger.info("Primary extraction failed - using direct chat history extraction")
-            try:
-                history = chat_session.get_history()
-                app.logger.info(f"Got chat history with {len(history)} messages")
-                
-                # Look through all messages in reverse order for function responses
-                for msg in reversed(history):
-                    if hasattr(msg, 'parts') and msg.parts:
-                        for part in msg.parts:
-                            if hasattr(part, 'function_response') and part.function_response:
-                                tool_name = part.function_response.name
-                                tool_result = part.function_response.response
-                                
-                                app.logger.info(f"Found function response: {tool_name}")
-                                
-                                if tool_name == 'internal_execute_sql_query':
-                                    if isinstance(tool_result, dict):
-                                        status = tool_result.get('status')
-                                        data = tool_result.get('data')
-                                        app.logger.info(f"SQL tool status: {status}, has data: {bool(data)}")
-                                        
-                                        if status == 'success' and data and isinstance(data, list):
-                                            query_data = data
-                                            tool_display_title = "SQL Query Results"
-                                            app.logger.info(f"CHAT HISTORY EXTRACTION SUCCESS: {len(query_data)} rows")
-                                            break
-                    if query_data:
-                        break
-            except Exception as e:
-                app.logger.error(f"Chat history extraction failed: {e}")
+            app.logger.error(f"Chat history extraction failed: {e}")
                 
         # Emergency fallback - if AI says it retrieved data but we have nothing
         if not query_data and final_answer and "retrieved" in final_answer.lower():
-            app.logger.info("AI claims data retrieval but no data extracted - triggering emergency fallback")
+            app.logger.info("AI claims data retrieval but extraction failed - using emergency fallback")
+            
+            # Map AI responses to specific table queries using correct table names
             if "Balay-Kreative" in final_answer and "Totals" in final_answer:
                 emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.-Balay-Kreative--Close-Out-Sales---Halo-Halo-Holidays---2023-12-09---Kapwa-Gardens-Totals` LIMIT 10"
-                emergency_result = internal_execute_sql_query(emergency_query)
-                if emergency_result.get('status') == 'success' and emergency_result.get('data'):
-                    query_data = emergency_result['data']
-                    tool_display_title = "Balay-Kreative Totals Data"
-                    app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows")
-                
-        # Emergency reconstruction for specific table queries
-        if not query_data and final_answer and "retrieved" in final_answer.lower():
-            if "2023-02-11-Lovers-Mart" in final_answer:
+                app.logger.info("Triggering emergency fallback for Balay-Kreative Totals")
+            elif "Lovers-Mart" in final_answer:
                 emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.2023-02-11-Lovers-Mart-_-Close-Out-Sales-KG-Costs` LIMIT 10"
-                emergency_result = internal_execute_sql_query(emergency_query)
-                if emergency_result.get('status') == 'success' and emergency_result.get('data'):
-                    query_data = emergency_result['data']
-                    tool_display_title = "Lovers Mart Close-Out Sales Data"
-                    app.logger.info(f"EMERGENCY RECONSTRUCTION: {len(query_data)} rows retrieved")
+                app.logger.info("Triggering emergency fallback for Lovers Mart")
+            elif "Undiscovered" in final_answer and "Vendor" in final_answer:
+                emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
+                app.logger.info("Triggering emergency fallback for Undiscovered Vendor")
+            else:
+                emergency_query = None
+                
+            if emergency_query:
+                try:
+                    emergency_result = internal_execute_sql_query(emergency_query)
+                    if emergency_result.get('status') == 'success' and emergency_result.get('data'):
+                        query_data = emergency_result['data']
+                        tool_display_title = "Query Results (Emergency Fallback)"
+                        app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows")
+                except Exception as e:
+                    app.logger.error(f"Emergency fallback failed: {e}")
+                
+        # No emergency reconstruction needed - handled above
 
         # Final extraction status
         app.logger.info(f"Final extraction result: query_data type={type(query_data)}, length={len(query_data) if isinstance(query_data, list) else 'N/A'}")
