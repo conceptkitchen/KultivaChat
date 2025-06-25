@@ -210,7 +210,7 @@ def handle_chat():
 ```javascript
 // In your other product
 async function queryKultivatAI(question) {
-  const response = await fetch('https://your-kultivate-ai.replit.app/api/v1/data/query', {
+  const response = await fetch('https://Kultivate-chat-ck.replit.app/api/v1/data/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -236,7 +236,7 @@ console.log(result.data); // Actual table data
 
 ```javascript
 async function executeSQLQuery(sql) {
-  const response = await fetch('https://your-kultivate-ai.replit.app/api/v1/data/sql', {
+  const response = await fetch('https://Kultivate-chat-ck.replit.app/api/v1/data/sql', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -258,7 +258,7 @@ const customers = await executeSQLQuery("SELECT * FROM balay_kreative_customers 
 
 ```javascript
 async function getAvailableTables() {
-  const response = await fetch('https://your-kultivate-ai.replit.app/api/v1/data/tables', {
+  const response = await fetch('https://Kultivate-chat-ck.replit.app/api/v1/data/tables', {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

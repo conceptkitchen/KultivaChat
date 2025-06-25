@@ -132,10 +132,128 @@ function startServer() {
     }
   });
 
+  // API v1 endpoints for external products
+  app.post('/api/v1/data/query', async (req: Request, res: Response) => {
+    try {
+      const { query, credentials } = req.body;
+      
+      if (!query) {
+        return res.status(400).json({ error: 'Query parameter required' });
+      }
+
+      if (!pythonBackend.isBackendReady()) {
+        return res.status(503).json({ error: 'Backend starting up...' });
+      }
+      
+      const response = await fetch('http://localhost:8081/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: query,
+          api_mode: true,
+          credentials: credentials
+        })
+      });
+      
+      const data = await response.json();
+      
+      res.json({
+        success: true,
+        query: query,
+        response: data.reply,
+        data: data.displays || [],
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  app.post('/api/v1/data/sql', async (req: Request, res: Response) => {
+    try {
+      const { sql, credentials } = req.body;
+      
+      if (!sql) {
+        return res.status(400).json({ error: 'SQL query required' });
+      }
+
+      if (!pythonBackend.isBackendReady()) {
+        return res.status(503).json({ error: 'Backend starting up...' });
+      }
+      
+      const response = await fetch('http://localhost:8081/api/execute_sql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sql_query: sql,
+          credentials: credentials
+        })
+      });
+      
+      const result = await response.json();
+      
+      res.json({
+        success: result.status === 'success',
+        data: result.data || [],
+        error: result.error_message || null,
+        rows_returned: result.data ? result.data.length : 0,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
+  app.get('/api/v1/data/tables', async (req: Request, res: Response) => {
+    try {
+      const { credentials } = req.body;
+
+      if (!pythonBackend.isBackendReady()) {
+        return res.status(503).json({ error: 'Backend starting up...' });
+      }
+      
+      const response = await fetch('http://localhost:8081/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: "show me all available tables",
+          api_mode: true,
+          credentials: credentials
+        })
+      });
+      
+      const data = await response.json();
+      
+      res.json({
+        success: true,
+        tables: data.displays || [],
+        total_tables: data.displays ? data.displays.length : 0,
+        timestamp: new Date().toISOString()
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   // Proxy for backend API routes (simplified) - but skip conversation messages
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    // Skip if this is auth or conversation messages endpoint
-    if (req.path.startsWith('/auth/') || req.path.includes('/conversations/') && req.path.includes('/messages')) {
+    // Skip if this is auth, API v1, or conversation messages endpoint
+    if (req.path.startsWith('/auth/') || req.path.startsWith('/v1/') || req.path.includes('/conversations/') && req.path.includes('/messages')) {
       return next();
     }
 

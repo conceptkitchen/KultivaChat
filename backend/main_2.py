@@ -1273,6 +1273,34 @@ def query_data_endpoint():
         return jsonify(result), 500
     return jsonify(result)
 
+@app.route('/api/execute_sql', methods=['POST'])
+def execute_sql_direct():
+    """Direct SQL execution for API consumers"""
+    try:
+        data = request.json
+        sql_query = data.get('sql_query')
+        credentials = data.get('credentials', {})
+        
+        if not sql_query:
+            return jsonify({'status': 'error', 'error_message': 'SQL query required'})
+        
+        # Update environment with provided credentials if available
+        if credentials:
+            for key, value in credentials.items():
+                if value:  # Only set non-empty values
+                    os.environ[key] = str(value)
+        
+        # Execute SQL using existing function
+        result = internal_execute_sql_query(sql_query)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'error',
+            'error_message': str(e)
+        })
+
 
 # --- CHAT ENDPOINT using genai.Client and Automatic Function Calling ---
 @app.route('/api/chat', methods=['POST'])
