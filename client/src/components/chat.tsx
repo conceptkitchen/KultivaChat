@@ -53,24 +53,23 @@ export function Chat({ conversation }: ChatProps) {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
-      const response = await fetch('/api/chat', {
+      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: content,
-          conversation_history: []
+          message: content
         })
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     },
     onSuccess: (data) => {
-      const displays = data.display ? [data.display] : (data.displays || []);
+      const displays = data.displays || [];
       
       const assistantMessage: Message = {
         id: uuidv4(),
         role: 'assistant',
-        content: data.reply || data.final_answer || "No response",
+        content: data.reply || "No response",
         displays: displays,
         timestamp: new Date(),
       };

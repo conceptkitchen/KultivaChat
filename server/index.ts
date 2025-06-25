@@ -91,9 +91,50 @@ function startServer() {
     res.redirect('/');
   });
 
+  // Handle conversation message endpoint specifically to prevent message duplication
+  app.post('/api/conversations/:id/messages', async (req: Request, res: Response) => {
+    if (!pythonBackend.isBackendReady()) {
+      return res.status(503).json({ error: 'Backend starting up...' });
+    }
+
+    const { message } = req.body;
+    const conversationId = req.params.id;
+    
+    const targetUrl = `http://localhost:8081/api/chat`;
+    const options: RequestInit = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        conversation_id: conversationId
+      })
+    };
+
+    console.log(`[Proxy] POST ${req.path} -> ${targetUrl}`);
+    
+    try {
+      const response = await fetch(targetUrl, options);
+      const text = await response.text();
+      console.log(`[Proxy] Backend response: ${response.status} ${text.substring(0, 200)}...`);
+      
+      const data = JSON.parse(text);
+      // Only return AI response, not user message to prevent duplication
+      res.status(response.status).json({
+        reply: data.reply,
+        displays: data.displays || []
+      });
+    } catch (error) {
+      console.error(`[Proxy Error]:`, error);
+      res.status(503).json({ error: 'Backend connection failed' });
+    }
+  });
+
   // Proxy for backend API routes (simplified)
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith('/auth/')) {
+    if (req.path.startsWith('/auth/') || req.path.includes('/messages')) {
       return next();
     }
 
