@@ -74,9 +74,11 @@ export function Chat({ conversation }: ChatProps) {
         timestamp: new Date(),
       };
 
-      setMessages(prev => 
-        prev.filter(msg => !msg.isLoading).concat([assistantMessage])
-      );
+      // Remove loading messages and add only the assistant response
+      setMessages(prev => {
+        const withoutLoading = prev.filter(msg => !msg.isLoading);
+        return [...withoutLoading, assistantMessage];
+      });
       setIsProcessing(false);
     },
     onError: (error) => {
@@ -95,9 +97,9 @@ export function Chat({ conversation }: ChatProps) {
     
     const trimmedContent = content.trim();
     
-    // Prevent duplicate messages
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.role === "user" && lastMessage.content === trimmedContent) {
+    // Prevent duplicate messages - check if last non-loading message is same
+    const lastUserMessage = messages.filter(msg => msg.role === "user").pop();
+    if (lastUserMessage && lastUserMessage.content === trimmedContent) {
       return;
     }
     
@@ -118,6 +120,7 @@ export function Chat({ conversation }: ChatProps) {
       isLoading: true,
     };
     
+    // Add user message and loading indicator
     setMessages(prev => [...prev, userMessage, loadingMessage]);
     sendMessageMutation.mutate(trimmedContent);
   };
