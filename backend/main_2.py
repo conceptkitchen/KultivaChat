@@ -1954,25 +1954,194 @@ def chat_with_gemini_client_style():
 
 @app.route('/api/v1/data/query', methods=['POST'])
 def api_v1_data_query():
-    """Natural language data query endpoint for external integration"""
+    """Intelligent query router - automatically determines which API method to use"""
     try:
         data = request.get_json()
         if not data:
             return jsonify({"success": False, "error": "No JSON data provided"}), 400
         
-        query = data.get('query', '')
+        query = data.get('query', '').lower().strip()
+        credentials = data.get('credentials', {})
+        
         if not query:
             return jsonify({"success": False, "error": "Query parameter is required"}), 400
         
-        app.logger.info(f"API v1 Natural Language Query: {query}")
+        app.logger.info(f"API v1 Intelligent Query Router: {query}")
         
-        # Use the same chat processing logic but format for API response
-        user_message_text = query
-        conversation_id = "api_v1_query"
+        # Smart routing logic based on query content
+        route_decision = determine_query_route(query)
+        app.logger.info(f"Route decision: {route_decision}")
         
-        # Process the query using existing chat logic
+        if route_decision['route'] == 'tables':
+            # Route to table discovery
+            app.logger.info("Routing to table discovery endpoint")
+            return handle_table_discovery_request(credentials)
+            
+        elif route_decision['route'] == 'sql':
+            # Route to direct SQL execution
+            app.logger.info(f"Routing to SQL execution: {route_decision['sql_query']}")
+            return handle_direct_sql_request(route_decision['sql_query'], credentials)
+            
+        else:
+            # Route to natural language processing
+            app.logger.info("Routing to natural language AI processing")
+            return handle_natural_language_request(query, credentials)
+        
+    except Exception as e:
+        app.logger.error(f"Error in intelligent query router: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+def determine_query_route(query):
+    """Determine which API route to use based on query content"""
+    
+    # Table discovery patterns
+    table_patterns = [
+        'show me tables', 'list tables', 'what tables', 'available tables',
+        'show tables', 'display tables', 'table list', 'all tables',
+        'what data do i have', 'show my data', 'data available'
+    ]
+    
+    # Check for table discovery requests first
+    if any(pattern in query for pattern in table_patterns):
+        return {'route': 'tables', 'reason': 'Table discovery request detected'}
+    
+    # Direct SQL patterns - must start with SQL keywords for accurate detection
+    sql_start_patterns = [
+        'select ', 'SELECT ', 'with ', 'WITH ', 'create ', 'CREATE ',
+        'insert ', 'INSERT ', 'update ', 'UPDATE ', 'delete ', 'DELETE '
+    ]
+    
+    # Check for direct SQL queries - must start with SQL keywords
+    if any(query.strip().startswith(pattern.strip()) for pattern in sql_start_patterns):
+        # Extract and clean the SQL query
+        sql_query = query.strip()
+        # Remove common prefixes
+        prefixes = ['execute ', 'run ', 'query ']
+        for prefix in prefixes:
+            if sql_query.startswith(prefix):
+                sql_query = sql_query[len(prefix):].strip()
+        
+        return {
+            'route': 'sql',
+            'sql_query': sql_query,
+            'reason': 'Direct SQL query detected'
+        }
+    
+    # Default to natural language processing for business queries
+    return {'route': 'nlp', 'reason': 'Natural language query requiring AI processing'}
+
+
+def handle_table_discovery_request(credentials):
+    """Handle table discovery requests"""
+    try:
+        table_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+        result = internal_execute_sql_query(table_query)
+        
+        if result.get('status') == 'success':
+            tables_data = result.get('data', [])
+            
+            # Format tables for better display
+            formatted_tables = []
+            for table in tables_data:
+                table_name = table.get('table_name', '')
+                business_area = "Unknown"
+                data_type = "General"
+                
+                if "Balay-Kreative" in table_name:
+                    business_area = "Balay Kreative"
+                    if "attendees" in table_name.lower():
+                        data_type = "Event Attendees"
+                    elif "sales" in table_name.lower() or "orders" in table_name.lower():
+                        data_type = "Sales Data"
+                elif "Kapwa-Gardens" in table_name:
+                    business_area = "Kapwa Gardens"
+                    data_type = "Market Data"
+                elif "Undiscovered" in table_name:
+                    business_area = "Undiscovered"
+                    if "Vendor" in table_name:
+                        data_type = "Vendor Data"
+                
+                formatted_tables.append({
+                    "Business Area": business_area,
+                    "Data Type": data_type,
+                    "Table Name": table_name,
+                    "Description": f"{business_area} {data_type.lower()}"
+                })
+            
+            return jsonify({
+                "success": True,
+                "query": "Table discovery request",
+                "response": f"Found {len(formatted_tables)} available data tables across your business areas.",
+                "data": [{
+                    "type": "table",
+                    "title": "Available Data Tables",
+                    "content": formatted_tables
+                }],
+                "route_used": "tables",
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": result.get('error', 'Failed to retrieve tables'),
+                "route_used": "tables",
+                "timestamp": datetime.now().isoformat()
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Error in table discovery: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "route_used": "tables",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+
+def handle_direct_sql_request(sql_query, credentials):
+    """Handle direct SQL execution requests"""
+    try:
+        result = internal_execute_sql_query(sql_query)
+        
+        if result.get('status') == 'success':
+            query_data = result.get('data', [])
+            return jsonify({
+                "success": True,
+                "query": sql_query,
+                "response": f"SQL query executed successfully. Returned {len(query_data)} rows.",
+                "data": [{
+                    "type": "table",
+                    "title": "SQL Query Results",
+                    "content": query_data
+                }] if query_data else [],
+                "route_used": "sql",
+                "rows_returned": len(query_data) if isinstance(query_data, list) else 0,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": result.get('error', 'SQL execution failed'),
+                "route_used": "sql",
+                "timestamp": datetime.now().isoformat()
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Error in SQL execution: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "route_used": "sql",
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+
+def handle_natural_language_request(query, credentials):
+    """Handle natural language AI processing requests"""
+    try:
         if not GEMINI_SDK_AVAILABLE:
-            return jsonify({"success": False, "error": "Gemini SDK not available"}), 500
+            return jsonify({"success": False, "error": "Gemini SDK not available", "route_used": "nlp"}), 500
         
         # Create chat session using global client
         chat_session = gemini_sdk_client.chats.create(
@@ -1991,7 +2160,7 @@ def api_v1_data_query():
         )
         
         # Send the query
-        response = chat_session.send_message(user_message_text)
+        response = chat_session.send_message(query)
         final_answer = response.text if hasattr(response, 'text') else str(response)
         
         # Extract data using existing logic
@@ -2027,12 +2196,18 @@ def api_v1_data_query():
             "query": query,
             "response": final_answer,
             "data": displays,
+            "route_used": "nlp",
             "timestamp": datetime.now().isoformat()
         })
         
     except Exception as e:
-        app.logger.error(f"Error in /api/v1/data/query: {e}", exc_info=True)
-        return jsonify({"success": False, "error": str(e)}), 500
+        app.logger.error(f"Error in natural language processing: {e}", exc_info=True)
+        return jsonify({
+            "success": False, 
+            "error": str(e), 
+            "route_used": "nlp",
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 
 @app.route('/api/v1/data/sql', methods=['POST'])
