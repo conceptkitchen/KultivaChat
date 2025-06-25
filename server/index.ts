@@ -214,7 +214,7 @@ function startServer() {
     }
   });
 
-  app.get('/api/v1/data/tables', async (req: Request, res: Response) => {
+  app.post('/api/v1/data/tables', async (req: Request, res: Response) => {
     try {
       const { credentials } = req.body;
 
