@@ -74,15 +74,11 @@ export function Chat({ conversation }: ChatProps) {
         timestamp: new Date(),
       };
 
-      // Remove loading messages and add only the assistant response
-      setMessages(prev => {
-        const withoutLoading = prev.filter(msg => !msg.isLoading);
-        return [...withoutLoading, assistantMessage];
-      });
+      // Simply add the assistant response
+      setMessages(prev => [...prev, assistantMessage]);
       setIsProcessing(false);
     },
     onError: (error) => {
-      setMessages(prev => prev.filter(msg => !msg.isLoading));
       setIsProcessing(false);
       toast({
         title: "Error",
@@ -97,9 +93,9 @@ export function Chat({ conversation }: ChatProps) {
     
     const trimmedContent = content.trim();
     
-    // Prevent duplicate messages - check if last non-loading message is same
-    const lastUserMessage = messages.filter(msg => msg.role === "user").pop();
-    if (lastUserMessage && lastUserMessage.content === trimmedContent) {
+    // Prevent duplicate messages
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === "user" && lastMessage.content === trimmedContent) {
       return;
     }
     
@@ -112,16 +108,8 @@ export function Chat({ conversation }: ChatProps) {
       timestamp: new Date(),
     };
     
-    const loadingMessage: Message = {
-      id: uuidv4(),
-      role: "assistant",
-      content: "",
-      timestamp: new Date(),
-      isLoading: true,
-    };
-    
-    // Add user message and loading indicator
-    setMessages(prev => [...prev, userMessage, loadingMessage]);
+    // Add ONLY user message - no loading message to prevent duplication
+    setMessages(prev => [...prev, userMessage]);
     sendMessageMutation.mutate(trimmedContent);
   };
 
@@ -138,7 +126,7 @@ export function Chat({ conversation }: ChatProps) {
             message={message}
           />
         ))}
-        {sendMessageMutation.isPending && <ChatBubbleSkeleton />}
+        {isProcessing && <ChatBubbleSkeleton />}
       </ScrollArea>
 
       <ChatInput 
