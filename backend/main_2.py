@@ -522,6 +522,13 @@ def internal_execute_sql_query(sql_query: str) -> dict:
     Ensure table names are fully qualified: `project_id.dataset_id.table_name`
     (e.g., `kbc-use4-839-261b.WORKSPACE_21894820.YOUR_TABLE_NAME`).
 
+    For in-depth analysis, you can:
+    - Use LIMIT 100 or higher for comprehensive data sets
+    - Perform aggregations (COUNT, SUM, AVG, GROUP BY)
+    - Join multiple tables for complex analysis
+    - Use date ranges and filtering for specific periods
+    - Calculate totals, trends, and statistical insights
+
     Args:
         sql_query (str): The BigQuery SQL SELECT query to execute.
 
@@ -825,8 +832,69 @@ def get_zip_codes_for_city(
     }
 
 
+def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overview") -> dict:
+    """Performs comprehensive data analysis on a specific table with advanced insights.
+    
+    Args:
+        table_name (str): The full table name (e.g., 'Balay-Kreative---attendees---all-orders')
+        analysis_type (str): Type of analysis - 'overview', 'trends', 'aggregations', 'detailed'
+    
+    Returns:
+        dict: Comprehensive analysis results with multiple data perspectives
+    """
+    app.logger.info(f"Tool Call: execute_comprehensive_analysis for {table_name}, type: {analysis_type}")
+    
+    try:
+        full_table_name = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{table_name}`"
+        
+        if analysis_type == "overview":
+            # Get table structure and sample data
+            queries = [
+                f"SELECT COUNT(*) as total_rows FROM {full_table_name}",
+                f"SELECT * FROM {full_table_name} LIMIT 50",
+                f"SELECT column_name, data_type FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.INFORMATION_SCHEMA.COLUMNS` WHERE table_name = '{table_name}'"
+            ]
+        elif analysis_type == "trends":
+            # Time-based analysis
+            queries = [
+                f"SELECT Event_Date, COUNT(*) as count FROM {full_table_name} GROUP BY Event_Date ORDER BY Event_Date",
+                f"SELECT Event_Name, COUNT(*) as attendees FROM {full_table_name} GROUP BY Event_Name ORDER BY attendees DESC LIMIT 20"
+            ]
+        elif analysis_type == "aggregations":
+            # Financial and statistical analysis
+            queries = [
+                f"SELECT SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue, AVG(CAST(Lineitem_price AS FLOAT64)) as avg_price FROM {full_table_name} WHERE Lineitem_price IS NOT NULL AND Lineitem_price != ''",
+                f"SELECT Event_Name, SUM(CAST(Lineitem_price AS FLOAT64)) as event_revenue FROM {full_table_name} WHERE Lineitem_price IS NOT NULL AND Lineitem_price != '' GROUP BY Event_Name ORDER BY event_revenue DESC"
+            ]
+        elif analysis_type == "detailed":
+            # Comprehensive dataset
+            queries = [f"SELECT * FROM {full_table_name} LIMIT 500"]
+        
+        results = []
+        for query in queries:
+            result = internal_execute_sql_query(query)
+            if result.get('status') == 'success':
+                results.append({
+                    'query': query,
+                    'data': result.get('data', []),
+                    'row_count': len(result.get('data', []))
+                })
+        
+        return {
+            "status": "success",
+            "analysis_type": analysis_type,
+            "table_name": table_name,
+            "results": results
+        }
+        
+    except Exception as e:
+        app.logger.error(f"Error in comprehensive analysis: {e}", exc_info=True)
+        return {"status": "error", "error_message": str(e)}
+
+
 gemini_tool_functions_list = [
     internal_execute_sql_query,
+    execute_comprehensive_analysis,
     get_zip_codes_for_city,
     get_current_time
 ]
