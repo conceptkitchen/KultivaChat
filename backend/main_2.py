@@ -1073,10 +1073,10 @@ def send_message_to_conversation(conversation_id):
         
         # Get the request data
         request_data = request.get_json()
-        if not request_data or 'content' not in request_data:
-            return jsonify({"error": "Missing 'content' in JSON payload."}), 400
+        if not request_data or 'message' not in request_data:
+            return jsonify({"error": "Missing 'message' in JSON payload."}), 400
 
-        user_content = request_data['content']
+        user_content = request_data['message']
         
         # Get existing conversation and messages from database
         database_url = os.getenv('DATABASE_URL')
