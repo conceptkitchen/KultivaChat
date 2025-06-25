@@ -96,9 +96,9 @@ export function Chat({ conversation }: ChatProps) {
     
     const trimmedContent = content.trim();
     
-    // Strict duplicate prevention - check last 3 messages
-    const recentUserMessages = messages.slice(-3).filter(msg => msg.role === "user");
-    if (recentUserMessages.some(msg => msg.content === trimmedContent)) {
+    // Prevent exact duplicates from last message only
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === "user" && lastMessage.content === trimmedContent) {
       return;
     }
     

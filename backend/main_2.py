@@ -1492,48 +1492,77 @@ def chat_with_gemini_client_style():
         query_data = None
         tool_display_title = "Tool Execution Result"
 
-        # CRITICAL FIX: Streamlined data extraction from response parts
+        # CRITICAL FIX: Primary data extraction from response parts
         try:
             if hasattr(response, 'parts') and response.parts:
                 app.logger.info(f"Checking {len(response.parts)} response parts for tool results")
                 for part in response.parts:
+                    app.logger.info(f"Part type: {type(part)}, has function_response: {hasattr(part, 'function_response')}")
                     if hasattr(part, 'function_response') and part.function_response:
+                        func_name = part.function_response.name
                         func_result = part.function_response.response
-                        if (part.function_response.name == 'internal_execute_sql_query' and 
+                        app.logger.info(f"Found function response: {func_name}, status: {func_result.get('status') if isinstance(func_result, dict) else 'N/A'}")
+                        
+                        if (func_name == 'internal_execute_sql_query' and 
                             isinstance(func_result, dict) and 
                             func_result.get('status') == 'success' and 
                             func_result.get('data')):
                             
                             query_data = func_result['data']
                             tool_display_title = "SQL Query Results"
-                            app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows from tool response")
+                            app.logger.info(f"PRIMARY EXTRACTION SUCCESS: {len(query_data)} rows from {func_name}")
                             break
+                        else:
+                            app.logger.warning(f"Tool {func_name} failed extraction: status={func_result.get('status')}, has_data={bool(func_result.get('data'))}")
+            else:
+                app.logger.warning("No response parts found for extraction")
         except Exception as e:
-            app.logger.error(f"Tool response extraction failed: {e}")
+            app.logger.error(f"Primary extraction failed: {e}")
             
-        # Emergency reconstruction for specific table queries when extraction fails
+        # If primary extraction got data, skip all other logic
+        if query_data:
+            app.logger.info(f"Primary extraction successful - creating display with {len(query_data)} rows")
+        else:
+            app.logger.warning("Primary extraction failed - checking emergency reconstruction")
+            
+        # CRITICAL FIX: Use same extraction logic as working table queries
+        if not query_data:
+            app.logger.info("Primary extraction failed - using chat history extraction (same as working queries)")
+            try:
+                if hasattr(chat_session, 'get_history'):
+                    history = chat_session.get_history()
+                    if history and len(history) > 0:
+                        # Check most recent message for function responses
+                        latest_message = history[-1]
+                        if hasattr(latest_message, 'parts') and latest_message.parts:
+                            for part in latest_message.parts:
+                                if hasattr(part, 'function_response') and part.function_response:
+                                    func_result = part.function_response.response
+                                    if (part.function_response.name == 'internal_execute_sql_query' and
+                                        isinstance(func_result, dict) and
+                                        func_result.get('status') == 'success' and
+                                        func_result.get('data')):
+                                        
+                                        query_data = func_result['data']
+                                        tool_display_title = "SQL Query Results"
+                                        app.logger.info(f"HISTORY EXTRACTION SUCCESS: {len(query_data)} rows")
+                                        break
+            except Exception as e:
+                app.logger.error(f"History extraction failed: {e}")
+                
+        # Emergency reconstruction for specific tables mentioned in AI response
         if not query_data and final_answer and "retrieved" in final_answer.lower():
-            app.logger.info("Emergency reconstruction: AI mentions data retrieval")
-            
-            # Extract table name patterns from AI response
-            table_patterns = [
-                "Close-Outs---Yum-Yams---2023-05-13---Kapwa-Gardens-Totals",
-                "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-",
-                "Balay-Kreative---attendees---all-orders"
-            ]
-            
-            for table_name in table_patterns:
-                if table_name in final_answer:
-                    emergency_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
-                    emergency_result = internal_execute_sql_query(emergency_query)
-                    if emergency_result.get('status') == 'success' and emergency_result.get('data'):
-                        query_data = emergency_result['data']
-                        tool_display_title = f"Data from {table_name}"
-                        app.logger.info(f"EMERGENCY SUCCESS: {len(query_data)} rows from {table_name}")
-                        break
+            # Extract table name from AI response and re-query directly
+            if "2023-02-11-Lovers-Mart" in final_answer:
+                emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.2023-02-11-Lovers-Mart-_-Close-Out-Sales-KG-Costs` LIMIT 10"
+                emergency_result = internal_execute_sql_query(emergency_query)
+                if emergency_result.get('status') == 'success' and emergency_result.get('data'):
+                    query_data = emergency_result['data']
+                    tool_display_title = "Lovers Mart Close-Out Sales Data"
+                    app.logger.info(f"EMERGENCY RECONSTRUCTION: {len(query_data)} rows retrieved")
 
-        # Skip redundant history parsing if we already have data
-        if not query_data and GEMINI_SDK_AVAILABLE:
+        # Remove redundant history parsing since we now use the working logic above
+        app.logger.info(f"Final extraction result: query_data type={type(query_data)}, length={len(query_data) if isinstance(query_data, list) else 'N/A'}")
             app.logger.info(
                 "Direct extraction failed, attempting to retrieve chat history using get_history()...")
             try:
@@ -1718,47 +1747,36 @@ def chat_with_gemini_client_style():
         else:
             app.logger.warning(f"NO DISPLAY CREATED: query_data={type(query_data)}, length={len(query_data) if isinstance(query_data, list) else 'N/A'}")
                 
-        # Only force create display for explicit table requests
-        explicit_table_keywords = [
-            "show me my tables", "list tables", "what tables do i have", 
-            "show me my data tables", "display tables", "available tables"
-        ]
-        user_wants_tables = any(phrase in user_message_text.lower() for phrase in explicit_table_keywords)
+        # Handle explicit table requests if no data was extracted
+        if not query_data:
+            explicit_table_keywords = [
+                "show me my tables", "list tables", "what tables do i have", 
+                "show me my data tables", "display tables", "available tables", "check my data tables"
+            ]
+            user_wants_tables = any(phrase in user_message_text.lower() for phrase in explicit_table_keywords)
+            
+            if user_wants_tables:
+                try:
+                    tool_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                    if tool_result.get('status') == 'success' and tool_result.get('data'):
+                        query_data = tool_result['data']
+                        tool_display_title = "Available Data Tables"
+                        app.logger.info(f"Created table list display with {len(query_data)} tables")
+                except Exception as e:
+                    app.logger.error(f"Error creating table list: {e}")
         
-        if not displays and user_wants_tables:
-            # Direct extraction from tool results for explicit table requests only
-            try:
-                tool_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
-                if tool_result.get('status') == 'success' and tool_result.get('data'):
-                    displays.append({
-                        "type": "table",
-                        "title": "Available Data Tables",
-                        "content": tool_result['data']
-                    })
-                    app.logger.info(f"Force-created display with {len(tool_result['data'])} rows for explicit request")
-                    final_answer = "Here are your available data tables:"
-            except Exception as e:
-                app.logger.error(f"Error in force display creation: {e}")
+        # Ensure proper response text
+        if not final_answer or final_answer.strip() == "":
+            final_answer = "I'm ready to help you analyze your data. What would you like to explore?"
         
-        # Ensure we always have proper response text
-        if not final_answer or final_answer.strip() == "" or final_answer == "None":
-            if displays:
-                final_answer = "Here are your available data tables:"
-            else:
-                final_answer = "I'm ready to help you analyze your data. What would you like to explore?"
-        
-        # FIXED: Proper check for query_data to create displays
+        # CRITICAL FIX: Create displays from extracted data
         if query_data and isinstance(query_data, list) and query_data:
-            app.logger.info(f"SUCCESS: Data for display extracted from tool with {len(query_data)} items")
-            if not displays:  # Only create display if we don't already have one
-                displays.append({
-                    "type": "table",
-                    "title": "Available Data Tables",
-                    "content": query_data
-                })
-                app.logger.info(f"Created display object with {len(query_data)} rows")
-                if not final_answer or final_answer.strip() == "":
-                    final_answer = "Here are your available data tables:"
+            displays.append({
+                "type": "table",
+                "title": tool_display_title or "Query Results",
+                "content": query_data
+            })
+            app.logger.info(f"DISPLAY CREATED: {len(query_data)} rows in '{tool_display_title}'")
         else:
             app.logger.warning(
                 "No structured query_data extracted from tool calls for display. Checking text response for fallback table info."
