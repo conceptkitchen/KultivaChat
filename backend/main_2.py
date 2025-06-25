@@ -1,5 +1,6 @@
 import os
 import re  # For fallback logic - moved to top
+import uuid
 from flask import Flask, jsonify, request
 from kbcstorage.client import Client as KeboolaStorageClient
 from google.cloud import bigquery
@@ -2140,55 +2141,17 @@ def handle_direct_sql_request(sql_query, credentials):
 def handle_natural_language_request(query, credentials):
     """Handle natural language AI processing requests"""
     try:
-        if not GEMINI_SDK_AVAILABLE:
-            return jsonify({"success": False, "error": "Gemini SDK not available", "route_used": "nlp"}), 500
+        app.logger.info(f"Processing natural language query: {query}")
         
-        # Create chat session using global client without history
-        chat_session = gemini_sdk_client.chats.create(
-            model="gemini-2.0-flash-exp",
-            config=gemini_generation_config_with_tools
-        )
-        
-        # Send the query
-        response = chat_session.send_message(query)
-        final_answer = response.text if hasattr(response, 'text') else str(response)
-        
-        # Extract data using existing logic
-        query_data = []
-        displays = []
-        
-        # Check if response contains function calls or data
-        if hasattr(response, 'candidates') and response.candidates:
-            for candidate in response.candidates:
-                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'function_call'):
-                            # Process function call results
-                            try:
-                                if part.function_call.name == 'internal_execute_sql_query':
-                                    sql_query = part.function_call.args.get('query', '')
-                                    result = internal_execute_sql_query(sql_query)
-                                    if result.get('status') == 'success' and result.get('data'):
-                                        query_data = result['data']
-                            except Exception as e:
-                                app.logger.error(f"Function call processing failed: {e}")
-        
-        # Create display format for API response
-        if query_data and isinstance(query_data, list) and len(query_data) > 0:
-            displays.append({
-                "type": "table",
-                "title": "Query Results",
-                "content": query_data
-            })
-        
+        # For now, return a simplified response directing to working endpoints
+        # This avoids the Gemini SDK initialization issues
         return jsonify({
-            "success": True,
-            "query": query,
-            "response": final_answer,
-            "data": displays,
+            "success": False,
+            "error": "Natural language processing via API v1 route temporarily unavailable. Please use table discovery or direct SQL endpoints.",
             "route_used": "nlp",
+            "suggestion": "Try 'show me tables' for table discovery or use direct SQL queries starting with SELECT",
             "timestamp": datetime.now().isoformat()
-        })
+        }), 503
         
     except Exception as e:
         app.logger.error(f"Error in natural language processing: {e}", exc_info=True)
