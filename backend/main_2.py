@@ -2143,20 +2143,10 @@ def handle_natural_language_request(query, credentials):
         if not GEMINI_SDK_AVAILABLE:
             return jsonify({"success": False, "error": "Gemini SDK not available", "route_used": "nlp"}), 500
         
-        # Create chat session using global client
+        # Create chat session using global client without history
         chat_session = gemini_sdk_client.chats.create(
             model="gemini-2.0-flash-exp",
-            config=gemini_generation_config_with_tools,
-            history=[
-                google_genai_types.Content(
-                    parts=[google_genai_types.Part(text="You are an AI assistant for data analysis.")],
-                    role="model"
-                ),
-                google_genai_types.Content(
-                    parts=[google_genai_types.Part(text="Hello, I'm ready to help with data analysis.")],
-                    role="user"
-                )
-            ]
+            config=gemini_generation_config_with_tools
         )
         
         # Send the query
