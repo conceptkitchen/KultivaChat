@@ -1974,9 +1974,10 @@ def api_v1_data_query():
         if not GEMINI_SDK_AVAILABLE:
             return jsonify({"success": False, "error": "Gemini SDK not available"}), 500
         
-        # Create chat session
-        chat_session = client.chats.create(
-            config=gemini_config,
+        # Create chat session using global client
+        chat_session = gemini_sdk_client.chats.create(
+            model="gemini-2.0-flash-exp",
+            config=gemini_generation_config_with_tools,
             history=[
                 google_genai_types.Content(
                     parts=[google_genai_types.Part(text="You are an AI assistant for data analysis.")],
