@@ -1527,12 +1527,11 @@ def chat_with_gemini_client_style():
             
         # CRITICAL FIX: Use same extraction logic as working table queries
         if not query_data:
-            app.logger.info("Primary extraction failed - using chat history extraction (same as working queries)")
+            app.logger.info("Primary extraction failed - using chat history extraction")
             try:
                 if hasattr(chat_session, 'get_history'):
                     history = chat_session.get_history()
                     if history and len(history) > 0:
-                        # Check most recent message for function responses
                         latest_message = history[-1]
                         if hasattr(latest_message, 'parts') and latest_message.parts:
                             for part in latest_message.parts:
@@ -1550,9 +1549,8 @@ def chat_with_gemini_client_style():
             except Exception as e:
                 app.logger.error(f"History extraction failed: {e}")
                 
-        # Emergency reconstruction for specific tables mentioned in AI response
+        # Emergency reconstruction for specific table queries
         if not query_data and final_answer and "retrieved" in final_answer.lower():
-            # Extract table name from AI response and re-query directly
             if "2023-02-11-Lovers-Mart" in final_answer:
                 emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.2023-02-11-Lovers-Mart-_-Close-Out-Sales-KG-Costs` LIMIT 10"
                 emergency_result = internal_execute_sql_query(emergency_query)
@@ -1563,66 +1561,6 @@ def chat_with_gemini_client_style():
 
         # Final extraction status
         app.logger.info(f"Final extraction result: query_data type={type(query_data)}, length={len(query_data) if isinstance(query_data, list) else 'N/A'}")
-
-
-            except AttributeError as e_attr:
-                app.logger.error(
-                    f"'ChatSession' object (type: {type(chat_session)}) might not have 'get_history' or it failed: {e_attr}. This indicates an API mismatch or an unexpected object type for chat_session."
-                )
-                # CRITICAL FIX: If history parsing fails, trigger the fallback extraction since we know AI got data
-                if not query_data and final_answer and "retrieved" in final_answer.lower():
-                    app.logger.info("History parsing failed but AI says it retrieved data - triggering emergency fallback")
-                    if "Undiscovered-Vendor-Export" in final_answer:
-                        try:
-                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
-                            fallback_result = internal_execute_sql_query(fallback_query)
-                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                                query_data = fallback_result['data']
-                                tool_display_title = "Undiscovered Vendor Export Data"
-                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
-                        except Exception as fallback_error:
-                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
-                    elif "Balay-Kreative" in final_answer:
-                        try:
-                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"
-                            fallback_result = internal_execute_sql_query(fallback_query)
-                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                                query_data = fallback_result['data']
-                                tool_display_title = "Balay-Kreative Attendee Data"
-                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
-                        except Exception as fallback_error:
-                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
-            except Exception as e_hist:
-                app.logger.error(
-                    f"An error occurred while trying to get or process chat history: {e_hist}",
-                    exc_info=True)
-                # CRITICAL FIX: If any history parsing fails, trigger the fallback extraction since we know AI got data
-                if not query_data and final_answer and "retrieved" in final_answer.lower():
-                    app.logger.info("History parsing failed with Exception but AI says it retrieved data - triggering emergency fallback")
-                    if "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-" in final_answer:
-                        try:
-                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-` LIMIT 10"
-                            fallback_result = internal_execute_sql_query(fallback_query)
-                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                                query_data = fallback_result['data']
-                                tool_display_title = "Undiscovered Attendees Export Data"
-                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
-                        except Exception as fallback_error:
-                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
-                    elif "Undiscovered-Vendor-Export" in final_answer:
-                        try:
-                            fallback_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"
-                            fallback_result = internal_execute_sql_query(fallback_query)
-                            if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                                query_data = fallback_result['data']
-                                tool_display_title = "Undiscovered Vendor Export Data"
-                                app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows extracted")
-                        except Exception as fallback_error:
-                            app.logger.error(f"Emergency fallback failed: {fallback_error}")
-
-        app.logger.info(
-            f"After history check - query_data type: {type(query_data)}, Is None: {query_data is None}, Length (if list): {len(query_data) if isinstance(query_data, list) else 'N/A'}"
-        )
 
         # FINAL STEP: Create displays from extracted data
         displays = []
