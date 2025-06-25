@@ -96,8 +96,7 @@ export function Chat({ conversation }: ChatProps) {
     
     const trimmedContent = content.trim();
     
-    // Prevent duplicate messages - check if processing or duplicate
-    if (isProcessing) return;
+    // Prevent duplicate messages
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === "user" && lastMessage.content === trimmedContent) {
       return;
