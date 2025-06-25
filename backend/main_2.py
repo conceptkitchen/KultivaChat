@@ -6,6 +6,7 @@ from google.cloud import bigquery
 import logging
 import json
 import time
+from datetime import datetime
 from difflib import SequenceMatcher
 
 # typing.Optional is crucial for parameters with a default value of None
@@ -1947,6 +1948,208 @@ def chat_with_gemini_client_style():
             exc_info=True)
         return jsonify({"error":
                         f"An unexpected error occurred: {str(e)}"}), 500
+
+
+# --- API v1 Endpoints for External Integration ---
+
+@app.route('/api/v1/data/query', methods=['POST'])
+def api_v1_data_query():
+    """Natural language data query endpoint for external integration"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No JSON data provided"}), 400
+        
+        query = data.get('query', '')
+        if not query:
+            return jsonify({"success": False, "error": "Query parameter is required"}), 400
+        
+        app.logger.info(f"API v1 Natural Language Query: {query}")
+        
+        # Use the same chat processing logic but format for API response
+        user_message_text = query
+        conversation_id = "api_v1_query"
+        
+        # Process the query using existing chat logic
+        if not GEMINI_SDK_AVAILABLE:
+            return jsonify({"success": False, "error": "Gemini SDK not available"}), 500
+        
+        # Create chat session
+        chat_session = client.chats.create(
+            config=gemini_config,
+            history=[
+                google_genai_types.Content(
+                    parts=[google_genai_types.Part(text="You are an AI assistant for data analysis.")],
+                    role="model"
+                ),
+                google_genai_types.Content(
+                    parts=[google_genai_types.Part(text="Hello, I'm ready to help with data analysis.")],
+                    role="user"
+                )
+            ]
+        )
+        
+        # Send the query
+        response = chat_session.send_message(user_message_text)
+        final_answer = response.text if hasattr(response, 'text') else str(response)
+        
+        # Extract data using existing logic
+        query_data = []
+        displays = []
+        
+        # Check if response contains function calls or data
+        if hasattr(response, 'candidates') and response.candidates:
+            for candidate in response.candidates:
+                if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'function_call'):
+                            # Process function call results
+                            try:
+                                if part.function_call.name == 'internal_execute_sql_query':
+                                    sql_query = part.function_call.args.get('query', '')
+                                    result = internal_execute_sql_query(sql_query)
+                                    if result.get('status') == 'success' and result.get('data'):
+                                        query_data = result['data']
+                            except Exception as e:
+                                app.logger.error(f"Function call processing failed: {e}")
+        
+        # Create display format for API response
+        if query_data and isinstance(query_data, list) and len(query_data) > 0:
+            displays.append({
+                "type": "table",
+                "title": "Query Results",
+                "content": query_data
+            })
+        
+        return jsonify({
+            "success": True,
+            "query": query,
+            "response": final_answer,
+            "data": displays,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in /api/v1/data/query: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/v1/data/sql', methods=['POST'])
+def api_v1_data_sql():
+    """Direct SQL execution endpoint for external integration"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No JSON data provided"}), 400
+        
+        sql_query = data.get('sql', '')
+        if not sql_query:
+            return jsonify({"success": False, "error": "SQL parameter is required"}), 400
+        
+        app.logger.info(f"API v1 Direct SQL Query: {sql_query}")
+        
+        # Execute SQL directly
+        result = internal_execute_sql_query(sql_query)
+        
+        if result.get('status') == 'success':
+            query_data = result.get('data', [])
+            return jsonify({
+                "success": True,
+                "data": query_data,
+                "error": None,
+                "rows_returned": len(query_data) if isinstance(query_data, list) else 0,
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "data": [],
+                "error": result.get('error', 'Unknown error'),
+                "rows_returned": 0,
+                "timestamp": datetime.now().isoformat()
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Error in /api/v1/data/sql: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "data": [],
+            "error": str(e),
+            "rows_returned": 0,
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+
+@app.route('/api/v1/data/tables', methods=['POST'])
+def api_v1_data_tables():
+    """Table discovery endpoint for external integration"""
+    try:
+        app.logger.info("API v1 Table Discovery Request")
+        
+        # Get all available tables
+        table_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
+        result = internal_execute_sql_query(table_query)
+        
+        if result.get('status') == 'success':
+            tables_data = result.get('data', [])
+            
+            # Format tables for better display
+            formatted_tables = []
+            for table in tables_data:
+                table_name = table.get('table_name', '')
+                # Parse business area from table name
+                business_area = "Unknown"
+                data_type = "General"
+                
+                if "Balay-Kreative" in table_name:
+                    business_area = "Balay Kreative"
+                    if "attendees" in table_name.lower():
+                        data_type = "Event Attendees"
+                    elif "sales" in table_name.lower() or "orders" in table_name.lower():
+                        data_type = "Sales Data"
+                elif "Kapwa-Gardens" in table_name:
+                    business_area = "Kapwa Gardens"
+                    data_type = "Market Data"
+                elif "Undiscovered" in table_name:
+                    business_area = "Undiscovered"
+                    if "Vendor" in table_name:
+                        data_type = "Vendor Data"
+                
+                formatted_tables.append({
+                    "Business Area": business_area,
+                    "Data Type": data_type,
+                    "Table Name": table_name,
+                    "Description": f"{business_area} {data_type.lower()}"
+                })
+            
+            return jsonify({
+                "success": True,
+                "tables": [{
+                    "type": "table",
+                    "title": "Available Data Tables",
+                    "content": formatted_tables
+                }],
+                "total_tables": len(formatted_tables),
+                "timestamp": datetime.now().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "tables": [],
+                "error": result.get('error', 'Failed to retrieve tables'),
+                "total_tables": 0,
+                "timestamp": datetime.now().isoformat()
+            }), 400
+            
+    except Exception as e:
+        app.logger.error(f"Error in /api/v1/data/tables: {e}", exc_info=True)
+        return jsonify({
+            "success": False,
+            "tables": [],
+            "error": str(e),
+            "total_tables": 0,
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 
 # --- Main Execution ---
