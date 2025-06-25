@@ -73,10 +73,26 @@ Transform natural language questions into intelligent data responses with actual
 ```
 
 #### Supported Query Types
+
+**Basic Data Operations:**
 - **Data Discovery:** "Show me all available tables", "What data do I have?"
 - **Specific Queries:** "Show me Kapwa Gardens sales data", "Get Undiscovered event attendees"
-- **Analytics Requests:** "Show me processed analytics", "Customer insights for Balay Kreative"
-- **Complex Analysis:** "Top vendors by revenue", "Event attendance by city"
+- **Sample Data:** "Show me balay kreative attendee data" (returns 10-50 rows)
+
+**Advanced Analytics & Comprehensive Analysis:**
+- **Revenue Analysis:** "Show me revenue trends for all events", "Which events generated the most income?"
+- **Attendance Analytics:** "Event attendance patterns over time", "Compare attendee engagement across events"
+- **Financial Insights:** "Calculate average ticket prices by event type", "Revenue per attendee analysis"
+- **Trend Analysis:** "Seasonal patterns in event attendance", "Growth trends year over year"
+- **Statistical Aggregations:** "Total revenue by event category", "Average customer lifetime value"
+- **Multi-table Analysis:** "Cross-reference vendor data with sales performance"
+- **Comprehensive Reports:** "Give me a complete analysis of balay kreative with trends and financials"
+
+**Enhanced Data Capabilities:**
+- **Large Datasets:** Up to 500 rows for detailed analysis (vs standard 10-row samples)
+- **Complex Aggregations:** GROUP BY, SUM, COUNT, AVG operations
+- **Time-Series Analysis:** Multi-year tracking and historical comparisons
+- **Business Intelligence:** ROI calculations, profitability metrics, performance indicators
 
 ### 2. Direct SQL Execution
 
@@ -113,10 +129,38 @@ Execute SQL queries directly against BigQuery with structured response formattin
 ```
 
 #### SQL Guidelines
+
+**Basic Requirements:**
 - Always use fully qualified table names: `kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME`
 - Tables often contain special characters (e.g., `Balay-Kreative---Customer-Data`)
 - Use LIMIT for large datasets to control response size
 - Available schemas: Use `INFORMATION_SCHEMA.TABLES` for table discovery
+
+**Advanced Analytics Support:**
+- **Large Dataset Queries:** Use `LIMIT 100` or `LIMIT 500` for comprehensive analysis
+- **Financial Aggregations:** `SUM(CAST(Lineitem_price AS FLOAT64))` for revenue calculations
+- **Trend Analysis:** `GROUP BY Event_Date ORDER BY Event_Date` for time-based patterns
+- **Statistical Operations:** `COUNT(*), AVG(), MAX(), MIN()` for detailed insights
+- **Multi-table Joins:** Join attendee data with vendor information for complex analysis
+
+**Example Advanced Queries:**
+```sql
+-- Revenue analysis by event
+SELECT Event_Name, COUNT(*) as attendees, 
+       SUM(CAST(Lineitem_price AS FLOAT64)) as revenue 
+FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders` 
+WHERE Lineitem_price IS NOT NULL AND Lineitem_price != '' 
+GROUP BY Event_Name ORDER BY revenue DESC LIMIT 20
+
+-- Time-based attendance trends
+SELECT Event_Date, COUNT(*) as total_attendees,
+       AVG(CAST(Lineitem_price AS FLOAT64)) as avg_price
+FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders`
+GROUP BY Event_Date ORDER BY Event_Date
+
+-- Comprehensive data export
+SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.TABLE_NAME` LIMIT 500
+```
 
 ### 3. Table Discovery
 
