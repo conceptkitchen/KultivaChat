@@ -62,6 +62,9 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
 
+# Global variable to capture SQL results during tool execution
+last_sql_results = None
+
 # --- Load Configuration ---
 KBC_API_URL = os.environ.get('KBC_API_URL')
 KBC_STORAGE_TOKEN = os.environ.get('KBC_STORAGE_TOKEN')
@@ -1540,6 +1543,9 @@ def chat_with_gemini_client_style():
                             app.logger.info(f"Found function response: {tool_name}")
                             
                             if tool_name == 'internal_execute_sql_query':
+                                app.logger.info(f"Processing SQL tool result: {type(tool_result)} - {str(tool_result)[:200]}")
+                                
+                                # Handle both dict and direct data responses
                                 if isinstance(tool_result, dict):
                                     status = tool_result.get('status')
                                     data = tool_result.get('data')
@@ -1550,6 +1556,35 @@ def chat_with_gemini_client_style():
                                         tool_display_title = "SQL Query Results"
                                         app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows")
                                         break
+                                elif isinstance(tool_result, list) and len(tool_result) > 0:
+                                    # Direct data response
+                                    query_data = tool_result
+                                    tool_display_title = "SQL Query Results"
+                                    app.logger.info(f"DIRECT EXTRACTION SUCCESS: {len(query_data)} rows")
+                                    break
+                                else:
+                                    app.logger.warning(f"Unexpected tool result format: {type(tool_result)} - content: {str(tool_result)}")
+                                    # Try to access the data through various methods
+                                    if hasattr(tool_result, 'data'):
+                                        data = getattr(tool_result, 'data')
+                                        if isinstance(data, list) and len(data) > 0:
+                                            query_data = data
+                                            tool_display_title = "SQL Query Results"
+                                            app.logger.info(f"ATTRIBUTE EXTRACTION SUCCESS: {len(query_data)} rows")
+                                            break
+                                    
+                                    # Try converting to dict if it's a string
+                                    if isinstance(tool_result, str):
+                                        try:
+                                            import json
+                                            parsed_result = json.loads(tool_result)
+                                            if isinstance(parsed_result, dict) and parsed_result.get('data'):
+                                                query_data = parsed_result['data']
+                                                tool_display_title = "SQL Query Results"
+                                                app.logger.info(f"JSON EXTRACTION SUCCESS: {len(query_data)} rows")
+                                                break
+                                        except json.JSONDecodeError:
+                                            pass
                 if query_data:
                     break
         except Exception as e:
