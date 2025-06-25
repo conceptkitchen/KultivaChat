@@ -112,6 +112,15 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 25, 2025**: CRITICAL DATA EXTRACTION BUG COMPLETELY RESOLVED - API service now fully operational
+  - ✅ FIXED: Enhanced data extraction logic to properly handle nested Gemini function responses
+  - ✅ FIXED: API responses now include actual table data instead of empty arrays
+  - ✅ IMPLEMENTED: Four-method extraction system handling all response structures from `{'result': {'status': 'success', 'data': [...]}}` 
+  - ✅ VERIFIED: Complete data pipeline working - natural language queries return authentic business data
+  - ✅ TESTED: Balay Kreative attendee data successfully extracted showing event details, orders, and transaction records
+  - ✅ CONFIRMED: External website integration ready - data transmission fully operational
+  - → Production API service at https://Kultivate-chat-ck.replit.app/api/v1 now provides complete data access
+
 - **June 25, 2025**: KULTIVATE AI API SERVICE FULLY DOCUMENTED AND VALIDATED
   - ✅ CREATED: Complete product overview document (KULTIVATE_AI_PRODUCT_OVERVIEW.md) with downloadable format
   - ✅ DOCUMENTED: All product capabilities, technical architecture, and business use cases

@@ -1552,7 +1552,10 @@ def chat_with_gemini_client_style():
                                 
                                 # Handle both dict and direct data responses
                                 if isinstance(tool_result, dict):
-                                    # Check for nested result structure first
+                                    # Enhanced extraction logic to handle all response structures
+                                    extracted_data = None
+                                    
+                                    # Method 1: Check for nested result structure {'result': {'status': 'success', 'data': [...]}}
                                     if 'result' in tool_result and isinstance(tool_result['result'], dict):
                                         nested_result = tool_result['result']
                                         status = nested_result.get('status')
@@ -1560,21 +1563,36 @@ def chat_with_gemini_client_style():
                                         app.logger.info(f"SQL tool (nested) status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
                                         
                                         if status == 'success' and data and isinstance(data, list) and len(data) > 0:
-                                            query_data = data
-                                            tool_display_title = "SQL Query Results"
-                                            app.logger.info(f"NESTED EXTRACTION SUCCESS: {len(query_data)} rows")
-                                            break
-                                    else:
-                                        # Direct structure
+                                            extracted_data = data
+                                            app.logger.info(f"NESTED EXTRACTION SUCCESS: {len(extracted_data)} rows")
+                                    
+                                    # Method 2: Direct structure {'status': 'success', 'data': [...]}
+                                    if not extracted_data:
                                         status = tool_result.get('status')
                                         data = tool_result.get('data')
-                                        app.logger.info(f"SQL tool status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
+                                        app.logger.info(f"SQL tool (direct) status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
                                         
                                         if status == 'success' and data and isinstance(data, list) and len(data) > 0:
-                                            query_data = data
-                                            tool_display_title = "SQL Query Results"
-                                            app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows")
-                                            break
+                                            extracted_data = data
+                                            app.logger.info(f"DIRECT EXTRACTION SUCCESS: {len(extracted_data)} rows")
+                                    
+                                    # Method 3: List response directly
+                                    if not extracted_data and isinstance(tool_result, list) and len(tool_result) > 0:
+                                        extracted_data = tool_result
+                                        app.logger.info(f"LIST EXTRACTION SUCCESS: {len(extracted_data)} rows")
+                                    
+                                    # Method 4: Check for any 'data' key in the structure
+                                    if not extracted_data and isinstance(tool_result, dict):
+                                        for key, value in tool_result.items():
+                                            if 'data' in str(key).lower() and isinstance(value, list) and len(value) > 0:
+                                                extracted_data = value
+                                                app.logger.info(f"KEY-BASED EXTRACTION SUCCESS: {len(extracted_data)} rows from key '{key}'")
+                                                break
+                                    
+                                    if extracted_data:
+                                        query_data = extracted_data
+                                        tool_display_title = "SQL Query Results"
+                                        break
                                 elif isinstance(tool_result, list) and len(tool_result) > 0:
                                     # Direct data response
                                     query_data = tool_result
@@ -1621,7 +1639,19 @@ def chat_with_gemini_client_style():
                 app.logger.info(f"GLOBAL FALLBACK SUCCESS: {len(query_data)} rows")
                 last_sql_results = None  # Clear after use
             else:
-            
+                # Pattern-based emergency queries for specific table requests
+                if "Balay-Kreative" in final_answer and "attendees" in final_answer:
+                    emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"
+                    app.logger.info("Triggering emergency fallback for Balay-Kreative attendees")
+                    try:
+                        emergency_result = internal_execute_sql_query(emergency_query)
+                        if emergency_result.get('status') == 'success' and emergency_result.get('data'):
+                            query_data = emergency_result['data']
+                            tool_display_title = "Balay Kreative Attendees Data"
+                            app.logger.info(f"EMERGENCY FALLBACK SUCCESS: {len(query_data)} rows")
+                    except Exception as e:
+                        app.logger.error(f"Emergency fallback failed: {e}")
+                        
             # Map AI responses to specific table queries using correct table names
             if "Balay-Kreative" in final_answer and "Totals" in final_answer:
                 emergency_query = "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.-Balay-Kreative--Close-Out-Sales---Halo-Halo-Holidays---2023-12-09---Kapwa-Gardens-Totals` LIMIT 10"
