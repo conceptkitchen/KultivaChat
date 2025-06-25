@@ -551,6 +551,11 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         app.logger.info(
             f"Tool Call: internal_execute_sql_query executed, returned {len(rows_list)} rows."
         )
+        
+        # Store results globally for fallback extraction
+        global last_sql_results
+        last_sql_results = rows_list
+        
         result_payload = {"status": "success", "data": rows_list}
         return result_payload
     except Exception as e:
@@ -1547,15 +1552,29 @@ def chat_with_gemini_client_style():
                                 
                                 # Handle both dict and direct data responses
                                 if isinstance(tool_result, dict):
-                                    status = tool_result.get('status')
-                                    data = tool_result.get('data')
-                                    app.logger.info(f"SQL tool status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
-                                    
-                                    if status == 'success' and data and isinstance(data, list) and len(data) > 0:
-                                        query_data = data
-                                        tool_display_title = "SQL Query Results"
-                                        app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows")
-                                        break
+                                    # Check for nested result structure first
+                                    if 'result' in tool_result and isinstance(tool_result['result'], dict):
+                                        nested_result = tool_result['result']
+                                        status = nested_result.get('status')
+                                        data = nested_result.get('data')
+                                        app.logger.info(f"SQL tool (nested) status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
+                                        
+                                        if status == 'success' and data and isinstance(data, list) and len(data) > 0:
+                                            query_data = data
+                                            tool_display_title = "SQL Query Results"
+                                            app.logger.info(f"NESTED EXTRACTION SUCCESS: {len(query_data)} rows")
+                                            break
+                                    else:
+                                        # Direct structure
+                                        status = tool_result.get('status')
+                                        data = tool_result.get('data')
+                                        app.logger.info(f"SQL tool status: {status}, data type: {type(data)}, length: {len(data) if isinstance(data, list) else 'N/A'}")
+                                        
+                                        if status == 'success' and data and isinstance(data, list) and len(data) > 0:
+                                            query_data = data
+                                            tool_display_title = "SQL Query Results"
+                                            app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows")
+                                            break
                                 elif isinstance(tool_result, list) and len(tool_result) > 0:
                                     # Direct data response
                                     query_data = tool_result
@@ -1593,6 +1612,15 @@ def chat_with_gemini_client_style():
         # Emergency fallback - if AI says it retrieved data but we have nothing
         if not query_data and final_answer and "retrieved" in final_answer.lower():
             app.logger.info("AI claims data retrieval but extraction failed - using emergency fallback")
+            
+            # First try using globally stored SQL results
+            global last_sql_results
+            if last_sql_results and isinstance(last_sql_results, list) and len(last_sql_results) > 0:
+                query_data = last_sql_results
+                tool_display_title = "SQL Query Results (Global Fallback)"
+                app.logger.info(f"GLOBAL FALLBACK SUCCESS: {len(query_data)} rows")
+                last_sql_results = None  # Clear after use
+            else:
             
             # Map AI responses to specific table queries using correct table names
             if "Balay-Kreative" in final_answer and "Totals" in final_answer:
