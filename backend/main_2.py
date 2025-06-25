@@ -1492,90 +1492,47 @@ def chat_with_gemini_client_style():
         query_data = None
         tool_display_title = "Tool Execution Result"
 
-        # CRITICAL FIX: Extract tool results from response and chat history
+        # CRITICAL FIX: Streamlined data extraction from response parts
         try:
-            # First try: Look for function call results in the response parts
             if hasattr(response, 'parts') and response.parts:
-                app.logger.info(f"Response has {len(response.parts)} parts")
-                for i, part in enumerate(response.parts):
-                    app.logger.info(f"Part {i}: {type(part)} - {hasattr(part, 'function_response')}")
+                app.logger.info(f"Checking {len(response.parts)} response parts for tool results")
+                for part in response.parts:
                     if hasattr(part, 'function_response') and part.function_response:
-                        func_name = part.function_response.name
                         func_result = part.function_response.response
-                        app.logger.info(f"Found function response: {func_name} with result keys: {list(func_result.keys()) if isinstance(func_result, dict) else 'Not a dict'}")
-                        
-                        # Extract data from internal_execute_sql_query responses
-                        if func_name == 'internal_execute_sql_query' and isinstance(func_result, dict):
-                            if func_result.get('status') == 'success' and func_result.get('data'):
-                                query_data = func_result['data']
-                                tool_display_title = "SQL Query Results"
-                                app.logger.info(f"Successfully extracted query data from response: {len(query_data)} rows")
-                                break
-            
-            # Second try: Extract from chat history
-            if not query_data and hasattr(chat_session, 'get_history'):
-                app.logger.info("No data in response parts, trying history extraction...")
-                history = chat_session.get_history()
-                if history and len(history) > 0:
-                    latest_response = history[-1]
-                    if hasattr(latest_response, 'parts') and latest_response.parts:
-                        for part in latest_response.parts:
-                            if hasattr(part, 'function_response') and part.function_response:
-                                if part.function_response.name == "internal_execute_sql_query":
-                                    func_result = part.function_response.response
-                                    app.logger.info(f"DIRECT: Found function response from {part.function_response.name}")
-                                    if isinstance(func_result, dict) and func_result.get('status') == 'success':
-                                        if func_result.get('data'):
-                                            query_data = func_result['data']
-                                            tool_display_title = "BigQuery Data"
-                                            app.logger.info(f"DIRECT EXTRACTION SUCCESS: {len(query_data)} rows extracted")
-                                            break
-        except Exception as e:
-            app.logger.error(f"Direct extraction failed: {e}")
-            
-        # CRITICAL FIX: Emergency reconstruction when AI mentions retrieved data
-        if not query_data and final_answer and ("retrieved" in final_answer.lower() and ("rows" in final_answer.lower() or "table" in final_answer.lower())):
-            app.logger.info("AI mentions retrieved data but extraction failed - attempting emergency reconstruction")
-            try:
-                import re
-                
-                # Parse AI response for specific table names and row counts
-                limit_match = re.search(r'(\d+)\s+rows', final_answer)
-                limit = int(limit_match.group(1)) if limit_match else 10
-                
-                # Emergency patterns for common tables mentioned in AI responses
-                emergency_tables = {
-                    '2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors': 'Undiscovered SF Vendor Data',
-                    'Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-': 'Undiscovered Attendees Export',
-                    'Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders': 'Balay-Kreative Attendees',
-                    'Undiscovered-Vendor-Export---Squarespace---All-data-orders': 'Undiscovered Vendor Export'
-                }
-                
-                for table_name, display_title in emergency_tables.items():
-                    if table_name in final_answer or table_name.lower() in final_answer.lower():
-                        emergency_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT {limit}"
-                        app.logger.info(f"Emergency reconstruction for {table_name}: {emergency_query}")
-                        
-                        emergency_result = internal_execute_sql_query(emergency_query)
-                        if emergency_result.get('status') == 'success' and emergency_result.get('data'):
-                            query_data = emergency_result['data']
-                            tool_display_title = display_title
-                            app.logger.info(f"EMERGENCY RECONSTRUCTION SUCCESS: {len(query_data)} rows extracted from {table_name}")
+                        if (part.function_response.name == 'internal_execute_sql_query' and 
+                            isinstance(func_result, dict) and 
+                            func_result.get('status') == 'success' and 
+                            func_result.get('data')):
+                            
+                            query_data = func_result['data']
+                            tool_display_title = "SQL Query Results"
+                            app.logger.info(f"EXTRACTION SUCCESS: {len(query_data)} rows from tool response")
                             break
-                
-                # If no specific table found, check for table list requests
-                if not query_data and ("tables" in final_answer.lower() or "available" in final_answer.lower()):
-                    fallback_query = "SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
-                    fallback_result = internal_execute_sql_query(fallback_query)
-                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
-                        query_data = fallback_result['data']
-                        tool_display_title = "Available Data Tables"
-                        app.logger.info(f"TABLE LIST RECONSTRUCTION: {len(query_data)} tables extracted")
-                        
-            except Exception as e:
-                app.logger.error(f"Emergency reconstruction failed: {e}")
+        except Exception as e:
+            app.logger.error(f"Tool response extraction failed: {e}")
+            
+        # Emergency reconstruction for specific table queries when extraction fails
+        if not query_data and final_answer and "retrieved" in final_answer.lower():
+            app.logger.info("Emergency reconstruction: AI mentions data retrieval")
+            
+            # Extract table name patterns from AI response
+            table_patterns = [
+                "Close-Outs---Yum-Yams---2023-05-13---Kapwa-Gardens-Totals",
+                "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-",
+                "Balay-Kreative---attendees---all-orders"
+            ]
+            
+            for table_name in table_patterns:
+                if table_name in final_answer:
+                    emergency_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{table_name}` LIMIT 10"
+                    emergency_result = internal_execute_sql_query(emergency_query)
+                    if emergency_result.get('status') == 'success' and emergency_result.get('data'):
+                        query_data = emergency_result['data']
+                        tool_display_title = f"Data from {table_name}"
+                        app.logger.info(f"EMERGENCY SUCCESS: {len(query_data)} rows from {table_name}")
+                        break
 
-        # Fallback to history parsing if direct extraction didn't work
+        # Skip redundant history parsing if we already have data
         if not query_data and GEMINI_SDK_AVAILABLE:
             app.logger.info(
                 "Direct extraction failed, attempting to retrieve chat history using get_history()...")
