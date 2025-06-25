@@ -132,9 +132,9 @@ function startServer() {
     }
   });
 
-  // Proxy for backend API routes (simplified)
+  // Proxy for backend API routes (simplified) - but skip conversation messages
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith('/auth/') || req.path.includes('/messages')) {
+    if (req.path.startsWith('/auth/') || req.path.match(/\/conversations\/[^\/]+\/messages/)) {
       return next();
     }
 
