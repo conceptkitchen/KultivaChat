@@ -120,10 +120,10 @@ curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/sql \
 
 ---
 
-### 4. Intelligent Query Router
+### 4. Natural Language Query Endpoint (Recommended)
 **Endpoint:** `POST /api/v1/data/query`
 
-**Purpose:** Single endpoint that automatically determines how to process your query
+**Purpose:** Ask business questions in plain English - the AI handles everything automatically
 
 **Request:**
 ```bash
@@ -156,7 +156,7 @@ Detects queries starting with:
 **Internally routes to:** SQL execution endpoint
 
 #### Natural Language Routing
-Everything else routes to natural language processing (currently returns helpful guidance)
+Everything else routes to advanced AI processing with full Gemini 2.0 Flash integration for business intelligence queries
 
 **Response includes routing transparency:**
 ```json
@@ -401,12 +401,45 @@ if (response.success) {
 
 ---
 
+## Simple Natural Language Usage
+
+The API now supports natural language queries just like talking to a business analyst:
+
+### Business Questions You Can Ask:
+```bash
+# Revenue analysis
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How much revenue did we generate from Balay Kreative events?"}'
+
+# Customer insights  
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Show me customer data from Kapwa Gardens orders"}'
+
+# Product analysis
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What are the top selling products across all vendors?"}'
+
+# Event performance
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Which events had the highest attendance rates?"}'
+```
+
+### How Natural Language Works:
+- Ask questions in plain English about your business data
+- The AI understands context about vendors, events, customers, and revenue
+- Automatically finds relevant tables and executes appropriate queries
+- Returns actual business data, not generic responses
+- Powered by advanced AI that understands your specific business entities
+
 ## Current Limitations
 
-1. **Natural Language Processing:** Returns 503 with helpful guidance
-2. **Result Set Size:** No enforced limits, use LIMIT clauses
-3. **Query Complexity:** Standard BigQuery limitations apply
-4. **Concurrent Requests:** Reasonable limits for production use
+1. **Result Set Size:** No enforced limits, use LIMIT clauses for large datasets
+2. **Query Complexity:** Standard BigQuery limitations apply
+3. **Concurrent Requests:** Reasonable limits for production use
 
 ---
 
