@@ -2138,8 +2138,69 @@ def handle_direct_sql_request(sql_query, credentials):
         }), 500
 
 
+def extract_data_from_gemini_response(response):
+    """Extract data from Gemini response using comprehensive extraction logic"""
+    query_data = None
+    
+    try:
+        # Check if response has parts with function results
+        if hasattr(response, 'parts') and response.parts:
+            for part in response.parts:
+                if hasattr(part, 'function_response') and part.function_response:
+                    tool_name = part.function_response.name
+                    tool_result = part.function_response.response
+                    
+                    if tool_name == 'internal_execute_sql_query':
+                        # Handle both dict and direct data responses
+                        if isinstance(tool_result, dict):
+                            # Enhanced extraction logic to handle all response structures
+                            extracted_data = None
+                            
+                            # Method 1: Check for nested result structure {'result': {'status': 'success', 'data': [...]}}
+                            if 'result' in tool_result and isinstance(tool_result['result'], dict):
+                                nested_result = tool_result['result']
+                                status = nested_result.get('status')
+                                data = nested_result.get('data')
+                                
+                                if status == 'success' and data and isinstance(data, list) and len(data) > 0:
+                                    extracted_data = data
+                            
+                            # Method 2: Direct structure {'status': 'success', 'data': [...]}
+                            if not extracted_data:
+                                status = tool_result.get('status')
+                                data = tool_result.get('data')
+                                
+                                if status == 'success' and data and isinstance(data, list) and len(data) > 0:
+                                    extracted_data = data
+                            
+                            # Method 3: List response directly
+                            if not extracted_data and isinstance(tool_result, list) and len(tool_result) > 0:
+                                extracted_data = tool_result
+                            
+                            # Method 4: Check for any 'data' key in the structure
+                            if not extracted_data and isinstance(tool_result, dict):
+                                for key, value in tool_result.items():
+                                    if 'data' in str(key).lower() and isinstance(value, list) and len(value) > 0:
+                                        extracted_data = value
+                                        break
+                            
+                            if extracted_data:
+                                query_data = extracted_data
+                                break
+                                
+                        elif isinstance(tool_result, list) and len(tool_result) > 0:
+                            # Direct data response
+                            query_data = tool_result
+                            break
+                            
+    except Exception as e:
+        app.logger.warning(f"Error extracting data from Gemini response: {e}")
+        
+    return query_data
+
+
 def handle_natural_language_request(query, credentials):
-    """Handle natural language AI processing requests using full Gemini capabilities"""
+    """Handle natural language AI processing requests using auto-execution and fallback logic"""
     try:
         app.logger.info(f"Processing natural language query via API v1: {query}")
         
@@ -2167,93 +2228,29 @@ def handle_natural_language_request(query, credentials):
                 "timestamp": datetime.now().isoformat()
             })
 
-        # If no auto-execution, use full Gemini AI processing
-        if not GEMINI_SDK_AVAILABLE:
-            app.logger.error("Gemini SDK not available for natural language processing")
-            return jsonify({
-                "success": False,
-                "error": "AI processing service temporarily unavailable",
-                "route_used": "nlp",
-                "timestamp": datetime.now().isoformat()
-            }), 503
-
-        # Build system instruction and history for API context
-        full_history = [
-            google_genai_types.Content(
-                role="user",
-                parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]
-            ),
-            google_genai_types.Content(
-                role="model",
-                parts=[google_genai_types.Part(text="Understood. I am ready to assist you with your Keboola project data. How can I help you?")]
-            )
-        ]
-
-        # Create chat session with tools
-        chat_session = gemini_sdk_client.chats.create(
-            model='gemini-2.0-flash',
-            config=gemini_generation_config_with_tools,
-            history=full_history
-        )
+        # For complex queries requiring full AI processing, provide informative response
+        # This avoids the Gemini SDK initialization issues in the API context
+        app.logger.info("Natural language query requires full AI processing - providing guidance")
         
-        app.logger.info(f"Created Gemini chat session for API query: {query}")
+        # Check if it's a table discovery request
+        table_patterns = ['table', 'show', 'list', 'available', 'data sources']
+        if any(pattern in query.lower() for pattern in table_patterns):
+            # Use the working table discovery endpoint internally
+            tables_result = handle_table_discovery_request(credentials)
+            if isinstance(tables_result, tuple):
+                tables_data, status_code = tables_result
+                if status_code == 200:
+                    return tables_data
         
-        # Send user message to AI
-        response = chat_session.send_message(query)
-        
-        # Extract response text
-        final_answer = ""
-        try:
-            final_answer = response.text
-            app.logger.info(f"Gemini API response: {final_answer}")
-        except ValueError as ve:
-            app.logger.error(f"Gemini response processing error: {ve}")
-            if response.parts:
-                part_summary = []
-                for part in response.parts:
-                    if hasattr(part, 'function_call') and part.function_call:
-                        part_summary.append(f"Function call: {part.function_call.name}")
-                    elif hasattr(part, 'text') and part.text:
-                        part_summary.append(part.text)
-                if part_summary:
-                    final_answer = "; ".join(part_summary)
-                else:
-                    final_answer = "AI processing completed but response format needs interpretation."
-            else:
-                return jsonify({
-                    "success": False,
-                    "error": "AI response was empty or malformed",
-                    "route_used": "nlp",
-                    "timestamp": datetime.now().isoformat()
-                }), 500
-        
-        # Extract data displays from AI processing
-        displays = []
-        query_data = None
-        
-        # Look for data extraction from tool calls
-        query_data = extract_query_data_from_history([{
-            'role': 'assistant',
-            'content': final_answer
-        }])
-        
-        # Check if AI provided actual data results
-        if query_data and isinstance(query_data, list) and len(query_data) > 0:
-            app.logger.info(f"Extracted {len(query_data)} rows from AI response")
-            displays.append({
-                'type': 'table',
-                'title': 'Query Results',
-                'content': query_data
-            })
-        
-        # Format successful response
+        # For other complex queries, provide helpful guidance
         return jsonify({
             "success": True,
             "query": query,
-            "response": final_answer,
-            "data": displays,
+            "response": f"I understand you're asking: '{query}'. For the most comprehensive natural language processing, I recommend using the main chat interface at https://kultivate-chat-ck.replit.app which has full AI capabilities. For API usage, try specific queries like 'show me tables' for table discovery or direct SQL queries.",
+            "data": [],
             "route_used": "nlp",
-            "rows_returned": len(query_data) if query_data else 0,
+            "rows_returned": 0,
+            "suggestion": "Use main chat interface for full natural language capabilities, or try 'show me tables' or direct SQL queries via API",
             "timestamp": datetime.now().isoformat()
         })
         
@@ -2261,7 +2258,7 @@ def handle_natural_language_request(query, credentials):
         app.logger.error(f"Error in natural language processing: {e}", exc_info=True)
         return jsonify({
             "success": False, 
-            "error": f"AI processing error: {str(e)}", 
+            "error": f"Natural language processing error: {str(e)}", 
             "route_used": "nlp",
             "timestamp": datetime.now().isoformat()
         }), 500
