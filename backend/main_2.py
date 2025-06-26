@@ -2651,6 +2651,7 @@ Current time: {datetime.now().isoformat()}"""
 
             # Create chat session with tools
             chat_session = client.chats.create(
+                model='gemini-2.0-flash',
                 config=google_genai_types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     tools=gemini_tool_functions_list,
