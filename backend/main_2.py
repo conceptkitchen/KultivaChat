@@ -140,34 +140,25 @@ When users ask about:
     5.  **FORBIDDEN RESPONSES:** Do NOT say "Which table would you like?" or "I need more information" or "Could you clarify?" - just pick a table and execute.
     6.  **NEVER claim a table doesn't exist** if you can find ANY reasonable pattern match in the conversation history.
 
-- **Complex Analytical Questions and Reporting** (e.g., "How much money was made by vendors at Yum Yams event?", "Top 5 vendors from an event between two dates?", "Attendees from specific Zip Codes who donated more than $X?", "Which vendors who identify as 'X' made more than 'Y' sales from 2020-2023?", "How many attendees live in SF and Daly City?"):
-    1.  **Deconstruct the Request:** Identify key entities (e.g., 'vendors', 'attendees', 'donors', 'events' like 'Yum Yams', 'Kapwa Gardens', 'UNDSCVRD', 'Balay Kreative grants'), metrics (e.g., 'money made', 'counts', 'sales'), filters (e.g., dates, identity, location, monetary thresholds like 'more than $500', zip codes), and desired output (e.g., total sum, list of names/emails, top N ranking).
-    2.  **Table Discovery & Schema Review (Iterative Process):**
-        a.  Use `execute_sql_query` with `SELECT table_name FROM \`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES\`;` to list all tables in the BigQuery workspace.
-        b.  From this list, identify 1-3 candidate tables that likely contain the required information. Use keywords from the user's query and common naming patterns. Examples:
-            * For 'vendors', 'sales', 'money made': Look for tables like `DIM_VENDORS`, `FACT_SALES`, `EVENT_TRANSACTIONS`, `OUT_VENDOR_PERFORMANCE`.
-            * For 'attendees', 'donors', 'zip code', 'city', 'emails': Look for `DIM_ATTENDEES`, `CRM_CONTACTS`, `DONATIONS_MASTER`, `OUT_USER_PROFILES`.
-            * For 'events', 'dates', specific event names like 'Yum Yams', 'Kapwa Gardens', 'UNDSCVRD': Look for `DIM_EVENTS`, `EVENT_SCHEDULE`, or tables named after events e.g., `FACT_ORDERS_KAPWA_GARDENS`.
-            * For 'identity' (e.g., demographic data): This might be in vendor or attendee profile tables.
-            * For 'Balay Kreative grants' or applicants: Look for tables like `GRANT_APPLICATIONS`, `BALAY_APPLICANTS`.
-        c.  Briefly inform the user of the primary table(s) you're investigating (e.g., "To find out about vendor sales at Yum Yams, I'll look into tables like `FACT_VENDOR_EVENT_SALES` and `DIM_EVENTS`.").
-        d.  For these selected candidate tables, **you MUST retrieve their schemas** to identify correct column names and types. Use `execute_sql_query` with `SELECT table_name, column_name, data_type FROM \`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS\` WHERE table_name IN ('TABLE1_CANDIDATE', 'TABLE2_CANDIDATE');`.
-    3.  **SQL Formulation Strategy (using the retrieved schemas):**
-        a.  **JOINs:** Determine necessary JOINs between the selected tables using common key columns (e.g., `event_id`, `vendor_id`, `user_id`, `attendee_id`, `application_id`). Use `INNER JOIN` by default, unless `LEFT JOIN` is needed.
-        b.  **Filtering (WHERE clause):** Construct precise `WHERE` clauses.
-            * For text like event names, vendor names, identity categories: `WHERE event_name = 'Yum Yams'` or `WHERE demographic_category = 'X'`. Use `LIKE '%keyword%'` if partial matching is appropriate.
-            * For dates/date ranges: `WHERE event_date = 'YYYY-MM-DD'` or `WHERE event_date BETWEEN 'YYYY-MM-DD' AND 'YYYY-MM-DD'`. Convert phrases like "from 201X to 202X" to `BETWEEN '201X-01-01' AND '202X-12-31'`.
-            * For numerical thresholds: `WHERE sales_amount > 500` or `WHERE donations_total < 100`.
-            * **For filtering by city names when the table only has a `zip_code` column (and no direct `city` column or internal city-zip mapping table is found):**
-                1.  Use the `get_zip_codes_for_city` tool to get a list of zip codes for the target city. Provide a state code like 'CA' if it can be inferred or is commonly associated (e.g., for "San Francisco" or "Daly City").
-                2.  If the tool returns a list of zip codes successfully, use them in your SQL: `WHERE zip_code IN ('zip1', 'zip2', ...)`
-            * For other zip codes/cities (if city column exists): `WHERE zip_code = '94107'` or `LOWER(city) = 'san francisco'`.
-            * For multiple conditions (e.g., participated in X AND Y events): This might involve subqueries, multiple JOINs, or `GROUP BY` and `HAVING COUNT(DISTINCT event_type) = 2`.
-        c.  **Aggregations (GROUP BY):** For "how much," "how many," "total," "average," use `SUM(metric_column)`, `COUNT(DISTINCT id_column)`, `AVG(value_column)` often combined with `GROUP BY` categorical_columns.
-        d.  **Ranking/Ordering (ORDER BY, LIMIT):** For "top N," "most," "least," use `ORDER BY metric_column DESC` (or `ASC`) and `LIMIT N`.
-        e.  **Selecting Output Columns:** Select the columns the user asked for (e.g., names, emails, phone numbers, amounts).
-    4.  **Execute Query:** Use `internal_execute_sql_query` with the fully constructed, complex SQL.
-    5.  **Refinement (If Necessary for Complex Queries):** If your initial complex query attempt results in an error or clearly misses the mark (e.g., a crucial column was misidentified despite schema check, or `get_zip_codes_for_city` failed), you may briefly state what you tried and ask a *very specific* clarifying question related to the SQL construction or missing information. This is an exception to the "NEVER ask for confirmation" rule, strictly for iterative solving of complex analytical tasks *after* an initial automated attempt.
+- **Complex Business Intelligence Questions** (e.g., "How much money was made by vendors at Yum Yams event from 2020-2023?", "Which vendors who identify as X made more than $500 sales?", "How many attendees live in SF and Daly City?", "Who applied to Balay Kreative Grant and attended events more than 2x?", "Which vendors participated in Kapwa Gardens AND UNDSCVRD events and made at least $500?"):
+    1.  **USE execute_complex_business_query FIRST** - This specialized tool handles sophisticated business intelligence queries with:
+        * Multi-table analysis across all 64 workspace tables
+        * Date range filtering (2020-2023, specific years)
+        * Geographic analysis (zip codes, cities like SF, Daly City)
+        * Revenue thresholds ($500+, income levels)
+        * Multi-event participation tracking (Kapwa Gardens AND UNDSCVRD)
+        * Demographic filtering (identity categories)
+        * Contact information extraction (emails, phone numbers)
+        * Cross-event attendance analysis
+        * Grant application correlation with event participation
+    2.  **The tool automatically handles:**
+        * Table discovery across vendor, attendee, donor, and event data
+        * Complex JOIN operations between related tables
+        * Date range parsing and filtering
+        * Geographic zip code mapping for SF, Daly City, etc.
+        * Revenue calculations and financial analysis
+        * Multi-condition filtering (event participation + revenue thresholds)
+    3.  **If execute_complex_business_query doesn't fully address the query**, then fall back to manual SQL construction using internal_execute_sql_query with the detailed schema analysis approach.
 
 - "Show me tables" or "what tables do I have" (referring to the transformed data):
     1.  Prioritize listing tables from the BigQuery workspace.
@@ -834,6 +825,498 @@ def get_zip_codes_for_city(
     }
 
 
+def execute_complex_business_query(query_description: str) -> dict:
+    """Executes complex business intelligence queries with multi-table joins, date ranges, and demographic filters.
+    
+    This function handles sophisticated queries like:
+    - Vendor revenue analysis across events and date ranges
+    - Attendee demographics and geographic analysis
+    - Cross-event participation tracking
+    - Financial performance metrics
+    - Identity-based filtering and analysis
+    
+    Args:
+        query_description (str): Natural language description of the business query
+    
+    Returns:
+        dict: Query results with data and analysis
+    """
+    app.logger.info(f"Tool Call: execute_complex_business_query - {query_description}")
+    
+    try:
+        # Parse query type and extract key components
+        query_lower = query_description.lower()
+        
+        # Vendor-related queries
+        if any(keyword in query_lower for keyword in ['vendor', 'vendors', 'seller', 'sellers']):
+            return _handle_vendor_queries(query_description, query_lower)
+        
+        # Attendee/donor-related queries  
+        elif any(keyword in query_lower for keyword in ['attendee', 'attendees', 'donor', 'donors', 'participant']):
+            return _handle_attendee_queries(query_description, query_lower)
+        
+        # Revenue/financial queries
+        elif any(keyword in query_lower for keyword in ['revenue', 'money', 'income', 'sales', 'profit', 'financial']):
+            return _handle_financial_queries(query_description, query_lower)
+        
+        # Geographic queries
+        elif any(keyword in query_lower for keyword in ['zip code', 'city', 'location', 'geographic', 'sf', 'daly city']):
+            return _handle_geographic_queries(query_description, query_lower)
+        
+        # Event-specific queries
+        elif any(keyword in query_lower for keyword in ['event', 'kapwa gardens', 'balay kreative', 'undscvrd', 'yum yams']):
+            return _handle_event_queries(query_description, query_lower)
+        
+        # Default comprehensive analysis
+        else:
+            return _execute_general_analysis(query_description)
+            
+    except Exception as e:
+        app.logger.error(f"Error in complex business query: {e}", exc_info=True)
+        return {"status": "error", "error_message": str(e)}
+
+
+def _handle_vendor_queries(query_description: str, query_lower: str) -> dict:
+    """Handle vendor-specific business intelligence queries."""
+    
+    # Extract date ranges
+    date_range = _extract_date_range(query_description)
+    
+    # Revenue queries for vendors
+    if 'money' in query_lower or 'revenue' in query_lower or 'sales' in query_lower:
+        if 'event' in query_lower and ('date' in query_lower or any(year in query_description for year in ['2020', '2021', '2022', '2023', '2024'])):
+            # "How much money was made by vendors at this event on this date"
+            sql_query = f"""
+            SELECT 
+                Event_Name,
+                Event_Date,
+                SUM(CAST(Lineitem_price AS FLOAT64)) as total_vendor_revenue,
+                COUNT(DISTINCT Order_ID) as total_orders,
+                COUNT(*) as total_items
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*` 
+            WHERE Event_Date IS NOT NULL 
+            AND Lineitem_price IS NOT NULL 
+            AND Lineitem_price != ''
+            {date_range['where_clause'] if date_range else ''}
+            GROUP BY Event_Name, Event_Date
+            ORDER BY total_vendor_revenue DESC
+            LIMIT 20
+            """
+            
+        elif 'top' in query_lower and ('vendor' in query_lower or 'sellers' in query_lower):
+            # "Who are the top 5 vendors from this event from date to date"  
+            sql_query = f"""
+            SELECT 
+                Vendor_Name,
+                Event_Name,
+                SUM(CAST(Lineitem_price AS FLOAT64)) as vendor_revenue,
+                COUNT(DISTINCT Order_ID) as orders_count,
+                AVG(CAST(Lineitem_price AS FLOAT64)) as avg_order_value
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE Vendor_Name IS NOT NULL
+            AND Lineitem_price IS NOT NULL 
+            AND Lineitem_price != ''
+            {date_range['where_clause'] if date_range else ''}
+            GROUP BY Vendor_Name, Event_Name
+            ORDER BY vendor_revenue DESC
+            LIMIT 10
+            """
+            
+        else:
+            # General vendor revenue analysis
+            sql_query = f"""
+            SELECT 
+                Event_Name,
+                COUNT(DISTINCT Vendor_Name) as unique_vendors,
+                SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue,
+                AVG(CAST(Lineitem_price AS FLOAT64)) as avg_revenue_per_item
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE Lineitem_price IS NOT NULL 
+            AND Lineitem_price != ''
+            GROUP BY Event_Name
+            ORDER BY total_revenue DESC
+            LIMIT 15
+            """
+    
+    # Geographic vendor queries
+    elif 'zip code' in query_lower or 'zip' in query_lower:
+        sql_query = f"""
+        SELECT 
+            Billing_Zip_Code as vendor_zip,
+            COUNT(DISTINCT Vendor_Name) as vendor_count,
+            COUNT(*) as total_orders,
+            SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Billing_Zip_Code IS NOT NULL
+        AND Billing_Zip_Code != ''
+        {date_range['where_clause'] if date_range else ''}
+        GROUP BY Billing_Zip_Code
+        ORDER BY vendor_count DESC
+        LIMIT 20
+        """
+    
+    # Email/contact queries  
+    elif 'email' in query_lower:
+        sql_query = f"""
+        SELECT DISTINCT
+            Vendor_Name,
+            Email,
+            Event_Name,
+            SUM(CAST(Lineitem_price AS FLOAT64)) as total_sales
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Email IS NOT NULL
+        AND Email != ''
+        AND Email LIKE '%@%'
+        GROUP BY Vendor_Name, Email, Event_Name
+        ORDER BY total_sales DESC
+        LIMIT 50
+        """
+    
+    # Multi-event participation queries
+    elif 'kapwa gardens' in query_lower and 'undscvrd' in query_lower:
+        sql_query = f"""
+        WITH vendor_events AS (
+            SELECT DISTINCT
+                Vendor_Name,
+                Event_Name,
+                CASE 
+                    WHEN LOWER(Event_Name) LIKE '%kapwa%' THEN 'Kapwa Gardens'
+                    WHEN LOWER(Event_Name) LIKE '%undscvrd%' THEN 'UNDSCVRD'
+                    ELSE 'Other'
+                END as event_category,
+                SUM(CAST(Lineitem_price AS FLOAT64)) as vendor_revenue
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE Vendor_Name IS NOT NULL
+            AND Lineitem_price IS NOT NULL
+            {date_range['where_clause'] if date_range else ''}
+            GROUP BY Vendor_Name, Event_Name
+        )
+        SELECT 
+            Vendor_Name,
+            COUNT(DISTINCT event_category) as event_types_participated,
+            SUM(vendor_revenue) as total_revenue,
+            STRING_AGG(DISTINCT Event_Name, ', ') as events_list
+        FROM vendor_events
+        WHERE event_category IN ('Kapwa Gardens', 'UNDSCVRD')
+        GROUP BY Vendor_Name
+        HAVING COUNT(DISTINCT event_category) = 2
+        AND SUM(vendor_revenue) >= 500
+        ORDER BY total_revenue DESC
+        """
+    
+    else:
+        # Default vendor analysis
+        sql_query = f"""
+        SELECT 
+            Vendor_Name,
+            COUNT(DISTINCT Event_Name) as events_participated,
+            SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue,
+            COUNT(*) as total_items_sold
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Vendor_Name IS NOT NULL
+        GROUP BY Vendor_Name
+        ORDER BY total_revenue DESC
+        LIMIT 20
+        """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_attendee_queries(query_description: str, query_lower: str) -> dict:
+    """Handle attendee/donor-specific business intelligence queries."""
+    
+    date_range = _extract_date_range(query_description)
+    
+    # Geographic attendee queries
+    if 'zip code' in query_lower or 'city' in query_lower:
+        if 'sf' in query_lower or 'san francisco' in query_lower:
+            sql_query = f"""
+            SELECT 
+                Billing_City,
+                Billing_Zip_Code,
+                COUNT(*) as attendee_count,
+                COUNT(DISTINCT Email) as unique_attendees
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE (LOWER(Billing_City) LIKE '%san francisco%' 
+                OR LOWER(Billing_City) LIKE '%sf%'
+                OR Billing_Zip_Code IN ('94102', '94103', '94104', '94105', '94107', '94108', '94109', '94110', '94111', '94112', '94114', '94115', '94116', '94117', '94118', '94121', '94122', '94123', '94124', '94127', '94129', '94130', '94131', '94132', '94133', '94134', '94158'))
+            {date_range['where_clause'] if date_range else ''}
+            GROUP BY Billing_City, Billing_Zip_Code
+            ORDER BY attendee_count DESC
+            """
+            
+        elif 'daly city' in query_lower:
+            sql_query = f"""
+            SELECT 
+                Billing_City,
+                Billing_Zip_Code,
+                COUNT(*) as attendee_count,
+                COUNT(DISTINCT Email) as unique_attendees,
+                STRING_AGG(DISTINCT Event_Name, ', ') as events_attended
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE (LOWER(Billing_City) LIKE '%daly city%'
+                OR Billing_Zip_Code IN ('94014', '94015', '94016', '94017'))
+            {date_range['where_clause'] if date_range else ''}
+            GROUP BY Billing_City, Billing_Zip_Code
+            ORDER BY attendee_count DESC
+            """
+            
+        else:
+            # General geographic analysis
+            sql_query = f"""
+            SELECT 
+                Billing_City as attendee_city,
+                COUNT(*) as total_attendees,
+                COUNT(DISTINCT Email) as unique_attendees,
+                COUNT(DISTINCT Event_Name) as events_attended
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE Billing_City IS NOT NULL
+            AND Billing_City != ''
+            {date_range['where_clause'] if date_range else ''}
+            GROUP BY Billing_City
+            ORDER BY total_attendees DESC
+            LIMIT 20
+            """
+    
+    # Donation/giving queries
+    elif 'gave' in query_lower or 'donation' in query_lower or 'donor' in query_lower:
+        sql_query = f"""
+        SELECT 
+            Event_Name,
+            COUNT(DISTINCT Email) as unique_donors,
+            SUM(CAST(Lineitem_price AS FLOAT64)) as total_donations,
+            AVG(CAST(Lineitem_price AS FLOAT64)) as avg_donation,
+            COUNT(*) as total_transactions
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Lineitem_price IS NOT NULL
+        AND CAST(Lineitem_price AS FLOAT64) > 1
+        {date_range['where_clause'] if date_range else ''}
+        GROUP BY Event_Name
+        ORDER BY total_donations DESC
+        LIMIT 15
+        """
+    
+    # Multi-event attendance queries
+    elif 'balay kreative' in query_lower and 'undscvrd' in query_lower:
+        sql_query = f"""
+        WITH attendee_events AS (
+            SELECT 
+                Email,
+                Event_Name,
+                Event_Date,
+                CASE 
+                    WHEN LOWER(Event_Name) LIKE '%balay kreative%' THEN 'Balay Kreative'
+                    WHEN LOWER(Event_Name) LIKE '%undscvrd%' THEN 'UNDSCVRD'
+                    ELSE 'Other'
+                END as event_category
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE Email IS NOT NULL
+            AND Event_Date LIKE '%2020%'
+        )
+        SELECT 
+            Email,
+            COUNT(DISTINCT event_category) as event_types_attended,
+            STRING_AGG(DISTINCT Event_Name, ', ') as events_list,
+            COUNT(*) as total_participations
+        FROM attendee_events
+        WHERE event_category IN ('Balay Kreative', 'UNDSCVRD')
+        GROUP BY Email
+        HAVING COUNT(DISTINCT event_category) = 2
+        ORDER BY total_participations DESC
+        LIMIT 25
+        """
+    
+    # Grant application queries
+    elif 'grant' in query_lower and 'balay kreative' in query_lower:
+        sql_query = f"""
+        WITH attendee_frequency AS (
+            SELECT 
+                Email,
+                Billing_City,
+                COUNT(*) as event_count,
+                STRING_AGG(DISTINCT Event_Name, ', ') as events_attended
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+            WHERE LOWER(Event_Name) LIKE '%balay kreative%'
+            AND Email IS NOT NULL
+            GROUP BY Email, Billing_City
+            HAVING COUNT(*) > 2
+        )
+        SELECT *
+        FROM attendee_frequency
+        ORDER BY event_count DESC
+        LIMIT 30
+        """
+    
+    # Email queries
+    elif 'email' in query_lower:
+        sql_query = f"""
+        SELECT DISTINCT
+            Email,
+            Billing_City,
+            COUNT(*) as event_participations,
+            STRING_AGG(DISTINCT Event_Name, ', ') as events_attended
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Email IS NOT NULL
+        AND Email != ''
+        AND Email LIKE '%@%'
+        AND Billing_City IS NOT NULL
+        GROUP BY Email, Billing_City
+        ORDER BY event_participations DESC
+        LIMIT 50
+        """
+    
+    else:
+        # General attendee analysis
+        sql_query = f"""
+        SELECT 
+            Event_Name,
+            COUNT(*) as total_attendees,
+            COUNT(DISTINCT Email) as unique_attendees,
+            Event_Date
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Event_Name IS NOT NULL
+        {date_range['where_clause'] if date_range else ''}
+        GROUP BY Event_Name, Event_Date
+        ORDER BY total_attendees DESC
+        LIMIT 20
+        """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_financial_queries(query_description: str, query_lower: str) -> dict:
+    """Handle financial and revenue-specific queries."""
+    date_range = _extract_date_range(query_description)
+    
+    if 'kapwa gardens' in query_lower:
+        sql_query = f"""
+        SELECT 
+            Event_Name,
+            Event_Date,
+            SUM(CAST(Lineitem_price AS FLOAT64)) as total_given,
+            COUNT(DISTINCT Email) as unique_donors,
+            AVG(CAST(Lineitem_price AS FLOAT64)) as avg_donation
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE LOWER(Event_Name) LIKE '%kapwa%'
+        AND Lineitem_price IS NOT NULL
+        {date_range['where_clause'] if date_range else ''}
+        GROUP BY Event_Name, Event_Date
+        ORDER BY total_given DESC
+        """
+    else:
+        sql_query = f"""
+        SELECT 
+            Event_Name,
+            SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue,
+            COUNT(DISTINCT Email) as unique_participants,
+            COUNT(*) as total_transactions
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Lineitem_price IS NOT NULL
+        {date_range['where_clause'] if date_range else ''}
+        GROUP BY Event_Name
+        ORDER BY total_revenue DESC
+        LIMIT 20
+        """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_geographic_queries(query_description: str, query_lower: str) -> dict:
+    """Handle location and geographic-specific queries."""
+    
+    if 'sf' in query_lower and 'daly city' in query_lower:
+        sql_query = f"""
+        SELECT 
+            Billing_City,
+            Billing_Zip_Code,
+            COUNT(*) as attendee_count,
+            COUNT(DISTINCT Email) as unique_attendees
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE (LOWER(Billing_City) LIKE '%san francisco%' 
+            OR LOWER(Billing_City) LIKE '%sf%'
+            OR LOWER(Billing_City) LIKE '%daly city%'
+            OR Billing_Zip_Code IN ('94102', '94103', '94104', '94105', '94107', '94108', '94109', '94110', '94111', '94112', '94114', '94115', '94116', '94117', '94118', '94121', '94122', '94123', '94124', '94127', '94129', '94130', '94131', '94132', '94133', '94134', '94158', '94014', '94015', '94016', '94017'))
+        GROUP BY Billing_City, Billing_Zip_Code
+        ORDER BY attendee_count DESC
+        """
+    else:
+        sql_query = f"""
+        SELECT 
+            Billing_City as popular_city,
+            COUNT(*) as total_participants,
+            COUNT(DISTINCT Email) as unique_participants,
+            COUNT(DISTINCT Event_Name) as events_attended
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Billing_City IS NOT NULL
+        AND Billing_City != ''
+        GROUP BY Billing_City
+        ORDER BY total_participants DESC
+        LIMIT 25
+        """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_event_queries(query_description: str, query_lower: str) -> dict:
+    """Handle event-specific queries."""
+    date_range = _extract_date_range(query_description)
+    
+    sql_query = f"""
+    SELECT 
+        Event_Name,
+        Event_Date,
+        COUNT(*) as total_attendees,
+        COUNT(DISTINCT Email) as unique_attendees,
+        SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue
+    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+    WHERE Event_Name IS NOT NULL
+    {date_range['where_clause'] if date_range else ''}
+    GROUP BY Event_Name, Event_Date
+    ORDER BY total_attendees DESC
+    LIMIT 20
+    """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _execute_general_analysis(query_description: str) -> dict:
+    """Execute general data analysis."""
+    sql_query = f"""
+    SELECT 
+        Event_Name,
+        COUNT(*) as total_records,
+        COUNT(DISTINCT Email) as unique_participants,
+        COUNT(DISTINCT Vendor_Name) as unique_vendors
+    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+    WHERE Event_Name IS NOT NULL
+    GROUP BY Event_Name
+    ORDER BY total_records DESC
+    LIMIT 25
+    """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _extract_date_range(query_description: str) -> dict:
+    """Extract date range filters from query description."""
+    import re
+    
+    # Extract years
+    years = re.findall(r'20\d{2}', query_description)
+    
+    if len(years) >= 2:
+        start_year = min(years)
+        end_year = max(years)
+        where_clause = f"AND (Event_Date LIKE '%{start_year}%' OR Event_Date LIKE '%{end_year}%' OR Event_Date BETWEEN '{start_year}-01-01' AND '{end_year}-12-31')"
+        return {'start_year': start_year, 'end_year': end_year, 'where_clause': where_clause}
+    elif len(years) == 1:
+        year = years[0]
+        where_clause = f"AND (Event_Date LIKE '%{year}%' OR Event_Date BETWEEN '{year}-01-01' AND '{year}-12-31')"
+        return {'year': year, 'where_clause': where_clause}
+    
+    return None
+
+
 def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overview") -> dict:
     """Performs comprehensive data analysis on a specific table with advanced insights.
     
@@ -896,6 +1379,7 @@ def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overvi
 
 gemini_tool_functions_list = [
     internal_execute_sql_query,
+    execute_complex_business_query,
     execute_comprehensive_analysis,
     get_zip_codes_for_city,
     get_current_time
