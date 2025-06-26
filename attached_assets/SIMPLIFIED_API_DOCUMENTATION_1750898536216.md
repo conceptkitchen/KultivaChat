@@ -38,6 +38,9 @@ The API uses a secure server-side credential system where:
 
 ## API Endpoints
 
+### Single Natural Language Query Interface
+The API has been simplified to use **one single endpoint** for all queries. Whether you want to discover tables, ask business questions, or run SQL queries, you simply send your request to the same endpoint and the AI automatically handles the appropriate processing.
+
 ### 1. Health Check
 **Endpoint:** `GET /api/health`
 
@@ -58,21 +61,7 @@ curl https://kultivate-chat-ck.replit.app/api/health
 
 ---
 
-### Alternative Endpoints (Advanced Users)
-
-#### Get Available Tables
-**Endpoint:** `POST /api/v1/data/tables`
-**Usage:** Technical users who need raw table listings
-
-#### Direct SQL Execution  
-**Endpoint:** `POST /api/v1/data/sql`
-**Usage:** Developers who prefer writing SQL directly
-
-*Note: Most users should use the natural language endpoint above instead of these technical endpoints.*
-
----
-
-### Primary Endpoint: Natural Language Queries
+### 2. Primary Endpoint: Natural Language Queries
 **Endpoint:** `POST /api/v1/data/query`
 
 **Purpose:** Ask business questions in plain English - this is the main way to use the API

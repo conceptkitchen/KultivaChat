@@ -112,6 +112,14 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 26, 2025**: API SIMPLIFIED TO SINGLE NATURAL LANGUAGE ENDPOINT - Removed redundant endpoints for cleaner architecture
+  - ✅ REMOVED: Redundant `/api/v1/data/sql` and `/api/v1/data/tables` endpoints that caused confusion
+  - ✅ STREAMLINED: Now only `/api/v1/data/query` exists as the single natural language interface
+  - ✅ CLEANED: Removed helper functions (handle_table_discovery_request, handle_direct_sql_request, handle_natural_language_request, determine_query_route)
+  - ✅ SIMPLIFIED: Architecture now has one clear path - natural language queries automatically handle table discovery, SQL execution, and business intelligence
+  - ✅ UPDATED: API documentation reflects single endpoint design
+  - → Users now have one simple interface: send any query to `/api/v1/data/query` and AI handles the rest
+
 - **June 26, 2025**: API DOCUMENTATION UPDATED FOR NATURAL LANGUAGE FOCUS - Documentation restructured to emphasize natural language queries as primary interface
   - ✅ UPDATED: API documentation now clearly positions natural language queries as the main way to use the API
   - ✅ SIMPLIFIED: Moved technical SQL and table endpoints to "Advanced Users" section
