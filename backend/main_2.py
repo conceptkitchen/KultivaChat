@@ -541,17 +541,9 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         import time
         start_time = time.time()
         
-        # Execute query with enhanced timeout handling
-        query_job = bigquery_client.query(sql_query, timeout=30)  # Reduced timeout for faster failure detection
-        
-        # Wait for job completion with proper timeout
-        try:
-            results = query_job.result(timeout=45)  # Slightly longer result timeout
-        except Exception as timeout_error:
-            app.logger.warning(f"Query timeout or connection issue, attempting retry: {timeout_error}")
-            # Single retry with fresh query job
-            query_job = bigquery_client.query(sql_query, timeout=20)
-            results = query_job.result(timeout=30)
+        # Execute query with proper timeout handling
+        query_job = bigquery_client.query(sql_query)
+        results = query_job.result(timeout=60)
         
         rows_list = []
         row_count = 0
