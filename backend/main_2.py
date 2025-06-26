@@ -2835,6 +2835,70 @@ def extract_data_from_gemini_response(response):
     return query_data
 
 
+def _analyze_query_complexity(query: str) -> dict:
+    """Analyze query complexity and provide processing metadata for API responses."""
+    query_lower = query.lower()
+    
+    # Complex query indicators
+    complex_indicators = [
+        # Multi-event analysis
+        ('kapwa gardens' in query_lower and 'undscvrd' in query_lower),
+        ('balay kreative' in query_lower and 'undscvrd' in query_lower),
+        
+        # Revenue/financial analysis with conditions
+        ('money' in query_lower and ('vendor' in query_lower or 'event' in query_lower)),
+        ('revenue' in query_lower and 'event' in query_lower),
+        ('made' in query_lower and '$' in query_lower),
+        ('at least $' in query_lower),
+        ('more than $' in query_lower),
+        
+        # Date range analysis
+        ('from 20' in query_lower and 'to 20' in query_lower),
+        ('2020' in query_lower and '2023' in query_lower),
+        ('2021' in query_lower and '2024' in query_lower),
+        
+        # Geographic with conditions
+        ('sf and daly city' in query_lower),
+        ('live in' in query_lower and 'zip' in query_lower),
+        ('attendees' in query_lower and 'city' in query_lower),
+        
+        # Multi-condition queries  
+        ('who' in query_lower and 'and' in query_lower and ('more than' in query_lower or 'at least' in query_lower)),
+        ('which' in query_lower and 'and' in query_lower and ('identify' in query_lower or 'made' in query_lower)),
+        
+        # Grant correlation
+        ('grant' in query_lower and 'event' in query_lower and 'more than' in query_lower),
+        ('applied' in query_lower and 'went to' in query_lower)
+    ]
+    
+    # Complex keyword counting
+    complex_keywords = [
+        'participated in', 'identify as', 'made more than', 'gave more than',
+        'from 20', 'to 20', 'at least', 'more than 2', 'email addresses', 
+        'zip codes', 'cell numbers', 'applied to', 'live in'
+    ]
+    
+    keyword_count = sum(1 for keyword in complex_keywords if keyword in query_lower)
+    is_complex = any(complex_indicators) or keyword_count >= 2
+    
+    if is_complex:
+        return {
+            'is_complex_query': True,
+            'estimated_processing_time': '15-30 seconds',
+            'processing_status': 'Analyzing business data across multiple tables...',
+            'complexity_factors': keyword_count,
+            'query_type': 'business_intelligence'
+        }
+    else:
+        return {
+            'is_complex_query': False,
+            'estimated_processing_time': '1-5 seconds', 
+            'processing_status': 'Processing query...',
+            'complexity_factors': keyword_count,
+            'query_type': 'simple'
+        }
+
+
 def handle_natural_language_request(query, credentials):
     """Handle natural language AI processing requests using auto-execution and fallback logic"""
     try:
@@ -2891,6 +2955,8 @@ def handle_natural_language_request(query, credentials):
                     return tables_data
         
         # For other complex queries, provide helpful guidance
+        complexity_metadata = _analyze_query_complexity(query)
+        
         return jsonify({
             "success": True,
             "query": query,
@@ -2898,6 +2964,7 @@ def handle_natural_language_request(query, credentials):
             "data": [],
             "route_used": "nlp",
             "rows_returned": 0,
+            **complexity_metadata,
             "suggestion": "Use main chat interface for full natural language capabilities, or try 'show me tables' or direct SQL queries via API",
             "timestamp": datetime.now().isoformat()
         })
@@ -3076,3 +3143,67 @@ if __name__ == '__main__':
             debug=False,
             use_reloader=False,
             threaded=True)
+
+
+def _analyze_query_complexity(query: str) -> dict:
+    """Analyze query complexity and provide processing metadata for API responses."""
+    query_lower = query.lower()
+    
+    # Complex query indicators
+    complex_indicators = [
+        # Multi-event analysis
+        ('kapwa gardens' in query_lower and 'undscvrd' in query_lower),
+        ('balay kreative' in query_lower and 'undscvrd' in query_lower),
+        
+        # Revenue/financial analysis with conditions
+        ('money' in query_lower and ('vendor' in query_lower or 'event' in query_lower)),
+        ('revenue' in query_lower and 'event' in query_lower),
+        ('made' in query_lower and '$' in query_lower),
+        ('at least $' in query_lower),
+        ('more than $' in query_lower),
+        
+        # Date range analysis
+        ('from 20' in query_lower and 'to 20' in query_lower),
+        ('2020' in query_lower and '2023' in query_lower),
+        ('2021' in query_lower and '2024' in query_lower),
+        
+        # Geographic with conditions
+        ('sf and daly city' in query_lower),
+        ('live in' in query_lower and 'zip' in query_lower),
+        ('attendees' in query_lower and 'city' in query_lower),
+        
+        # Multi-condition queries  
+        ('who' in query_lower and 'and' in query_lower and ('more than' in query_lower or 'at least' in query_lower)),
+        ('which' in query_lower and 'and' in query_lower and ('identify' in query_lower or 'made' in query_lower)),
+        
+        # Grant correlation
+        ('grant' in query_lower and 'event' in query_lower and 'more than' in query_lower),
+        ('applied' in query_lower and 'went to' in query_lower)
+    ]
+    
+    # Complex keyword counting
+    complex_keywords = [
+        'participated in', 'identify as', 'made more than', 'gave more than',
+        'from 20', 'to 20', 'at least', 'more than 2', 'email addresses', 
+        'zip codes', 'cell numbers', 'applied to', 'live in'
+    ]
+    
+    keyword_count = sum(1 for keyword in complex_keywords if keyword in query_lower)
+    is_complex = any(complex_indicators) or keyword_count >= 2
+    
+    if is_complex:
+        return {
+            'is_complex_query': True,
+            'estimated_processing_time': '15-30 seconds',
+            'processing_status': 'Analyzing business data across multiple tables...',
+            'complexity_factors': keyword_count,
+            'query_type': 'business_intelligence'
+        }
+    else:
+        return {
+            'is_complex_query': False,
+            'estimated_processing_time': '1-5 seconds', 
+            'processing_status': 'Processing query...',
+            'complexity_factors': keyword_count,
+            'query_type': 'simple'
+        }
