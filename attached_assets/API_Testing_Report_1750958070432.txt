@@ -1,0 +1,164 @@
+# API Testing Report
+
+## Introduction
+This report summarizes the testing conducted on the specified API, focusing on various endpoints and the integrity of the data returned. The objective was to discover the available tables in the database, retrieve sample records, and identify any data-related errors.
+
+## Tests Conducted
+1. **Table Discovery**: Retrieved a list of available tables in the database.
+2. **Event Data Queries**: Executed queries on specific event data tables.
+3. **Close-Outs Queries**: Executed queries on various close-out tables.
+4. **Vendor Data Queries**: Executed queries on vendor-related tables.
+5. **Undiscovered Data Queries**: Retrieved data from the undiscovered tables.
+
+## Results
+- **Table Discovery**: Successfully retrieved 64 available tables.
+- **Close-Out Sales Data**: Multiple queries showed consistent data structures, but a lack of complete entries with many empty fields.
+- **Vendor Data**: Similar findings with missing critical fields across different queries.
+- **Undiscovered Vendor Export**: Mixed data quality observed with a blend of complete and incomplete records.
+
+## Errors Observed
+- Many returned records had empty fields or returned `#REF!` values, indicating potential data integrity issues in the source.
+- Consistency in returned structures across different tables, demonstrating some reliability in the API, but incomplete data raises concerns.
+
+## Conclusion
+The API shows potential for retrieving useful data; however, attention is required to address the missing fields and the integrity of the data being returned. Future software updates may consider refining how data is populated to ensure completeness.
+
+## Detailed Test Attempts
+
+### 1. Table Discovery
+- **Attempt:** Retrieve the list of available tables.
+- **Result:** Successfully retrieved 64 tables, confirming the API's ability to enumerate resources.
+
+### 2. Event Data Queries
+- **Table:** Close-Out-Sales---Be-Free-Festival---2023-06-10---Kapwa-Gardens
+  - **Attempt:** Execute a query to retrieve sample data.
+  - **Result:** Successful retrieval but with several entries showing empty fields.
+
+- **Table:** Close-Out-Sales---Lavender-Cinema-Lounge---2023-09-15---Kapwa-Gardens-Revenue-Share-Rules
+  - **Attempt:** Execute a query to retrieve sample data.
+  - **Result:** Similar issues with empty fields and consistent structure observed.
+
+### 3. Close-Outs Queries
+- **Table:** Close-Outs---Yum-Yams---2023-05-13---Kapwa-Gardens-All-Vendor-Close-Out-Sales
+  - **Attempt:** Retrieve data records.
+  - **Result:** Returned records showed consistent format but many empty entries.
+
+### 4. Vendor Data Queries
+- **Table:** Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-KG-Costs
+  - **Attempt:** Query execution for sample.
+  - **Result:** Data returned but lacked completion in several fields.
+
+- **Table:** Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-Revenue-Share-Rules
+  - **Attempt:** Query execution.
+  - **Result:** Similar findings, raising concerns over data integrity.
+
+### 5. Undiscovered Data Queries
+- **Table:** Undiscovered-Vendor-Export---Squarespace---All-data-orders
+  - **Attempt:** Retrieve and analyze data.
+  - **Result:** Mixed data quality observed; some entries contained complete data, others included many missing fields.
+
+### Summary of Failures
+- Multiple queries consistently retrieved records with empty fields or `#REF!` values.
+- This suggests potential issues with the data input process or database integrity that need to be addressed.
+
+
+   Execution Details                                                   
+                                                                                                                      
+                                                  1. Table Discovery                                                  
+                                                                                                                      
+   • Command Executed:                                                                                                
+                                                                                                                      
+                                                                                                                      
+     curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d       
+   '{"query": "show me tables"}'                                                                                      
+                                                                                                                      
+                                                                                                                      
+   • Result:                                                                                                          
+                                                                                                                      
+                                                                                                                      
+     { "success": true, "total_tables": 64, "tables": [...] }                                                         
+                                                                                                                      
+                                                                                                                      
+                                                2. Event Data Queries                                                 
+                                                                                                                      
+   • Table: Close-Out-Sales---Be-Free-Festival---2023-06-10---Kapwa-Gardens                                           
+      • Command Executed:                                                                                             
+                                                                                                                      
+                                                                                                                      
+       curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d     
+   '{"query": "SELECT * FROM                                                                                          
+   `kbc-use4-839-261b.WORKSPACE_21894820.Close-Out-Sales---Be-Free-Festival---2023-06-10---Kapwa-Gardens` LIMIT 10"   
+       ```                                                                                                            
+     - **Result:**                                                                                                    
+   ```text                                                                                                            
+       { "data": [{ "Vendor":"Security - in house", "Cost":"$25.00", "QT":"0", "Total":"$0.00" }, ... ] }             
+       ```                                                                                                            
+                                                                                                                      
+   - **Table:** Close-Out-Sales---Lavender-Cinema-Lounge---2023-09-15---Kapwa-Gardens-Revenue-Share-Rules             
+     - **Command Executed:**                                                                                          
+   ```text                                                                                                            
+       curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d     
+   '{"query": "SELECT * FROM                                                                                          
+   `kbc-use4-839-261b.WORKSPACE_21894820.Close-Out-Sales---Lavender-Cinema-Lounge---2023-09-15---Kapwa-Gardens-Reve   
+   e-Share-Rules` LIMIT 10"}'                                                                                         
+       ```                                                                                                            
+     - **Result:**                                                                                                    
+   ```text                                                                                                            
+       { "data": [{ "Vendor":"Sound Manager", "Total":"$237.50", ... }] }                                             
+       ```                                                                                                            
+                                                                                                                      
+   ### 3. Close-Outs Queries                                                                                          
+   - **Table:** Close-Outs---Yum-Yams---2023-05-13---Kapwa-Gardens-All-Vendor-Close-Out-Sales                         
+     - **Command Executed:**                                                                                          
+   ```text                                                                                                            
+       curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d     
+   '{"query": "SELECT * FROM                                                                                          
+   `kbc-use4-839-261b.WORKSPACE_21894820.Close-Outs---Yum-Yams---2023-05-13---Kapwa-Gardens-All-Vendor-Close-Out-Sa   
+   s` LIMIT 10"}'                                                                                                     
+       ```                                                                                                            
+     - **Result:**                                                                                                    
+   ```text                                                                                                            
+       { "data": [{ "Vendor":"Security - in house", "Cost":"$25.00", ...}] }                                          
+       ```                                                                                                            
+                                                                                                                      
+   ### 4. Vendor Data Queries                                                                                         
+   - **Table:** Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-KG-Costs                                      
+     - **Command Executed:**                                                                                          
+   ```text                                                                                                            
+       curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d     
+   '{"query": "SELECT * FROM                                                                                          
+   `kbc-use4-839-261b.WORKSPACE_21894820.Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-KG-Costs` LIMIT      
+   10"}'                                                                                                              
+       ```                                                                                                            
+     - **Result:**                                                                                                    
+   ```text                                                                                                            
+       { "data": [{ "Vendor":"Security - in house", "Total": "..."}, ...] }                                           
+       ```                                                                                                            
+                                                                                                                      
+   - **Table:** Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-Revenue-Share-Rules                           
+     - **Command Executed:**                                                                                          
+   ```text                                                                                                            
+       curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d     
+   '{"query": "SELECT * FROM                                                                                          
+   `kbc-use4-839-261b.WORKSPACE_21894820.Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-Revenue-Share-Rule   
+   LIMIT 10"}'                                                                                                        
+       ```                                                                                                            
+     - **Result:**                                                                                                    
+   ```text                                                                                                            
+       { "data": [{ "Vendor":"Security - in house", "Total":"$0.00"}, ...] }                                          
+       ```                                                                                                            
+                                                                                                                      
+   ### 5. Undiscovered Data Queries                                                                                   
+   - **Table:** Undiscovered-Vendor-Export---Squarespace---All-data-orders                                            
+     - **Command Executed:**                                                                                          
+   ```text                                                                                                            
+       curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query -H "Content-Type: application/json" -d     
+   '{"query": "SELECT * FROM                                                                                          
+   `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered-Vendor-Export---Squarespace---All-data-orders` LIMIT 10"}'      
+       ```                                                                                                            
+     - **Result:**                                                                                                    
+   ```text                                                                                                            
+       { "data": [{ "Vendor_Name":"Excelsior Coffee", "Total_Sales":"#REF!"}, ...] }                                  
+       ```                                                                                                            
+                                                                                                                      
+   ---                                                                                   
