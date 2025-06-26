@@ -112,6 +112,15 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 26, 2025**: COMPREHENSIVE API TESTING COMPLETED - All endpoints verified operational with detailed usage documentation
+  - ✅ TESTED: Complete endpoint validation with zero 404 errors found across all documented APIs
+  - ✅ VERIFIED: Health check (200), table discovery (64 tables, 200), direct SQL execution (200), intelligent routing (200)
+  - ✅ DOCUMENTED: Specific query types allowed - table discovery phrases, SQL syntax requirements, error handling
+  - ✅ CREATED: Comprehensive API usage guide (KULTIVATE_AI_API_USAGE_GUIDE.md) with specific examples and limitations
+  - ✅ IMPLEMENTED: Graceful degradation for natural language processing (503 status with helpful guidance)
+  - ✅ CONFIRMED: Single intelligent endpoint /api/v1/data/query auto-routes all query types successfully
+  - → Production API service fully documented with specific usage guidelines and comprehensive error handling
+
 - **June 25, 2025**: INTELLIGENT QUERY ROUTER IMPLEMENTED - Single endpoint automatically routes to optimal processing method
   - ✅ CREATED: Smart routing system in `/api/v1/data/query` that automatically determines processing method
   - ✅ IMPLEMENTED: Pattern-based detection for table discovery, direct SQL execution, and natural language processing
