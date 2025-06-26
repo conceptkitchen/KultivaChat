@@ -533,24 +533,47 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         msg = "BigQuery client not initialized. Please provide your Google Cloud credentials file to enable data querying."
         app.logger.error(f"Tool call internal_execute_sql_query: {msg}")
         return {"status": "error", "error_message": msg}
-    app.logger.info(
-        f"Tool Call: internal_execute_sql_query with query: {sql_query}")
+    
+    app.logger.info(f"Tool Call: internal_execute_sql_query with query: {sql_query}")
+    
     try:
-        query_job = bigquery_client.query(sql_query)
-        results = query_job.result(timeout=60)
+        # Enhanced timeout and connection handling for repeated requests
+        import time
+        start_time = time.time()
+        
+        # Execute query with enhanced timeout handling
+        query_job = bigquery_client.query(sql_query, timeout=30)  # Reduced timeout for faster failure detection
+        
+        # Wait for job completion with proper timeout
+        try:
+            results = query_job.result(timeout=45)  # Slightly longer result timeout
+        except Exception as timeout_error:
+            app.logger.warning(f"Query timeout or connection issue, attempting retry: {timeout_error}")
+            # Single retry with fresh query job
+            query_job = bigquery_client.query(sql_query, timeout=20)
+            results = query_job.result(timeout=30)
+        
         rows_list = []
+        row_count = 0
+        
+        # Process results with memory-efficient iteration
         for row in results:
             row_dict = {}
             for key, value in dict(row).items():
-                if hasattr(value, '__class__') and 'Decimal' in str(
-                        type(value)):
+                if hasattr(value, '__class__') and 'Decimal' in str(type(value)):
                     row_dict[key] = float(value)
                 else:
                     row_dict[key] = value
             rows_list.append(row_dict)
-        app.logger.info(
-            f"Tool Call: internal_execute_sql_query executed, returned {len(rows_list)} rows."
-        )
+            row_count += 1
+            
+            # Prevent memory issues with very large result sets
+            if row_count >= 1000:
+                app.logger.warning(f"Result set truncated at {row_count} rows to prevent memory issues")
+                break
+        
+        execution_time = time.time() - start_time
+        app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(rows_list)} rows.")
         
         # Store results globally for fallback extraction
         global last_sql_results
@@ -558,13 +581,20 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         
         result_payload = {"status": "success", "data": rows_list}
         return result_payload
+        
     except Exception as e:
-        app.logger.error(
-            f"Tool Call: Error executing BigQuery query for internal_execute_sql_query: {e}",
-            exc_info=True)
+        app.logger.error(f"Tool Call: Error executing BigQuery query for internal_execute_sql_query: {e}", exc_info=True)
+        
+        # Enhanced error handling with connection diagnostics
+        error_msg = str(e)
+        if "timeout" in error_msg.lower() or "deadline" in error_msg.lower():
+            error_msg = f"Query timeout after 45 seconds - try simplifying the query or adding LIMIT clause: {error_msg}"
+        elif "connection" in error_msg.lower() or "network" in error_msg.lower():
+            error_msg = f"BigQuery connection issue - this may resolve on retry: {error_msg}"
+        
         return {
             "status": "error",
-            "error_message": f"Error executing BigQuery query: {str(e)}"
+            "error_message": f"Error executing BigQuery query: {error_msg}"
         }
 
 
