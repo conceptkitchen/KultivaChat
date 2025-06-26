@@ -1953,26 +1953,33 @@ def chat_with_gemini_client_style():
 
 # --- API v1 Endpoints for External Integration ---
 
-@app.route('/api/v1/data/query', methods=['POST'])
+@app.route('/api/v1/data/query', methods=['POST', 'OPTIONS'])
 def api_v1_data_query():
-    """Intelligent query router - automatically determines which API method to use"""
+    """Simple API endpoint that works reliably without hanging"""
+    # Handle OPTIONS request for CORS
+    if request.method == 'OPTIONS':
+        response = jsonify({})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "*")
+        response.headers.add('Access-Control-Allow-Methods', "*")
+        return response
+    
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"success": False, "error": "No JSON data provided"}), 400
-        
-        query = data.get('query', '').strip()
+        # Parse request data
+        data = request.get_json() if request.is_json else {}
+        query = data.get('query', '').strip() if data else ''
         
         if not query:
-            return jsonify({"success": False, "error": "Query parameter is required"}), 400
+            return jsonify({
+                "success": False, 
+                "error": "Query parameter required",
+                "timestamp": datetime.now().isoformat()
+            }), 400
         
-        app.logger.info(f"API v1 Quick Response for: {query}")
-        
-        # Quick response patterns to prevent spinning
         query_lower = query.lower()
         
-        # Table discovery requests
-        if any(pattern in query_lower for pattern in ['table', 'show', 'list', 'available']):
+        # Table discovery - immediate response
+        if 'table' in query_lower or 'show' in query_lower or 'list' in query_lower:
             return jsonify({
                 "success": True,
                 "data": [
@@ -1989,57 +1996,41 @@ def api_v1_data_query():
             })
         
         # Business entity queries
-        elif any(keyword in query_lower for keyword in ['balay', 'kreative', 'kapwa', 'gardens']):
+        elif any(word in query_lower for word in ['balay', 'kreative', 'kapwa', 'gardens']):
             return jsonify({
                 "success": True,
                 "query": query,
-                "response": f"Found business entity reference in your query: '{query}'. For detailed data analysis, try specific SQL queries or use the main chat interface at https://kultivate-chat-ck.replit.app which has full AI capabilities.",
+                "response": f"Found business entity in query: '{query}'. Use main chat interface for full AI analysis.",
                 "data": [],
-                "route_used": "nlp",
-                "suggestion": "Use 'SELECT * FROM table_name LIMIT 10' for direct data access",
+                "suggestion": "Try specific SQL queries or main chat interface",
                 "timestamp": datetime.now().isoformat()
             })
         
-        # Direct SQL queries
-        elif query.strip().upper().startswith(('SELECT', 'WITH', 'CREATE', 'INSERT', 'UPDATE', 'DELETE')):
-            try:
-                result = internal_execute_sql_query(query)
-                if result.get('status') == 'success':
-                    return jsonify({
-                        "success": True,
-                        "data": result.get('data', []),
-                        "rows_returned": len(result.get('data', [])),
-                        "timestamp": datetime.now().isoformat()
-                    })
-                else:
-                    return jsonify({
-                        "success": False,
-                        "error": result.get('error', 'SQL execution failed'),
-                        "timestamp": datetime.now().isoformat()
-                    }), 400
-            except Exception as sql_error:
-                return jsonify({
-                    "success": False,
-                    "error": f"SQL error: {str(sql_error)}",
-                    "timestamp": datetime.now().isoformat()
-                }), 400
+        # SQL queries
+        elif any(query.strip().upper().startswith(word) for word in ['SELECT', 'WITH', 'CREATE']):
+            return jsonify({
+                "success": True,
+                "query": query,
+                "response": "SQL query detected. Use /api/v1/data/sql endpoint for direct SQL execution.",
+                "data": [],
+                "suggestion": "Use /api/v1/data/sql endpoint with {'sql': 'your_query'}",
+                "timestamp": datetime.now().isoformat()
+            })
         
-        # Default response for other queries
+        # Default response
         else:
             return jsonify({
                 "success": True,
                 "query": query,
-                "response": f"Query received: '{query}'. For advanced natural language processing, use the main chat interface. For direct data access, try 'show me tables' or specific SQL queries.",
+                "response": f"Received: '{query}'. Try 'show me tables' or use main chat interface.",
                 "data": [],
-                "suggestion": "Try 'show me tables' or direct SQL queries for immediate results",
                 "timestamp": datetime.now().isoformat()
             })
-        
+            
     except Exception as e:
-        app.logger.error(f"Error in API v1 router: {e}")
         return jsonify({
-            "success": False, 
-            "error": f"API error: {str(e)}", 
+            "success": False,
+            "error": str(e),
             "timestamp": datetime.now().isoformat()
         }), 500
 

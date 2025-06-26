@@ -145,7 +145,8 @@ function startServer() {
         return res.status(503).json({ error: 'Backend starting up...' });
       }
       
-      const response = await fetch('http://localhost:8081/api/chat', {
+      // Route directly to the new API v1 endpoint in backend
+      const response = await fetch('http://localhost:8081/api/v1/data/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
