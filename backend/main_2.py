@@ -2748,114 +2748,13 @@ Current time: {datetime.now().isoformat()}"""
         }), 500
 
 
-def determine_query_route(query):
-    """Determine which API route to use based on query content"""
-    
-    # Table discovery patterns
-    table_patterns = [
-        'show me tables', 'list tables', 'what tables', 'available tables',
-        'show tables', 'display tables', 'table list', 'all tables',
-        'what data do i have', 'show my data', 'data available'
-    ]
-    
-    # Check for table discovery requests first
-    if any(pattern in query for pattern in table_patterns):
-        return {'route': 'tables', 'reason': 'Table discovery request detected'}
-    
-    # Direct SQL patterns - must start with SQL keywords for accurate detection
-    sql_start_patterns = [
-        'select ', 'SELECT ', 'with ', 'WITH ', 'create ', 'CREATE ',
-        'insert ', 'INSERT ', 'update ', 'UPDATE ', 'delete ', 'DELETE '
-    ]
-    
-    # Check for direct SQL queries - must start with SQL keywords
-    if any(query.strip().startswith(pattern.strip()) for pattern in sql_start_patterns):
-        # Extract and clean the SQL query
-        sql_query = query.strip()
-        # Remove common prefixes
-        prefixes = ['execute ', 'run ', 'query ']
-        for prefix in prefixes:
-            if sql_query.startswith(prefix):
-                sql_query = sql_query[len(prefix):].strip()
-        
-        return {
-            'route': 'sql',
-            'sql_query': sql_query,
-            'reason': 'Direct SQL query detected'
-        }
-    
-    # Default to natural language processing for business queries
-    return {'route': 'nlp', 'reason': 'Natural language query requiring AI processing'}
 
 
-def handle_table_discovery_request(credentials):
-    """Handle table discovery requests with timeout protection"""
-    try:
-        app.logger.info("Processing table discovery request")
-        
-        # Quick response with known tables to avoid hanging
-        known_tables = [
-            {"table_name": "Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders"},
-            {"table_name": "Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-New-close-out-Dye-Hard"},
-            {"table_name": "Kapwa-Gardens---Close-Out-Market-RECAP---NEW---April-Events-RECAP"},
-            {"table_name": "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-"},
-            {"table_name": "Kapwa-Gardens---market-vendors-recap---2-23-24---vendors-Vendor-Recap-"},
-            {"table_name": "Balay-Kreative---Event-Planner-data---All-data-bookings"}
-        ]
-        
-        return jsonify({
-            "success": True,
-            "data": known_tables,
-            "total_tables": len(known_tables),
-            "message": "Available business data tables - use these names for queries",
-            "timestamp": datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        app.logger.error(f"Error in table discovery: {e}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }), 500
 
 
-def handle_direct_sql_request(sql_query, credentials):
-    """Handle direct SQL execution requests"""
-    try:
-        result = internal_execute_sql_query(sql_query)
-        
-        if result.get('status') == 'success':
-            query_data = result.get('data', [])
-            return jsonify({
-                "success": True,
-                "query": sql_query,
-                "response": f"SQL query executed successfully. Returned {len(query_data)} rows.",
-                "data": [{
-                    "type": "table",
-                    "title": "SQL Query Results",
-                    "content": query_data
-                }] if query_data else [],
-                "route_used": "sql",
-                "rows_returned": len(query_data) if isinstance(query_data, list) else 0,
-                "timestamp": datetime.now().isoformat()
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "error": result.get('error', 'SQL execution failed'),
-                "route_used": "sql",
-                "timestamp": datetime.now().isoformat()
-            }), 400
-            
-    except Exception as e:
-        app.logger.error(f"Error in SQL execution: {e}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "route_used": "sql",
-            "timestamp": datetime.now().isoformat()
-        }), 500
+
+
+
 
 
 def extract_data_from_gemini_response(response):
@@ -3063,122 +2962,10 @@ def handle_natural_language_request(query, credentials):
         }), 500
 
 
-@app.route('/api/v1/data/sql', methods=['POST'])
-def api_v1_data_sql():
-    """Direct SQL execution endpoint for external integration"""
-    try:
-        data = request.get_json()
-        if not data:
-            return jsonify({"success": False, "error": "No JSON data provided"}), 400
-        
-        sql_query = data.get('sql', '')
-        if not sql_query:
-            return jsonify({"success": False, "error": "SQL parameter is required"}), 400
-        
-        app.logger.info(f"API v1 Direct SQL Query: {sql_query}")
-        
-        # Execute SQL directly
-        result = internal_execute_sql_query(sql_query)
-        
-        if result.get('status') == 'success':
-            query_data = result.get('data', [])
-            return jsonify({
-                "success": True,
-                "data": query_data,
-                "error": None,
-                "rows_returned": len(query_data) if isinstance(query_data, list) else 0,
-                "timestamp": datetime.now().isoformat()
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "data": [],
-                "error": result.get('error', 'Unknown error'),
-                "rows_returned": 0,
-                "timestamp": datetime.now().isoformat()
-            }), 400
-            
-    except Exception as e:
-        app.logger.error(f"Error in /api/v1/data/sql: {e}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "data": [],
-            "error": str(e),
-            "rows_returned": 0,
-            "timestamp": datetime.now().isoformat()
-        }), 500
 
 
-@app.route('/api/v1/data/tables', methods=['POST'])
-def api_v1_data_tables():
-    """Table discovery endpoint for external integration"""
-    try:
-        app.logger.info("API v1 Table Discovery Request")
-        
-        # Get all available tables
-        table_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` ORDER BY table_name"
-        result = internal_execute_sql_query(table_query)
-        
-        if result.get('status') == 'success':
-            tables_data = result.get('data', [])
-            
-            # Format tables for better display
-            formatted_tables = []
-            for table in tables_data:
-                table_name = table.get('table_name', '')
-                # Parse business area from table name
-                business_area = "Unknown"
-                data_type = "General"
-                
-                if "Balay-Kreative" in table_name:
-                    business_area = "Balay Kreative"
-                    if "attendees" in table_name.lower():
-                        data_type = "Event Attendees"
-                    elif "sales" in table_name.lower() or "orders" in table_name.lower():
-                        data_type = "Sales Data"
-                elif "Kapwa-Gardens" in table_name:
-                    business_area = "Kapwa Gardens"
-                    data_type = "Market Data"
-                elif "Undiscovered" in table_name:
-                    business_area = "Undiscovered"
-                    if "Vendor" in table_name:
-                        data_type = "Vendor Data"
-                
-                formatted_tables.append({
-                    "Business Area": business_area,
-                    "Data Type": data_type,
-                    "Table Name": table_name,
-                    "Description": f"{business_area} {data_type.lower()}"
-                })
-            
-            return jsonify({
-                "success": True,
-                "tables": [{
-                    "type": "table",
-                    "title": "Available Data Tables",
-                    "content": formatted_tables
-                }],
-                "total_tables": len(formatted_tables),
-                "timestamp": datetime.now().isoformat()
-            })
-        else:
-            return jsonify({
-                "success": False,
-                "tables": [],
-                "error": result.get('error', 'Failed to retrieve tables'),
-                "total_tables": 0,
-                "timestamp": datetime.now().isoformat()
-            }), 400
-            
-    except Exception as e:
-        app.logger.error(f"Error in /api/v1/data/tables: {e}", exc_info=True)
-        return jsonify({
-            "success": False,
-            "tables": [],
-            "error": str(e),
-            "total_tables": 0,
-            "timestamp": datetime.now().isoformat()
-        }), 500
+
+
 
 
 # --- Main Execution ---
