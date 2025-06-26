@@ -898,8 +898,41 @@ def execute_complex_business_query(query_description: str) -> dict:
         return {"status": "error", "error_message": str(e)}
 
 
+def _get_queryable_tables() -> list:
+    """Get list of queryable tables (BASE TABLEs only, excluding problematic views)."""
+    try:
+        tables_query = """
+        SELECT table_name 
+        FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
+        WHERE table_type = 'BASE TABLE' 
+        AND table_name NOT LIKE '-%'
+        ORDER BY table_name
+        """
+        result = internal_execute_sql_query(tables_query)
+        if result.get('status') == 'success' and result.get('data'):
+            return [row['table_name'] for row in result['data']]
+        return []
+    except Exception as e:
+        app.logger.error(f"Error getting queryable tables: {e}")
+        return []
+
 def _handle_vendor_queries(query_description: str, query_lower: str) -> dict:
     """Handle vendor-specific business intelligence queries."""
+    
+    # Get available queryable tables first
+    available_tables = _get_queryable_tables()
+    if not available_tables:
+        return {"status": "error", "error_message": "No queryable tables available"}
+    
+    # Use first relevant table for vendor queries (avoiding wildcards)
+    vendor_table = None
+    for table in available_tables:
+        if any(keyword in table.lower() for keyword in ['vendor', 'attendees', 'orders', 'sales']):
+            vendor_table = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{table}`"
+            break
+    
+    if not vendor_table:
+        vendor_table = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{available_tables[0]}`"
     
     # Extract date ranges
     date_range = _extract_date_range(query_description)
@@ -915,7 +948,7 @@ def _handle_vendor_queries(query_description: str, query_lower: str) -> dict:
                 SUM(CAST(Lineitem_price AS FLOAT64)) as total_vendor_revenue,
                 COUNT(DISTINCT Order_ID) as total_orders,
                 COUNT(*) as total_items
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*` 
+            FROM {vendor_table}
             WHERE Event_Date IS NOT NULL 
             AND Lineitem_price IS NOT NULL 
             AND Lineitem_price != ''
@@ -2486,27 +2519,42 @@ def api_v1_data_query():
         
         query_lower = query.lower()
         
-        # Quick table discovery without AI processing
+        # Quick table discovery without AI processing - filter out problematic views
         if any(pattern in query_lower for pattern in ['show me tables', 'list tables', 'what tables', 'available tables']):
             try:
-                result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                # Only get actual tables, not views, and exclude ones starting with dash
+                tables_query = """
+                SELECT table_name, table_type 
+                FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
+                WHERE table_type = 'BASE TABLE' 
+                AND table_name NOT LIKE '-%'
+                ORDER BY table_name
+                """
+                result = internal_execute_sql_query(tables_query)
                 if result.get('status') == 'success' and result.get('data'):
                     return jsonify({
                         "success": True,
                         "data": result['data'],
                         "total_tables": len(result['data']),
-                        "message": "Available business data tables from BigQuery",
+                        "message": "Available queryable tables from BigQuery (excluding problematic views)",
                         "timestamp": datetime.now().isoformat()
                     })
             except Exception as table_error:
                 app.logger.error(f"Table discovery error: {table_error}")
         
-        # Auto-execute business entity queries using table matching
+        # Auto-execute business entity queries using table matching - avoid problematic views
         business_entities = ['balay', 'kreative', 'kapwa', 'gardens', 'vendor', 'undiscovered']
         if any(entity in query_lower for entity in business_entities):
             try:
-                # Get available tables first
-                tables_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                # Get available queryable tables first (exclude views and dash-prefixed names)
+                tables_query = """
+                SELECT table_name 
+                FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
+                WHERE table_type = 'BASE TABLE' 
+                AND table_name NOT LIKE '-%'
+                ORDER BY table_name
+                """
+                tables_result = internal_execute_sql_query(tables_query)
                 if tables_result.get('status') == 'success' and tables_result.get('data'):
                     available_tables = [row['table_name'] for row in tables_result['data']]
                     
