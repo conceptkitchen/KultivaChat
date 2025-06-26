@@ -901,13 +901,12 @@ def execute_complex_business_query(query_description: str) -> dict:
 
 
 def _get_queryable_tables() -> list:
-    """Get list of queryable tables (BASE TABLEs only, excluding problematic views)."""
+    """Get list of queryable tables (all tables are VIEW type, excluding dash-prefixed names)."""
     try:
         tables_query = """
         SELECT table_name 
         FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
-        WHERE table_type = 'BASE TABLE' 
-        AND table_name NOT LIKE '-%'
+        WHERE table_name NOT LIKE '-%'
         ORDER BY table_name
         """
         result = internal_execute_sql_query(tables_query)
@@ -2527,15 +2526,14 @@ def api_v1_data_query():
         
         query_lower = query.lower()
         
-        # Quick table discovery without AI processing - filter out problematic views
+        # Quick table discovery without AI processing
         if any(pattern in query_lower for pattern in ['show me tables', 'list tables', 'what tables', 'available tables']):
             try:
-                # Only get actual tables, not views, and exclude ones starting with dash
+                # Get all tables including views (all 64 tables are VIEW type in this workspace)
                 tables_query = """
                 SELECT table_name, table_type 
                 FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
-                WHERE table_type = 'BASE TABLE' 
-                AND table_name NOT LIKE '-%'
+                WHERE table_name NOT LIKE '-%'
                 ORDER BY table_name
                 """
                 result = internal_execute_sql_query(tables_query)
@@ -2550,16 +2548,15 @@ def api_v1_data_query():
             except Exception as table_error:
                 app.logger.error(f"Table discovery error: {table_error}")
         
-        # Auto-execute business entity queries using table matching - avoid problematic views
+        # Auto-execute business entity queries using table matching
         business_entities = ['balay', 'kreative', 'kapwa', 'gardens', 'vendor', 'undiscovered']
         if any(entity in query_lower for entity in business_entities):
             try:
-                # Get available queryable tables first (exclude views and dash-prefixed names)
+                # Get available queryable tables (all 64 tables are VIEW type in this workspace)
                 tables_query = """
                 SELECT table_name 
                 FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
-                WHERE table_type = 'BASE TABLE' 
-                AND table_name NOT LIKE '-%'
+                WHERE table_name NOT LIKE '-%'
                 ORDER BY table_name
                 """
                 tables_result = internal_execute_sql_query(tables_query)
