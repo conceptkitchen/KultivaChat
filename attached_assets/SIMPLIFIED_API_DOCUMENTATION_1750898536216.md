@@ -2,9 +2,11 @@
 
 ## Overview
 
-This API provides direct access to BigQuery Keboola Workspace data without requiring client-side credential management. All authentication is handled server-side, making integration straightforward and secure.
+This API provides intelligent access to BigQuery business data through **natural language queries**. Simply ask questions in plain English, and the AI automatically handles data discovery, query generation, and result formatting.
 
 **Base URL:** `https://kultivate-chat-ck.replit.app`
+
+**Primary Usage:** Send natural language questions to get business insights without writing SQL or managing credentials.
 
 ---
 
@@ -56,90 +58,47 @@ curl https://kultivate-chat-ck.replit.app/api/health
 
 ---
 
-### 2. Get All Available Tables
+### Alternative Endpoints (Advanced Users)
+
+#### Get Available Tables
 **Endpoint:** `POST /api/v1/data/tables`
+**Usage:** Technical users who need raw table listings
 
-**Purpose:** Retrieve list of all 64 available data tables
-
-**Request:**
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/tables \
-  -H "Content-Type: application/json" \
-  -d '{}'
-```
-
-**How it works internally:**
-```sql
-SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {"table_name": "Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders"},
-    {"table_name": "Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-New-close-out-Dye-Hard"},
-    {"table_name": "Close-Outs---Yum-Yams---2023-05-13---Kapwa-Gardens-All-Vendor-Close-Out-Sales"}
-  ],
-  "timestamp": "2025-06-26T00:13:06.687138"
-}
-```
-
----
-
-### 3. Execute SQL Queries
+#### Direct SQL Execution  
 **Endpoint:** `POST /api/v1/data/sql`
+**Usage:** Developers who prefer writing SQL directly
 
-**Purpose:** Run direct SQL queries against BigQuery Keboola Workspace
-
-**Request:**
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/sql \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sql": "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 5"
-  }'
-```
-
-**How it works internally:**
-1. Validates SQL syntax
-2. Executes query using server-side BigQuery client
-3. Returns actual business data records
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "Event_Name": "Barya Kitchen & An Choi: Filipino x Vietnamese Kamayan - 3/20/2020",
-      "Lineitem_price": "75",
-      "Lineitem_quantity": "2",
-      "Order_ID": "8",
-      "Event_Date": "3/20/2020"
-    }
-  ],
-  "rows_returned": 5,
-  "error": null,
-  "timestamp": "2025-06-26T00:13:16.770172"
-}
-```
+*Note: Most users should use the natural language endpoint above instead of these technical endpoints.*
 
 ---
 
-### 4. Natural Language Query Endpoint (Recommended)
+### Primary Endpoint: Natural Language Queries
 **Endpoint:** `POST /api/v1/data/query`
 
-**Purpose:** Ask business questions in plain English - the AI handles everything automatically
+**Purpose:** Ask business questions in plain English - this is the main way to use the API
 
-**Request:**
+**Simple Usage:**
 ```bash
 curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "show me tables"
+    "query": "show me revenue data from 2023 events"
   }'
+```
+
+**Other Natural Language Examples:**
+```bash
+# Get available data
+{"query": "what tables are available?"}
+
+# Business analysis
+{"query": "which vendors made the most money at Kapwa Gardens events?"}
+
+# Financial insights  
+{"query": "show me cost breakdown for Yum-Yams event"}
+
+# Customer analysis
+{"query": "how many attendees came to Balay Kreative events?"}
 ```
 
 **How the AI processing works:**
@@ -272,60 +231,46 @@ curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/sql \
 
 ### JavaScript/Node.js
 ```javascript
-async function getBusinessData() {
+async function askBusinessQuestion(question) {
   const response = await fetch('https://kultivate-chat-ck.replit.app/api/v1/data/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      query: 'show me tables'
+      query: question
     })
   });
   const data = await response.json();
-  console.log('Available tables:', data.data.length);
   return data;
 }
 
-async function querySpecificData() {
-  const response = await fetch('https://kultivate-chat-ck.replit.app/api/v1/data/sql', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sql: "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 5"
-    })
-  });
-  return await response.json();
-}
+// Example usage
+const results = await askBusinessQuestion("which vendors made the most money at Kapwa Gardens?");
+console.log('Analysis results:', results.data);
+
+const insights = await askBusinessQuestion("show me cost breakdown for 2023 events");
+console.log('Cost insights:', insights.data);
 ```
 
 ### Python
 ```python
 import requests
 
-def get_tables():
+def ask_business_question(question):
     response = requests.post(
         'https://kultivate-chat-ck.replit.app/api/v1/data/query',
-        json={'query': 'show me tables'}
+        json={'query': question}
     )
     return response.json()
 
-def query_business_data(sql_query):
-    response = requests.post(
-        'https://kultivate-chat-ck.replit.app/api/v1/data/sql',
-        json={'sql': sql_query}
-    )
-    return response.json()
+# Example usage - Natural language questions
+analysis = ask_business_question("what vendors made the most money in 2023?")
+print(f"Top vendors: {analysis['data']}")
 
-# Example usage
-tables = get_tables()
-print(f"Found {len(tables['data'])} tables")
+costs = ask_business_question("show me operational costs for Yum-Yams event")
+print(f"Cost breakdown: {costs['data']}")
 
-# Get actual business records
-data = query_business_data("""
-    SELECT Event_Name, Event_Date, Lineitem_price 
-    FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` 
-    LIMIT 10
-""")
-print(f"Retrieved {data['rows_returned']} records")
+trends = ask_business_question("how many people attended Balay Kreative events?")
+print(f"Attendance data: {trends['data']}")
 ```
 
 ---
