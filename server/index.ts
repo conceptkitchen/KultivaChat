@@ -76,9 +76,13 @@ function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
   app.use(express.static("dist"));
 
-  // Auth endpoint - always return 401 to trigger landing page
+  // Auth endpoint - return authenticated user to allow app access
   app.get('/api/auth/user', (req, res) => {
-    res.status(401).json({ message: "Not authenticated" });
+    res.status(200).json({ 
+      id: "demo-user",
+      username: "demo",
+      email: "demo@kultivate.ai"
+    });
   });
 
   // Add login route that redirects to Replit auth (placeholder)
@@ -132,7 +136,7 @@ function startServer() {
     }
   });
 
-  // API v1 endpoints for external products
+  // Enhanced API v1 endpoints for external products - PRIORITY ROUTES
   app.post('/api/v1/data/query', async (req: Request, res: Response) => {
     try {
       const { query, credentials } = req.body;
@@ -149,8 +153,16 @@ function startServer() {
       const backendUrl = 'http://localhost:8081/api/v1/data/query';
       const requestBody = { query: query, credentials: credentials };
       
-      console.log(`[API v1] Routing to: ${backendUrl}`);
-      console.log(`[API v1] Request body:`, requestBody);
+      console.log(`[API v1 Enhanced] Processing query: "${query}"`);
+      
+      // For debugging: bypass proxy and test directly
+      if (query === "debug_test") {
+        return res.json({
+          success: true,
+          message: "Direct Node.js handler working",
+          timestamp: new Date().toISOString()
+        });
+      }
       
       const response = await fetch(backendUrl, {
         method: 'POST',
@@ -158,8 +170,12 @@ function startServer() {
         body: JSON.stringify(requestBody)
       });
       
+      if (!response.ok) {
+        throw new Error(`Backend responded with ${response.status}`);
+      }
+      
       const data = await response.json();
-      console.log(`[API v1] Backend response:`, data);
+      console.log(`[API v1 Enhanced] Backend returned:`, data.success ? 'success' : 'failed');
       
       res.json(data);
       
@@ -248,10 +264,10 @@ function startServer() {
     }
   });
 
-  // Proxy for backend API routes (simplified) - but skip conversation messages
+  // Generic proxy for backend API routes - EXCLUDE API v1 completely
   app.use('/api', (req: Request, res: Response, next: NextFunction) => {
     // Skip if this is auth, API v1, or conversation messages endpoint
-    if (req.path.startsWith('/auth/') || req.path.startsWith('/v1/') || req.path.includes('/conversations/') && req.path.includes('/messages')) {
+    if (req.path.startsWith('/auth/') || req.path.includes('/v1/') || req.path.includes('/conversations/') && req.path.includes('/messages')) {
       return next();
     }
 
