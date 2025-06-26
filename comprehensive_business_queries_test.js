@@ -1,21 +1,20 @@
 import https from 'https';
 
 async function testAllBusinessQueries() {
-    console.log('COMPREHENSIVE BUSINESS INTELLIGENCE QUERY TEST');
-    console.log('Testing all vendor and attendee queries from your requirements\n');
+    console.log('COMPREHENSIVE BUSINESS INTELLIGENCE QUERY TESTING\n');
     
     const vendorQueries = [
         "How much money was made by vendors at Kapwa Gardens events in 2023?",
         "Which event from 2020 to 2023 made the most money for vendors?",
         "Who are the top 5 vendors from Kapwa Gardens events from 2020 to 2023?",
         "What zip codes are our vendors from who participated from 2020 to 2023?",
-        "Which vendors who identify as Asian made more than $500 sales from 2020 to 2023?",
-        "What are the email addresses of vendors that sell food products?",
-        "What are the email addresses of vendors that make less than $200 income?",
+        "Which vendors who identify as Middle Eastern made more than $500 from 2020 to 2023?",
+        "What are the email addresses of vendors that sell food?",
+        "What are the email addresses of vendors that make less than $1000 income?",
         "What are the cell numbers of vendors that participated in Yum Yams events?",
         "What are the cell numbers of vendors that participated at Kapwa Gardens?",
-        "Which vendors participated in Kapwa Gardens events and UNDSCVRD events from 2020 to 2023 and made at least $500?",
-        "Which vendors participated in Kapwa Gardens events and UNDSCVRD events from 2020 to 2023 and identify as Middle Eastern?"
+        "Which vendors participated in Kapwa Gardens events and UNDSCVRD events from 2020-2023 and made at least $500?",
+        "Which vendors participated in Kapwa Gardens events and UNDSCVRD events from 2020-2023 and identify as Middle Eastern?"
     ];
     
     const attendeeQueries = [
@@ -32,17 +31,17 @@ async function testAllBusinessQueries() {
         "Which of our Balay Kreative applicants identify as Filipino?"
     ];
     
-    const allQueries = [...vendorQueries, ...attendeeQueries];
-    const results = [];
+    const allQueries = [
+        ...vendorQueries.map(q => ({ type: 'Vendor', query: q })),
+        ...attendeeQueries.map(q => ({ type: 'Attendee', query: q }))
+    ];
     
-    console.log(`Testing ${allQueries.length} business intelligence queries...\n`);
+    let successCount = 0;
+    let failCount = 0;
     
     for (let i = 0; i < allQueries.length; i++) {
-        const query = allQueries[i];
-        const isVendor = i < vendorQueries.length;
-        const category = isVendor ? 'VENDOR' : 'ATTENDEE';
-        
-        console.log(`[${i + 1}/${allQueries.length}] ${category}: ${query}`);
+        const { type, query } = allQueries[i];
+        console.log(`[${i + 1}/${allQueries.length}] ${type}: ${query.substring(0, 60)}...`);
         
         try {
             const startTime = Date.now();
@@ -50,164 +49,40 @@ async function testAllBusinessQueries() {
             const duration = Date.now() - startTime;
             
             if (result.success && result.response.data) {
-                const recordCount = result.response.data.length;
-                console.log(`✅ SUCCESS: ${recordCount} records (${duration}ms)`);
-                
-                if (recordCount > 0) {
-                    const firstRecord = result.response.data[0];
-                    const fields = Object.keys(firstRecord);
-                    
-                    // Analyze data relevance
-                    const hasFinancialData = fields.some(f => 
-                        f.toLowerCase().includes('price') || 
-                        f.toLowerCase().includes('revenue') || 
-                        f.toLowerCase().includes('cost') ||
-                        f.toLowerCase().includes('total')
-                    );
-                    
-                    const hasContactData = fields.some(f => 
-                        f.toLowerCase().includes('email') || 
-                        f.toLowerCase().includes('phone') ||
-                        f.toLowerCase().includes('cell')
-                    );
-                    
-                    const hasLocationData = fields.some(f => 
-                        f.toLowerCase().includes('city') || 
-                        f.toLowerCase().includes('zip') ||
-                        f.toLowerCase().includes('address')
-                    );
-                    
-                    const hasEventData = fields.some(f => 
-                        f.toLowerCase().includes('event') || 
-                        f.toLowerCase().includes('date')
-                    );
-                    
-                    console.log(`   Fields: ${fields.slice(0, 4).join(', ')}${fields.length > 4 ? '...' : ''}`);
-                    console.log(`   Data: Financial=${hasFinancialData}, Contact=${hasContactData}, Location=${hasLocationData}, Event=${hasEventData}`);
-                    
-                    // Show sample data for key fields
-                    if (hasFinancialData) {
-                        const financialField = fields.find(f => 
-                            f.toLowerCase().includes('price') || 
-                            f.toLowerCase().includes('total') || 
-                            f.toLowerCase().includes('cost')
-                        );
-                        if (financialField && firstRecord[financialField]) {
-                            console.log(`   Sample: ${financialField}="${firstRecord[financialField]}"`);
-                        }
-                    }
-                }
-                
-                results.push({
-                    query,
-                    category,
-                    status: 'success',
-                    recordCount,
-                    duration,
-                    hasData: recordCount > 0
-                });
+                console.log(`   ✅ SUCCESS (${duration}ms) - ${result.response.data.length} records`);
+                successCount++;
             } else if (result.success) {
-                console.log(`✅ PROCESSED: AI analysis complete (${duration}ms)`);
-                results.push({
-                    query,
-                    category,
-                    status: 'processed',
-                    recordCount: 0,
-                    duration
-                });
+                console.log(`   ⚠️ SUCCESS but no data (${duration}ms)`);
+                successCount++;
             } else {
-                console.log(`❌ FAILED: HTTP ${result.status}`);
-                results.push({
-                    query,
-                    category,
-                    status: 'failed',
-                    error: `HTTP ${result.status}`
-                });
+                console.log(`   ❌ FAILED - ${result.response.error || 'Unknown error'}`);
+                failCount++;
             }
-            
         } catch (error) {
-            console.log(`💥 ERROR: ${error.message}`);
-            results.push({
-                query,
-                category,
-                status: 'error',
-                error: error.message
-            });
+            console.log(`   💥 ERROR - ${error.message}`);
+            failCount++;
         }
         
-        // Rate limiting between requests
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        // Brief pause between queries
+        await new Promise(resolve => setTimeout(resolve, 1000));
     }
     
-    // Comprehensive analysis
-    console.log('\n' + '='.repeat(80));
-    console.log('BUSINESS INTELLIGENCE API COMPREHENSIVE ANALYSIS');
-    console.log('='.repeat(80));
+    console.log('\n' + '='.repeat(60));
+    console.log('BUSINESS INTELLIGENCE TESTING RESULTS');
+    console.log('='.repeat(60));
+    console.log(`Total Queries Tested: ${allQueries.length}`);
+    console.log(`Successful: ${successCount}`);
+    console.log(`Failed: ${failCount}`);
+    console.log(`Success Rate: ${((successCount / allQueries.length) * 100).toFixed(1)}%`);
     
-    const vendorResults = results.filter(r => r.category === 'VENDOR');
-    const attendeeResults = results.filter(r => r.category === 'ATTENDEE');
-    
-    const vendorSuccess = vendorResults.filter(r => r.status === 'success' || r.status === 'processed');
-    const attendeeSuccess = attendeeResults.filter(r => r.status === 'success' || r.status === 'processed');
-    
-    const vendorWithData = vendorResults.filter(r => r.status === 'success' && r.hasData);
-    const attendeeWithData = attendeeResults.filter(r => r.status === 'success' && r.hasData);
-    
-    console.log(`\nVENDOR QUERIES (${vendorQueries.length} total):`);
-    console.log(`✅ Successful: ${vendorSuccess.length}/${vendorQueries.length} (${(vendorSuccess.length / vendorQueries.length * 100).toFixed(1)}%)`);
-    console.log(`📊 Returned Data: ${vendorWithData.length}/${vendorQueries.length} (${(vendorWithData.length / vendorQueries.length * 100).toFixed(1)}%)`);
-    
-    console.log(`\nATTENDEE/DONOR QUERIES (${attendeeQueries.length} total):`);
-    console.log(`✅ Successful: ${attendeeSuccess.length}/${attendeeQueries.length} (${(attendeeSuccess.length / attendeeQueries.length * 100).toFixed(1)}%)`);
-    console.log(`📊 Returned Data: ${attendeeWithData.length}/${attendeeQueries.length} (${(attendeeWithData.length / attendeeQueries.length * 100).toFixed(1)}%)`);
-    
-    const totalSuccess = vendorSuccess.length + attendeeSuccess.length;
-    const totalWithData = vendorWithData.length + attendeeWithData.length;
-    const overallSuccessRate = (totalSuccess / allQueries.length * 100);
-    const dataRetrievalRate = (totalWithData / allQueries.length * 100);
-    
-    console.log(`\nOVERALL PERFORMANCE:`);
-    console.log(`✅ Success Rate: ${totalSuccess}/${allQueries.length} (${overallSuccessRate.toFixed(1)}%)`);
-    console.log(`📊 Data Retrieval: ${totalWithData}/${allQueries.length} (${dataRetrievalRate.toFixed(1)}%)`);
-    
-    if (totalWithData > 0) {
-        const avgDuration = results.filter(r => r.duration).reduce((sum, r) => sum + r.duration, 0) / results.filter(r => r.duration).length;
-        console.log(`⚡ Average Response Time: ${avgDuration.toFixed(0)}ms`);
-    }
-    
-    // Show successful data queries
-    console.log('\n📈 QUERIES SUCCESSFULLY RETURNING BUSINESS DATA:');
-    const successfulDataQueries = results.filter(r => r.status === 'success' && r.hasData);
-    successfulDataQueries.forEach((result, index) => {
-        console.log(`${index + 1}. [${result.category}] "${result.query.substring(0, 60)}..." → ${result.recordCount} records`);
-    });
-    
-    // Show failed queries for debugging
-    const failedQueries = results.filter(r => r.status === 'failed' || r.status === 'error');
-    if (failedQueries.length > 0) {
-        console.log('\n❌ FAILED QUERIES (for debugging):');
-        failedQueries.forEach((result, index) => {
-            console.log(`${index + 1}. [${result.category}] "${result.query.substring(0, 60)}..." → ${result.error || 'Unknown error'}`);
-        });
-    }
-    
-    // Final assessment
-    console.log('\n🎯 BUSINESS INTELLIGENCE CAPABILITY ASSESSMENT:');
-    
-    if (overallSuccessRate >= 85) {
-        console.log(`🟢 EXCELLENT: ${overallSuccessRate.toFixed(1)}% success rate - Production ready for all business queries`);
-    } else if (overallSuccessRate >= 70) {
-        console.log(`🟡 GOOD: ${overallSuccessRate.toFixed(1)}% success rate - Most business queries working well`);
+    if (successCount === allQueries.length) {
+        console.log('\n🎯 ALL BUSINESS INTELLIGENCE QUERIES WORKING');
+        console.log('✅ API ready for production deployment');
+    } else if (successCount >= allQueries.length * 0.8) {
+        console.log('\n⚠️ MOST QUERIES WORKING - Minor optimization needed');
     } else {
-        console.log(`🔴 NEEDS IMPROVEMENT: ${overallSuccessRate.toFixed(1)}% success rate - Requires optimization`);
+        console.log('\n❌ SIGNIFICANT ISSUES DETECTED - Requires investigation');
     }
-    
-    console.log('\nThe enhanced API now supports sophisticated business intelligence queries including:');
-    console.log('• Multi-table vendor revenue analysis with date ranges');
-    console.log('• Geographic attendee analysis and contact extraction');
-    console.log('• Cross-event participation tracking');
-    console.log('• Financial performance metrics and demographic filtering');
-    console.log('• Grant application correlation with event attendance');
 }
 
 function makeAPIRequest(query) {
@@ -223,7 +98,7 @@ function makeAPIRequest(query) {
                 'Content-Type': 'application/json',
                 'Content-Length': Buffer.byteLength(postData)
             },
-            timeout: 30000
+            timeout: 25000
         };
         
         const req = https.request(options, (res) => {
@@ -241,7 +116,7 @@ function makeAPIRequest(query) {
         
         req.on('timeout', () => {
             req.destroy();
-            reject(new Error('Request timeout'));
+            reject(new Error('Timeout'));
         });
         
         req.on('error', (e) => reject(e));
