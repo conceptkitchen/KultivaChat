@@ -919,7 +919,13 @@ def _get_queryable_tables() -> list:
 def _handle_vendor_queries(query_description: str, query_lower: str) -> dict:
     """Handle vendor-specific business intelligence queries."""
     
-    # Get available queryable tables first
+    # Get available queryable tables first to avoid hitting views
+    queryable_tables = _get_queryable_tables()
+    if not queryable_tables:
+        return {"status": "error", "error_message": "Could not retrieve queryable tables"}
+    
+    # Filter tables for vendor-related data
+    vendor_tables = [t for t in queryable_tables if any(keyword in t.lower() for keyword in ['vendor', 'close-out', 'sales'])]
     available_tables = _get_queryable_tables()
     if not available_tables:
         return {"status": "error", "error_message": "No queryable tables available"}
