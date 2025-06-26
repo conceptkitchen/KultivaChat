@@ -2139,25 +2139,129 @@ def handle_direct_sql_request(sql_query, credentials):
 
 
 def handle_natural_language_request(query, credentials):
-    """Handle natural language AI processing requests"""
+    """Handle natural language AI processing requests using full Gemini capabilities"""
     try:
-        app.logger.info(f"Processing natural language query: {query}")
+        app.logger.info(f"Processing natural language query via API v1: {query}")
         
-        # For now, return a simplified response directing to working endpoints
-        # This avoids the Gemini SDK initialization issues
+        # Check for auto-execution opportunity first
+        auto_result = auto_execute_table_query(query, [])
+        if auto_result:
+            app.logger.info(f"Auto-executed query for table: {auto_result['table_used']}")
+            
+            # Format response for API v1
+            response_data = []
+            if auto_result['result'].get('data'):
+                response_data = [{
+                    'type': 'table',
+                    'title': f"Data from {auto_result['table_used']}",
+                    'content': auto_result['result']['data']
+                }]
+            
+            return jsonify({
+                "success": True,
+                "query": query,
+                "response": f"Retrieved data from {auto_result['table_used']} table based on your request.",
+                "data": response_data,
+                "route_used": "nlp",
+                "rows_returned": len(auto_result['result'].get('data', [])),
+                "timestamp": datetime.now().isoformat()
+            })
+
+        # If no auto-execution, use full Gemini AI processing
+        if not GEMINI_SDK_AVAILABLE:
+            app.logger.error("Gemini SDK not available for natural language processing")
+            return jsonify({
+                "success": False,
+                "error": "AI processing service temporarily unavailable",
+                "route_used": "nlp",
+                "timestamp": datetime.now().isoformat()
+            }), 503
+
+        # Build system instruction and history for API context
+        full_history = [
+            google_genai_types.Content(
+                role="user",
+                parts=[google_genai_types.Part(text=SYSTEM_INSTRUCTION_PROMPT)]
+            ),
+            google_genai_types.Content(
+                role="model",
+                parts=[google_genai_types.Part(text="Understood. I am ready to assist you with your Keboola project data. How can I help you?")]
+            )
+        ]
+
+        # Create chat session with tools
+        chat_session = gemini_sdk_client.chats.create(
+            model='gemini-2.0-flash',
+            config=gemini_generation_config_with_tools,
+            history=full_history
+        )
+        
+        app.logger.info(f"Created Gemini chat session for API query: {query}")
+        
+        # Send user message to AI
+        response = chat_session.send_message(query)
+        
+        # Extract response text
+        final_answer = ""
+        try:
+            final_answer = response.text
+            app.logger.info(f"Gemini API response: {final_answer}")
+        except ValueError as ve:
+            app.logger.error(f"Gemini response processing error: {ve}")
+            if response.parts:
+                part_summary = []
+                for part in response.parts:
+                    if hasattr(part, 'function_call') and part.function_call:
+                        part_summary.append(f"Function call: {part.function_call.name}")
+                    elif hasattr(part, 'text') and part.text:
+                        part_summary.append(part.text)
+                if part_summary:
+                    final_answer = "; ".join(part_summary)
+                else:
+                    final_answer = "AI processing completed but response format needs interpretation."
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "AI response was empty or malformed",
+                    "route_used": "nlp",
+                    "timestamp": datetime.now().isoformat()
+                }), 500
+        
+        # Extract data displays from AI processing
+        displays = []
+        query_data = None
+        
+        # Look for data extraction from tool calls
+        query_data = extract_query_data_from_history([{
+            'role': 'assistant',
+            'content': final_answer
+        }])
+        
+        # Check if AI provided actual data results
+        if query_data and isinstance(query_data, list) and len(query_data) > 0:
+            app.logger.info(f"Extracted {len(query_data)} rows from AI response")
+            displays.append({
+                'type': 'table',
+                'title': 'Query Results',
+                'content': query_data
+            })
+        
+        # Format successful response
         return jsonify({
-            "success": False,
-            "error": "Natural language processing via API v1 route temporarily unavailable. Please use table discovery or direct SQL endpoints.",
+            "success": True,
+            "query": query,
+            "response": final_answer,
+            "data": displays,
             "route_used": "nlp",
-            "suggestion": "Try 'show me tables' for table discovery or use direct SQL queries starting with SELECT",
+            "rows_returned": len(query_data) if query_data else 0,
             "timestamp": datetime.now().isoformat()
-        }), 503
+        })
         
     except Exception as e:
         app.logger.error(f"Error in natural language processing: {e}", exc_info=True)
         return jsonify({
             "success": False, 
-            "error": str(e), 
+            "error": f"AI processing error: {str(e)}", 
             "route_used": "nlp",
             "timestamp": datetime.now().isoformat()
         }), 500

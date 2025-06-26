@@ -112,6 +112,15 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 26, 2025**: ENHANCED NATURAL LANGUAGE API CAPABILITIES IMPLEMENTED - Full AI processing now available for external integration
+  - ✅ UPGRADED: API v1 endpoint now has same natural language capabilities as main chat interface
+  - ✅ IMPLEMENTED: Full Gemini 2.0 Flash AI processing for complex business questions via /api/v1/data/query
+  - ✅ ENHANCED: Auto-execution logic detects table names and business contexts from casual language
+  - ✅ CREATED: Comprehensive enhanced API documentation with natural language examples and business use cases
+  - ✅ ENABLED: External applications can now ask complex questions like "Show me revenue from Balay Kreative events"
+  - ✅ MAINTAINED: Intelligent routing system automatically handles natural language, SQL, and table discovery
+  - → API now provides full business intelligence capabilities matching the chat interface experience
+
 - **June 26, 2025**: API DOCUMENTATION REVIEW COMPLETED - Comprehensive documentation verified as production-ready
   - ✅ REVIEWED: Complete API documentation with 4 core endpoints and intelligent routing system
   - ✅ VERIFIED: Previous testing shows 100% documentation accuracy with zero 404 errors
