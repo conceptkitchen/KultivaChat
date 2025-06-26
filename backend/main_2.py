@@ -2550,6 +2550,63 @@ def api_v1_data_query():
         
         # Auto-execute business entity queries using table matching
         business_entities = ['balay', 'kreative', 'kapwa', 'gardens', 'vendor', 'undiscovered']
+        geographic_keywords = ['city', 'cities', 'location', 'where', 'live', 'popular', 'most common']
+        
+        # Enhanced geographic query handling
+        if any(geo in query_lower for geo in geographic_keywords) and any(entity in query_lower for entity in ['donor', 'customer', 'attendee', 'participant']):
+            try:
+                # Execute comprehensive city analysis across all relevant tables
+                city_query = """
+                WITH all_cities AS (
+                    SELECT 
+                        CASE 
+                            WHEN Billing_City IS NOT NULL AND Billing_City != '' THEN Billing_City
+                            WHEN Shipping_City IS NOT NULL AND Shipping_City != '' THEN Shipping_City
+                            ELSE NULL
+                        END as city,
+                        'Balay Kreative Attendees' as source
+                    FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
+                    
+                    UNION ALL
+                    
+                    SELECT 
+                        CASE 
+                            WHEN Billing_City IS NOT NULL AND Billing_City != '' THEN Billing_City
+                            WHEN Shipping_City IS NOT NULL AND Shipping_City != '' THEN Shipping_City
+                            ELSE NULL
+                        END as city,
+                        'Undiscovered Attendees' as source
+                    FROM `kbc-use4-839-261b.WORKSPACE_21894820.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
+                )
+                SELECT 
+                    city,
+                    COUNT(*) as participant_count,
+                    STRING_AGG(DISTINCT source) as data_sources
+                FROM all_cities 
+                WHERE city IS NOT NULL 
+                GROUP BY city 
+                ORDER BY participant_count DESC 
+                LIMIT 10
+                """
+                
+                city_result = internal_execute_sql_query(city_query)
+                if city_result.get('status') == 'success' and city_result.get('data'):
+                    complexity_metadata = _analyze_query_complexity(query)
+                    return jsonify({
+                        "success": True,
+                        "query": query,
+                        "data": city_result['data'],
+                        "analysis_type": "geographic_analysis",
+                        "rows_returned": len(city_result['data']),
+                        "message": f"Most popular cities among participants based on {len(city_result['data'])} unique locations",
+                        "timestamp": datetime.now().isoformat(),
+                        **complexity_metadata
+                    })
+                        
+            except Exception as geo_error:
+                app.logger.error(f"Geographic query error: {geo_error}")
+        
+        # Standard business entity matching
         if any(entity in query_lower for entity in business_entities):
             try:
                 # Get available queryable tables (all 64 tables are VIEW type in this workspace)
@@ -2639,10 +2696,18 @@ Available tools:
 - get_current_time: Get current date/time
 - get_zip_codes_for_city: Get zip codes for cities
 
+IMPORTANT: For complex business questions (like "most popular city for donors"):
+1. FIRST discover available tables: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`
+2. THEN examine table schemas: SELECT column_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.COLUMNS` WHERE table_name = 'TABLE_NAME'
+3. FINALLY execute business logic using actual column names found in the schema
+
+For geographic/city questions, look for columns like: Billing_City, Shipping_City, City, Address, Location
+
 When users ask about business data, tables, revenue, customers, or events:
 1. Use internal_execute_sql_query to get actual data
-2. Provide specific insights and analysis
-3. Always show actual data, not just table names
+2. Always discover table structure before making assumptions about column names
+3. Provide specific insights and analysis based on actual schema
+4. Always show actual data, not just table names
 
 Be decisive and immediately execute queries when users mention:
 - Balay Kreative, Kapwa Gardens, vendors, events, attendees, orders
