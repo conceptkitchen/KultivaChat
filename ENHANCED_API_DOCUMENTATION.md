@@ -1,488 +1,292 @@
-# Kultivate AI Enhanced API Documentation
+# Kultivate AI Enhanced API Documentation - Natural Language Processing
 
 ## Overview
 
-This API provides intelligent access to BigQuery Keboola Workspace data with **full natural language processing capabilities**. All authentication is handled server-side, and the AI can understand complex business questions and automatically execute appropriate queries.
+The Kultivate AI API v1 endpoint now provides **full natural language processing capabilities** identical to the main chat interface, powered by Gemini 2.0 Flash AI with direct BigQuery integration.
 
 **Base URL:** `https://kultivate-chat-ck.replit.app`
 
 ---
 
-## Natural Language Intelligence
+## Enhanced Natural Language Capabilities
 
-### ✨ **What's New: Full AI Understanding**
+### Business Intelligence Features
+- **Automatic table discovery** from 64+ BigQuery business tables
+- **Smart entity matching** for Balay Kreative, Kapwa Gardens, vendors, events
+- **Revenue analysis** with real financial calculations
+- **Attendee data extraction** from event management systems
+- **Full SQL generation** for complex business queries
 
-The API now has the same natural language capabilities as the main chat interface:
-
-- **Complex Business Questions**: "Show me revenue trends from Balay Kreative events"
-- **Casual Table References**: "Get attendee data from that Filipino event"
-- **Analytical Requests**: "Analyze sales performance across all vendors"
-- **Contextual Queries**: "How many people attended the March events?"
+### AI Processing Pipeline
+1. **Natural language understanding** via Gemini 2.0 Flash
+2. **Intelligent table matching** using fuzzy search algorithms
+3. **Automatic SQL generation** for BigQuery WORKSPACE_21894820
+4. **Data extraction** with comprehensive fallback mechanisms
+5. **Business context analysis** for meaningful insights
 
 ---
 
-## API Endpoints
+## API Endpoint: Enhanced Query Processing
 
-### 1. Health Check
-**Endpoint:** `GET /api/health`
+### Endpoint
+**POST** `/api/v1/data/query`
 
-**Purpose:** Verify API service status
-
-**Request:**
-```bash
-curl https://kultivate-chat-ck.replit.app/api/health
-```
-
-**Response:**
+### Enhanced Request Format
 ```json
 {
-  "backend": "running",
-  "status": "healthy"
+  "query": "show me revenue from Balay Kreative events this year"
 }
 ```
 
----
+### Natural Language Query Examples
 
-### 2. **Intelligent Query Router** (Recommended)
-**Endpoint:** `POST /api/v1/data/query`
-
-**Purpose:** Single endpoint that understands any type of query - natural language, SQL, or table discovery
-
-**Natural Language Examples:**
-```bash
-# Business question
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Show me revenue from Balay Kreative events"}'
-
-# Casual request
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "How many people attended Kapwa Gardens events?"}'
-
-# Analysis request
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Analyze vendor performance in the last quarter"}'
-```
-
-**Table Discovery:**
+#### 1. Business Entity Analysis
 ```bash
 curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "show me all tables"}'
+  -d '{"query": "show me data from Balay Kreative events"}'
 ```
 
-**Direct SQL:**
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` LIMIT 10"}'
-```
-
-**Enhanced Response Format:**
+**Enhanced Response:**
 ```json
 {
   "success": true,
-  "query": "Show me revenue from Balay Kreative events",
-  "response": "I found revenue data from Balay Kreative events. Here's the analysis of 166 attendees across multiple events with total revenue of $3,954.",
+  "query": "show me data from Balay Kreative events",
   "data": [
     {
-      "type": "table",
-      "title": "Balay Kreative Revenue Analysis",
-      "content": [
-        {
-          "Event_Name": "Barya Kitchen & An Choi: Filipino x Vietnamese Kamayan - 3/20/2020",
-          "Event_Date": "3/20/2020",
-          "Lineitem_price": "75",
-          "Total_Revenue": "150"
-        }
-      ]
+      "event_name": "Halo Halo Holidays",
+      "date": "2023-12-09",
+      "venue": "Kapwa Gardens",
+      "attendees": 85,
+      "revenue": 1250.00
+    },
+    {
+      "event_name": "Spring Market",
+      "date": "2024-03-15", 
+      "venue": "Balay Kreative",
+      "attendees": 120,
+      "revenue": 2150.00
     }
   ],
-  "route_used": "nlp",
-  "rows_returned": 10,
-  "timestamp": "2025-06-26T00:50:12.345Z"
+  "table_name": "-Balay-Kreative--Close-Out-Sales---Halo-Halo-Holidays---2023-12-09---Kapwa-Gardens-KG-Costs",
+  "rows_returned": 2,
+  "ai_analysis": true,
+  "timestamp": "2025-06-26T05:04:00.000Z"
 }
 ```
 
----
-
-### 3. Table Discovery
-**Endpoint:** `POST /api/v1/data/tables`
-
-**Purpose:** Get list of all available data tables
-
-**Request:**
+#### 2. Revenue Analysis Queries
 ```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/tables \
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
   -H "Content-Type: application/json" \
-  -d '{}'
+  -d '{"query": "what revenue did we generate from Kapwa Gardens events?"}'
 ```
 
-**Response:**
+#### 3. Table Discovery
+```bash
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "show me available tables"}'
+```
+
+**Enhanced Response:**
 ```json
 {
   "success": true,
   "data": [
+    {"table_name": "-Balay-Kreative--Close-Out-Sales---Halo-Halo-Holidays---2023-12-09---Kapwa-Gardens-KG-Costs"},
     {"table_name": "Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders"},
-    {"table_name": "Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-New-close-out-Dye-Hard"}
+    {"table_name": "Kapwa-Gardens---Close-Out-Market-RECAP---NEW---April-Events-RECAP"},
+    {"table_name": "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-"}
   ],
-  "timestamp": "2025-06-26T00:50:12.345Z"
+  "total_tables": 64,
+  "message": "Available business data tables from BigQuery",
+  "timestamp": "2025-06-26T05:04:00.000Z"
 }
+```
+
+#### 4. Complex Business Questions
+```bash
+curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "analyze attendee trends across all events"}'
 ```
 
 ---
 
-### 4. Direct SQL Execution
-**Endpoint:** `POST /api/v1/data/sql`
+## Enhanced Response Structure
 
-**Purpose:** Execute SQL queries directly against BigQuery
-
-**Request:**
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/sql \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sql": "SELECT Event_Name, SUM(CAST(Lineitem_price AS FLOAT64)) as revenue FROM `kbc-use4-839-261b.WORKSPACE_21894820.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` GROUP BY Event_Name ORDER BY revenue DESC LIMIT 5"
-  }'
-```
-
-**Response:**
+### Successful Data Retrieval
 ```json
 {
   "success": true,
+  "query": "original user query",
+  "response": "AI-generated analysis text",
   "data": [
     {
-      "Event_Name": "Barya Kitchen & An Choi: Filipino x Vietnamese Kamayan - 3/20/2020",
-      "revenue": 450.0
+      "column1": "value1",
+      "column2": "value2"
     }
   ],
-  "rows_returned": 5,
-  "error": null,
-  "timestamp": "2025-06-26T00:50:12.345Z"
+  "table_name": "source_table_identifier",
+  "rows_returned": 10,
+  "ai_analysis": true,
+  "extraction_method": "primary|fallback_table_reference",
+  "timestamp": "2025-06-26T05:04:00.000Z"
+}
+```
+
+### AI Processing Response
+```json
+{
+  "success": true,
+  "query": "user query",
+  "response": "Natural language AI response with business insights",
+  "data": [],
+  "ai_analysis": true,
+  "suggestion": "Try asking about specific business entities or use direct SQL",
+  "timestamp": "2025-06-26T05:04:00.000Z"
 }
 ```
 
 ---
 
-## Natural Language Capabilities
+## Business Use Cases
 
-### 🧠 **AI Understanding Examples**
+### 1. Event Management
+- **Query:** "show me all Balay Kreative events from last quarter"
+- **Returns:** Event details, attendance, revenue, dates
+- **Use Case:** Performance tracking, planning future events
 
-**Business Analysis:**
-- "What's the total revenue from all events?"
-- "Show me the most popular events by attendance"
-- "Compare vendor performance between Q1 and Q2"
-- "Which events had the highest ticket prices?"
+### 2. Revenue Analysis
+- **Query:** "what's our total revenue from Kapwa Gardens?"
+- **Returns:** Financial summaries, transaction details, trends
+- **Use Case:** Financial reporting, ROI analysis
 
-**Data Exploration:**
-- "Show me recent vendor data"
-- "Get customer information from Filipino events"
-- "Find all events in March 2020"
-- "List attendees who spent more than $100"
+### 3. Customer Insights
+- **Query:** "list all attendees from recent events"
+- **Returns:** Customer data, contact information, purchase history
+- **Use Case:** Marketing campaigns, customer retention
 
-**Trend Analysis:**
-- "Analyze attendance trends over time"
-- "Show revenue growth by month"
-- "Compare event performance year over year"
-- "Identify peak attendance periods"
-
-### 🎯 **Smart Data Recognition**
-
-The AI automatically recognizes:
-- **Event Names**: "Balay Kreative", "Kapwa Gardens", "Filipino events"
-- **Vendor References**: "Dye Hard", "Yum Yams", vendor close-outs
-- **Time Periods**: "March 2020", "last quarter", "recent events"
-- **Business Metrics**: revenue, attendance, ticket prices, orders
+### 4. Vendor Performance
+- **Query:** "show me vendor sales data"
+- **Returns:** Vendor revenue, product performance, commission tracking
+- **Use Case:** Vendor relationship management, inventory planning
 
 ---
 
-## Enhanced Integration Examples
+## Technical Implementation
+
+### AI Processing Flow
+1. **Query Classification:** Determines if query is table discovery, business entity, or general analysis
+2. **Entity Recognition:** Identifies business entities (Balay Kreative, Kapwa Gardens, etc.)
+3. **Table Matching:** Uses fuzzy search to find relevant data tables
+4. **SQL Generation:** Creates optimized BigQuery queries automatically
+5. **Data Extraction:** Multiple extraction methods ensure reliable data retrieval
+6. **Response Formatting:** Structures data for easy integration
+
+### Performance Optimization
+- **Server-side credential management** eliminates client-side authentication
+- **Intelligent caching** reduces query response times
+- **Fallback mechanisms** ensure reliable data access
+- **Timeout protection** prevents hanging requests
+
+### Security Features
+- **No client credentials required** - all authentication handled server-side
+- **Rate limiting** prevents abuse
+- **Input validation** protects against injection attacks
+- **Secure BigQuery connections** with service account authentication
+
+---
+
+## Integration Examples
 
 ### JavaScript/Node.js
 ```javascript
-async function askBusinessQuestion(question) {
+async function queryKultivateAI(businessQuestion) {
   const response = await fetch('https://kultivate-chat-ck.replit.app/api/v1/data/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: question })
+    body: JSON.stringify({ query: businessQuestion })
   });
   
   const result = await response.json();
   
-  if (result.success) {
-    console.log('AI Response:', result.response);
-    
-    // Process data tables
-    result.data.forEach(display => {
-      if (display.type === 'table') {
-        console.log(`\n${display.title}:`);
-        console.table(display.content);
-      }
-    });
-    
-    return result;
+  if (result.success && result.data.length > 0) {
+    console.log(`Found ${result.rows_returned} records from ${result.table_name}`);
+    return result.data;
   } else {
-    console.error('Query failed:', result.error);
+    console.log('AI Response:', result.response);
+    return result;
   }
 }
 
 // Usage examples
-await askBusinessQuestion("What's the total revenue from Balay Kreative events?");
-await askBusinessQuestion("Show me the top 5 highest-attended events");
-await askBusinessQuestion("Analyze vendor performance trends");
+queryKultivateAI("show me Balay Kreative event revenue");
+queryKultivateAI("what vendors performed best last month?");
+queryKultivateAI("list all customer orders from Kapwa Gardens");
 ```
 
 ### Python
 ```python
 import requests
 
-def ask_business_question(question):
+def analyze_business_data(question):
     response = requests.post(
         'https://kultivate-chat-ck.replit.app/api/v1/data/query',
-        json={'query': question}
+        json={'query': question},
+        timeout=30
     )
     
-    result = response.json()
+    if response.status_code == 200:
+        result = response.json()
+        
+        if result['success'] and result.get('data'):
+            print(f"Retrieved {len(result['data'])} records")
+            return result['data']
+        else:
+            print(f"AI Analysis: {result.get('response')}")
+            return result
     
-    if result['success']:
-        print(f"AI Response: {result['response']}")
-        
-        # Process data tables
-        for display in result.get('data', []):
-            if display['type'] == 'table':
-                print(f"\n{display['title']}:")
-                for row in display['content']:
-                    print(row)
-        
-        return result
-    else:
-        print(f"Query failed: {result['error']}")
-        return None
+    return None
 
 # Usage examples
-ask_business_question("What's the average ticket price across all events?")
-ask_business_question("Show me customer demographics from event data")
-ask_business_question("Find events with highest profit margins")
-```
-
-### PHP
-```php
-function askBusinessQuestion($question) {
-    $data = json_encode(['query' => $question]);
-    
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\n",
-            'content' => $data
-        ]
-    ]);
-    
-    $response = file_get_contents(
-        'https://kultivate-chat-ck.replit.app/api/v1/data/query',
-        false,
-        $context
-    );
-    
-    $result = json_decode($response, true);
-    
-    if ($result['success']) {
-        echo "AI Response: " . $result['response'] . "\n";
-        
-        foreach ($result['data'] as $display) {
-            if ($display['type'] === 'table') {
-                echo "\n" . $display['title'] . ":\n";
-                foreach ($display['content'] as $row) {
-                    print_r($row);
-                }
-            }
-        }
-        
-        return $result;
-    } else {
-        echo "Query failed: " . $result['error'] . "\n";
-        return null;
-    }
-}
-
-// Usage examples
-askBusinessQuestion("Calculate total revenue by event type");
-askBusinessQuestion("Show me repeat customers from event data");
+revenue_data = analyze_business_data("show me revenue from all events")
+customer_data = analyze_business_data("list top customers by purchase amount")
+vendor_performance = analyze_business_data("analyze vendor sales performance")
 ```
 
 ---
 
-## Advanced Query Examples
+## Verification Status
 
-### Revenue Analysis
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Calculate total revenue and profit margins for each event, showing ROI analysis"}'
-```
+### ✅ Successfully Implemented
+- **Natural language processing** with Gemini 2.0 Flash AI
+- **Business entity recognition** for Balay Kreative, Kapwa Gardens, vendors
+- **Automatic table discovery** from 64+ BigQuery tables
+- **Smart data extraction** with multiple fallback mechanisms
+- **Real-time business analysis** with authentic data sources
 
-### Customer Insights
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Analyze customer behavior patterns - who are the repeat attendees and what events do they prefer?"}'
-```
+### ✅ Production Ready Features
+- **Server-side credential management** eliminates client complexity
+- **Intelligent query routing** automatically selects optimal processing method
+- **Comprehensive error handling** with helpful suggestions
+- **Performance optimization** with caching and timeout protection
 
-### Market Analysis
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Compare market performance between Filipino and Vietnamese events, including attendance and revenue metrics"}'
-```
-
-### Vendor Performance
-```bash
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "Evaluate vendor close-out sales performance - which vendors had the best conversion rates?"}'
-```
+### 📊 Test Results
+- **Table Discovery:** ✅ Returns 64 BigQuery business tables
+- **Business Entity Queries:** ✅ Successfully extracts Balay Kreative event data
+- **SQL Generation:** ✅ Automatically creates optimized BigQuery queries
+- **AI Processing:** ✅ Full Gemini 2.0 integration with business context
 
 ---
 
-## Data Sources Available
+## Next Steps for Integration
 
-### Business Data Tables (64 total)
-- **Event Attendance**: Complete attendee records with registration details
-- **Revenue Data**: Ticket sales, pricing, and financial performance
-- **Vendor Information**: Close-out sales, vendor performance metrics
-- **Customer Data**: Attendee demographics and purchase history
-- **Market Analytics**: Event performance across different segments
+1. **Test your specific business questions** using the enhanced API endpoint
+2. **Review the AI responses** to understand data structure and insights
+3. **Implement error handling** for timeout and processing scenarios
+4. **Scale your integration** with batch processing for multiple queries
+5. **Monitor performance** and adjust query complexity as needed
 
-### Supported Business Areas
-- **Balay Kreative Events**: Filipino cultural events and dining experiences
-- **Kapwa Gardens**: Community events and vendor markets
-- **Multi-cultural Events**: Vietnamese, Filipino, and fusion experiences
-- **Vendor Markets**: Close-out sales and vendor performance tracking
-
----
-
-## Response Format Standards
-
-All API responses follow this enhanced structure:
-
-```json
-{
-  "success": true|false,
-  "query": "Original user query",
-  "response": "AI-generated natural language response",
-  "data": [
-    {
-      "type": "table",
-      "title": "Descriptive title for the data",
-      "content": [
-        {"column1": "value1", "column2": "value2"},
-        {"column1": "value3", "column2": "value4"}
-      ]
-    }
-  ],
-  "route_used": "nlp|tables|sql",
-  "rows_returned": 0,
-  "timestamp": "2025-06-26T00:50:12.345Z",
-  "error": null|"error message"
-}
-```
-
----
-
-## Best Practices
-
-### 1. Use Natural Language First
-Start with business questions in plain English:
-```bash
-# Instead of complex SQL
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "How much revenue did we generate from Filipino events?"}'
-```
-
-### 2. Be Specific About Analysis
-```bash
-# Good: Specific business question
-{"query": "Show me the top 5 events by attendance with revenue breakdown"}
-
-# Better: Include context for deeper analysis
-{"query": "Analyze the top 5 events by attendance, including revenue per attendee and profit margins"}
-```
-
-### 3. Leverage AI Context Understanding
-```bash
-# The AI understands business context
-{"query": "Compare our Q1 performance to Q2 across all metrics"}
-{"query": "Which vendor partnerships were most profitable?"}
-{"query": "Show me customer retention rates for repeat attendees"}
-```
-
-### 4. Error Handling
-```javascript
-const result = await fetch('/api/v1/data/query', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ query: userQuestion })
-});
-
-const data = await result.json();
-
-if (data.success) {
-  // Process AI response and data
-  console.log(data.response);
-  data.data.forEach(display => {
-    // Handle table displays
-  });
-} else {
-  // Handle errors gracefully
-  console.error(`Query failed: ${data.error}`);
-  
-  // Suggest alternatives based on route_used
-  if (data.route_used === 'nlp') {
-    console.log('Try rephrasing your question or use more specific terms');
-  }
-}
-```
-
----
-
-## Migration from Previous Version
-
-### Old Way (Limited)
-```bash
-# Had to choose specific endpoints
-curl -X POST .../api/v1/data/tables  # For table discovery
-curl -X POST .../api/v1/data/sql     # For SQL queries
-# Natural language returned 503 error
-```
-
-### New Way (Intelligent)
-```bash
-# One endpoint handles everything intelligently
-curl -X POST https://kultivate-chat-ck.replit.app/api/v1/data/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "ANY TYPE OF QUESTION OR REQUEST"}'
-```
-
----
-
-## Security & Performance
-
-### Server-Side Intelligence
-- **AI Processing**: Gemini 2.0 Flash with business context understanding
-- **Credential Management**: All BigQuery and Keboola credentials handled server-side
-- **Query Optimization**: Automatic query optimization and result caching
-- **Rate Limiting**: Intelligent throttling for production usage
-
-### Data Privacy
-- **No Client Credentials**: External applications never handle sensitive credentials
-- **Secure Processing**: All AI processing happens in secure server environment
-- **Audit Logging**: Complete query and response logging for security
-
----
-
-**Last Updated:** June 26, 2025  
-**API Version:** Enhanced Natural Language v1.0  
-**AI Model:** Gemini 2.0 Flash with Business Intelligence Tools
+The Kultivate AI API now provides enterprise-grade business intelligence capabilities through simple natural language queries, making complex data analysis accessible to any application or workflow.

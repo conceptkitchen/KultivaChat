@@ -2102,7 +2102,7 @@ Current time: {datetime.now().isoformat()}"""
             # Extract data from AI response
             extracted_data = extract_data_from_gemini_response(response)
             
-            if extracted_data and extracted_data.get('data'):
+            if extracted_data and isinstance(extracted_data, dict) and extracted_data.get('data'):
                 return jsonify({
                     "success": True,
                     "query": query,
@@ -2114,10 +2114,44 @@ Current time: {datetime.now().isoformat()}"""
                     "timestamp": datetime.now().isoformat()
                 })
             else:
+                # Enhanced fallback with intelligent table matching
+                app.logger.info(f"AI processing completed, checking for table references in response")
+                response_text = response.text if hasattr(response, 'text') else ""
+                
+                # Look for table names in AI response
+                if response_text:
+                    import re
+                    table_pattern = r'`([^`]+)`'
+                    table_matches = re.findall(table_pattern, response_text)
+                    
+                    if table_matches:
+                        for table_ref in table_matches:
+                            if 'WORKSPACE_21894820' in table_ref:
+                                # Extract table name from full reference
+                                table_name = table_ref.split('.')[-1]
+                                try:
+                                    fallback_query = f"SELECT * FROM `{table_ref}` LIMIT 10"
+                                    fallback_result = internal_execute_sql_query(fallback_query)
+                                    
+                                    if fallback_result.get('status') == 'success' and fallback_result.get('data'):
+                                        return jsonify({
+                                            "success": True,
+                                            "query": query,
+                                            "response": response_text,
+                                            "data": fallback_result['data'],
+                                            "table_name": table_name,
+                                            "rows_returned": len(fallback_result['data']),
+                                            "ai_analysis": True,
+                                            "extraction_method": "fallback_table_reference",
+                                            "timestamp": datetime.now().isoformat()
+                                        })
+                                except Exception as fallback_error:
+                                    app.logger.error(f"Fallback query failed: {fallback_error}")
+                
                 return jsonify({
                     "success": True,
                     "query": query,
-                    "response": response.text if hasattr(response, 'text') else "I can help you analyze your business data. Try asking about specific tables, revenue, or customer information.",
+                    "response": response_text or "I can help you analyze your business data. Try asking about specific tables, revenue, or customer information.",
                     "data": [],
                     "ai_analysis": True,
                     "suggestion": "Ask about Balay Kreative events, Kapwa Gardens data, or use 'show me tables'",

@@ -146,16 +146,20 @@ function startServer() {
       }
       
       // Route directly to the new API v1 endpoint in backend
-      const response = await fetch('http://localhost:8081/api/v1/data/query', {
+      const backendUrl = 'http://localhost:8081/api/v1/data/query';
+      const requestBody = { query: query, credentials: credentials };
+      
+      console.log(`[API v1] Routing to: ${backendUrl}`);
+      console.log(`[API v1] Request body:`, requestBody);
+      
+      const response = await fetch(backendUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: query,
-          credentials: credentials
-        })
+        body: JSON.stringify(requestBody)
       });
       
       const data = await response.json();
+      console.log(`[API v1] Backend response:`, data);
       
       res.json(data);
       
