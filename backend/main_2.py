@@ -239,7 +239,9 @@ You have the following tools at your disposal:
         1.  Follow the "Complex Analytical Questions and Reporting" detailed strategy above: Deconstruct Request -> Discover Tables & Schemas (using `INFORMATION_SCHEMA.TABLES` then `INFORMATION_SCHEMA.COLUMNS` for candidates) -> Formulate Complex SQL (JOINs, aggregations, filters, potentially using `get_zip_codes_for_city` if needed for location filtering by city against a zip_code column) -> Execute Query -> Refine if stuck (allowing specific clarification as an exception).
     * **For Type C (List BigQuery Tables):**
         1.  SQL: `SELECT table_name FROM \`kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES\` ORDER BY table_name;`.
-        2.  Call `execute_sql_query`.
+        2.  Call `internal_execute_sql_query`.
+
+**CRITICAL BIGQUERY SYNTAX RULE: ALL table references must be fully qualified with backticks: `kbc-use4-839-261b.WORKSPACE_21894820.table_name`. NEVER use unqualified references like `INFORMATION_SCHEMA.TABLES` - this will cause errors. Always use `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`.**
     * **For Type D (Keboola Storage Exploration):**
         1.  Use `list_keboola_buckets`, `list_tables_in_keboola_bucket`, `get_keboola_table_detail` (for Keboola Storage table schemas) as appropriate.
 
@@ -2631,6 +2633,9 @@ def api_v1_data_query():
             # System instruction for API mode
             system_instruction = f"""You are a business intelligence assistant with access to BigQuery data warehouse.
 Project: kbc-use4-839-261b, Dataset: WORKSPACE_21894820
+
+CRITICAL: ALL BigQuery table references MUST be fully qualified with backticks: `kbc-use4-839-261b.WORKSPACE_21894820.table_name`
+NEVER use unqualified references like INFORMATION_SCHEMA.TABLES - always use `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`
 
 Available tools:
 - internal_execute_sql_query: Execute SQL queries against BigQuery
