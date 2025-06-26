@@ -150,21 +150,14 @@ function startServer() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: query,
-          api_mode: true,
+          query: query,
           credentials: credentials
         })
       });
       
       const data = await response.json();
       
-      res.json({
-        success: true,
-        query: query,
-        response: data.reply,
-        data: data.displays || [],
-        timestamp: new Date().toISOString()
-      });
+      res.json(data);
       
     } catch (error) {
       res.status(500).json({

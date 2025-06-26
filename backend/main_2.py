@@ -1955,7 +1955,7 @@ def chat_with_gemini_client_style():
 
 @app.route('/api/v1/data/query', methods=['POST', 'OPTIONS'])
 def api_v1_data_query():
-    """Simple API endpoint that works reliably without hanging"""
+    """Enhanced API endpoint with full Gemini AI natural language processing"""
     # Handle OPTIONS request for CORS
     if request.method == 'OPTIONS':
         response = jsonify({})
@@ -1976,58 +1976,169 @@ def api_v1_data_query():
                 "timestamp": datetime.now().isoformat()
             }), 400
         
+        app.logger.info(f"API v1 Enhanced Query: {query}")
+        
         query_lower = query.lower()
         
-        # Table discovery - immediate response
-        if 'table' in query_lower or 'show' in query_lower or 'list' in query_lower:
-            return jsonify({
-                "success": True,
-                "data": [
-                    {"table_name": "Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders"},
-                    {"table_name": "Vendor-Close-Out---Dye-Hard--2023-04-02---Kapwa-Gardens-New-close-out-Dye-Hard"},
-                    {"table_name": "Kapwa-Gardens---Close-Out-Market-RECAP---NEW---April-Events-RECAP"},
-                    {"table_name": "Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-"},
-                    {"table_name": "Kapwa-Gardens---market-vendors-recap---2-23-24---vendors-Vendor-Recap-"},
-                    {"table_name": "Balay-Kreative---Event-Planner-data---All-data-bookings"}
-                ],
-                "total_tables": 6,
-                "message": "Available business data tables",
-                "timestamp": datetime.now().isoformat()
-            })
+        # Quick table discovery without AI processing
+        if any(pattern in query_lower for pattern in ['show me tables', 'list tables', 'what tables', 'available tables']):
+            try:
+                result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                if result.get('status') == 'success' and result.get('data'):
+                    return jsonify({
+                        "success": True,
+                        "data": result['data'],
+                        "total_tables": len(result['data']),
+                        "message": "Available business data tables from BigQuery",
+                        "timestamp": datetime.now().isoformat()
+                    })
+            except Exception as table_error:
+                app.logger.error(f"Table discovery error: {table_error}")
         
-        # Business entity queries
-        elif any(word in query_lower for word in ['balay', 'kreative', 'kapwa', 'gardens']):
+        # Auto-execute business entity queries using table matching
+        business_entities = ['balay', 'kreative', 'kapwa', 'gardens', 'vendor', 'undiscovered']
+        if any(entity in query_lower for entity in business_entities):
+            try:
+                # Get available tables first
+                tables_result = internal_execute_sql_query("SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` ORDER BY table_name")
+                if tables_result.get('status') == 'success' and tables_result.get('data'):
+                    available_tables = [row['table_name'] for row in tables_result['data']]
+                    
+                    # Find best matching table
+                    best_match = None
+                    for table in available_tables:
+                        table_lower = table.lower()
+                        if any(entity in table_lower for entity in business_entities if entity in query_lower):
+                            best_match = table
+                            break
+                    
+                    if best_match:
+                        # Execute query on matched table
+                        data_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{best_match}` LIMIT 10"
+                        data_result = internal_execute_sql_query(data_query)
+                        
+                        if data_result.get('status') == 'success' and data_result.get('data'):
+                            return jsonify({
+                                "success": True,
+                                "query": query,
+                                "data": data_result['data'],
+                                "table_name": best_match,
+                                "rows_returned": len(data_result['data']),
+                                "message": f"Data from {best_match} matching your query",
+                                "timestamp": datetime.now().isoformat()
+                            })
+                        
+            except Exception as business_error:
+                app.logger.error(f"Business entity query error: {business_error}")
+        
+        # Direct SQL execution
+        if any(query.strip().upper().startswith(word) for word in ['SELECT', 'WITH', 'CREATE', 'INSERT', 'UPDATE']):
+            try:
+                result = internal_execute_sql_query(query)
+                if result.get('status') == 'success':
+                    return jsonify({
+                        "success": True,
+                        "query": query,
+                        "data": result.get('data', []),
+                        "rows_returned": len(result.get('data', [])),
+                        "message": "SQL query executed successfully",
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": result.get('error', 'SQL execution failed'),
+                        "query": query,
+                        "timestamp": datetime.now().isoformat()
+                    }), 400
+            except Exception as sql_error:
+                return jsonify({
+                    "success": False,
+                    "error": f"SQL error: {str(sql_error)}",
+                    "query": query,
+                    "timestamp": datetime.now().isoformat()
+                }), 400
+        
+        # Enhanced natural language processing with full AI capabilities
+        try:
+            app.logger.info(f"Processing natural language query with Gemini AI: {query}")
+            
+            # Initialize Gemini client with tools
+            client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
+            
+            # System instruction for API mode
+            system_instruction = f"""You are a business intelligence assistant with access to BigQuery data warehouse.
+Project: kbc-use4-839-261b, Dataset: WORKSPACE_21894820
+
+Available tools:
+- internal_execute_sql_query: Execute SQL queries against BigQuery
+- get_current_time: Get current date/time
+- get_zip_codes_for_city: Get zip codes for cities
+
+When users ask about business data, tables, revenue, customers, or events:
+1. Use internal_execute_sql_query to get actual data
+2. Provide specific insights and analysis
+3. Always show actual data, not just table names
+
+Be decisive and immediately execute queries when users mention:
+- Balay Kreative, Kapwa Gardens, vendors, events, attendees, orders
+- Revenue, sales, customer data, market data
+- Any business metrics or analysis requests
+
+Current time: {datetime.now().isoformat()}"""
+
+            # Create chat session with tools
+            chat_session = client.chats.create(
+                config=google_genai_types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    tools=gemini_tool_functions_list,
+                    temperature=0.1
+                )
+            )
+            
+            # Send user query
+            response = chat_session.send_message(query)
+            
+            # Extract data from AI response
+            extracted_data = extract_data_from_gemini_response(response)
+            
+            if extracted_data and extracted_data.get('data'):
+                return jsonify({
+                    "success": True,
+                    "query": query,
+                    "response": response.text if hasattr(response, 'text') else "Analysis complete",
+                    "data": extracted_data['data'],
+                    "table_name": extracted_data.get('table_name'),
+                    "rows_returned": len(extracted_data['data']),
+                    "ai_analysis": True,
+                    "timestamp": datetime.now().isoformat()
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "query": query,
+                    "response": response.text if hasattr(response, 'text') else "I can help you analyze your business data. Try asking about specific tables, revenue, or customer information.",
+                    "data": [],
+                    "ai_analysis": True,
+                    "suggestion": "Ask about Balay Kreative events, Kapwa Gardens data, or use 'show me tables'",
+                    "timestamp": datetime.now().isoformat()
+                })
+                
+        except Exception as ai_error:
+            app.logger.error(f"AI processing error: {ai_error}")
+            
+            # Fallback response for natural language queries
             return jsonify({
                 "success": True,
                 "query": query,
-                "response": f"Found business entity in query: '{query}'. Use main chat interface for full AI analysis.",
+                "response": f"Received natural language query: '{query}'. For advanced AI analysis, the full chat interface provides comprehensive business intelligence capabilities.",
                 "data": [],
-                "suggestion": "Try specific SQL queries or main chat interface",
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        # SQL queries
-        elif any(query.strip().upper().startswith(word) for word in ['SELECT', 'WITH', 'CREATE']):
-            return jsonify({
-                "success": True,
-                "query": query,
-                "response": "SQL query detected. Use /api/v1/data/sql endpoint for direct SQL execution.",
-                "data": [],
-                "suggestion": "Use /api/v1/data/sql endpoint with {'sql': 'your_query'}",
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        # Default response
-        else:
-            return jsonify({
-                "success": True,
-                "query": query,
-                "response": f"Received: '{query}'. Try 'show me tables' or use main chat interface.",
-                "data": [],
+                "suggestion": "Try specific table names, SQL queries, or use the main chat interface for full AI processing",
                 "timestamp": datetime.now().isoformat()
             })
             
     except Exception as e:
+        app.logger.error(f"API v1 error: {e}")
         return jsonify({
             "success": False,
             "error": str(e),
