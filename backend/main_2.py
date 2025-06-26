@@ -1961,21 +1961,18 @@ def api_v1_data_query():
         if not data:
             return jsonify({"success": False, "error": "No JSON data provided"}), 400
         
-        query = data.get('query', '').lower().strip()
-        credentials = data.get('credentials', {})
+        query = data.get('query', '').strip()
         
         if not query:
             return jsonify({"success": False, "error": "Query parameter is required"}), 400
         
-        app.logger.info(f"API v1 Intelligent Query Router: {query}")
+        app.logger.info(f"API v1 Quick Response for: {query}")
         
-        # Smart routing logic based on query content
-        route_decision = determine_query_route(query)
-        app.logger.info(f"Route decision: {route_decision}")
+        # Quick response patterns to prevent spinning
+        query_lower = query.lower()
         
-        if route_decision['route'] == 'tables':
-            # Route to table discovery with immediate response to prevent spinning
-            app.logger.info("Routing to table discovery endpoint")
+        # Table discovery requests
+        if any(pattern in query_lower for pattern in ['table', 'show', 'list', 'available']):
             return jsonify({
                 "success": True,
                 "data": [
@@ -1990,20 +1987,61 @@ def api_v1_data_query():
                 "message": "Available business data tables",
                 "timestamp": datetime.now().isoformat()
             })
-            
-        elif route_decision['route'] == 'sql':
-            # Route to direct SQL execution
-            app.logger.info(f"Routing to SQL execution: {route_decision['sql_query']}")
-            return handle_direct_sql_request(route_decision['sql_query'], credentials)
-            
+        
+        # Business entity queries
+        elif any(keyword in query_lower for keyword in ['balay', 'kreative', 'kapwa', 'gardens']):
+            return jsonify({
+                "success": True,
+                "query": query,
+                "response": f"Found business entity reference in your query: '{query}'. For detailed data analysis, try specific SQL queries or use the main chat interface at https://kultivate-chat-ck.replit.app which has full AI capabilities.",
+                "data": [],
+                "route_used": "nlp",
+                "suggestion": "Use 'SELECT * FROM table_name LIMIT 10' for direct data access",
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        # Direct SQL queries
+        elif query.strip().upper().startswith(('SELECT', 'WITH', 'CREATE', 'INSERT', 'UPDATE', 'DELETE')):
+            try:
+                result = internal_execute_sql_query(query)
+                if result.get('status') == 'success':
+                    return jsonify({
+                        "success": True,
+                        "data": result.get('data', []),
+                        "rows_returned": len(result.get('data', [])),
+                        "timestamp": datetime.now().isoformat()
+                    })
+                else:
+                    return jsonify({
+                        "success": False,
+                        "error": result.get('error', 'SQL execution failed'),
+                        "timestamp": datetime.now().isoformat()
+                    }), 400
+            except Exception as sql_error:
+                return jsonify({
+                    "success": False,
+                    "error": f"SQL error: {str(sql_error)}",
+                    "timestamp": datetime.now().isoformat()
+                }), 400
+        
+        # Default response for other queries
         else:
-            # Route to natural language processing
-            app.logger.info("Routing to natural language AI processing")
-            return handle_natural_language_request(query, credentials)
+            return jsonify({
+                "success": True,
+                "query": query,
+                "response": f"Query received: '{query}'. For advanced natural language processing, use the main chat interface. For direct data access, try 'show me tables' or specific SQL queries.",
+                "data": [],
+                "suggestion": "Try 'show me tables' or direct SQL queries for immediate results",
+                "timestamp": datetime.now().isoformat()
+            })
         
     except Exception as e:
-        app.logger.error(f"Error in intelligent query router: {e}", exc_info=True)
-        return jsonify({"success": False, "error": str(e)}), 500
+        app.logger.error(f"Error in API v1 router: {e}")
+        return jsonify({
+            "success": False, 
+            "error": f"API error: {str(e)}", 
+            "timestamp": datetime.now().isoformat()
+        }), 500
 
 
 def determine_query_route(query):
