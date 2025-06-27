@@ -3,7 +3,7 @@ import re  # For fallback logic - moved to top
 import uuid
 import subprocess
 from flask import Flask, jsonify, request
-# Removed Keboola client import - using BigQuery workspace only
+from keboola import Client as KeboolaClient
 from google.cloud import bigquery
 import logging
 import json
@@ -73,6 +73,8 @@ GOOGLE_APPLICATION_CREDENTIALS_PATH = os.environ.get(
     'GOOGLE_APPLICATION_CREDENTIALS')
 KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+KBC_API_URL = os.getenv('KBC_API_URL')
+KBC_STORAGE_TOKEN = os.getenv('KBC_STORAGE_TOKEN')
 
 # Add configuration variables for project and workspace IDs
 GOOGLE_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID', 'kbc-use4-839-261b')
@@ -303,7 +305,20 @@ def timeout_context(seconds):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
-# Removed Keboola Storage Client initialization - using BigQuery workspace only
+# Initialize Keboola Storage Client for BigQuery workspace access
+keboola_client = None
+try:
+    if KBC_API_URL and KBC_STORAGE_TOKEN:
+        app.logger.info("Attempting to initialize Keboola Storage Client...")
+        with timeout_context(30):  # 30 second timeout
+            keboola_client = KeboolaClient(KBC_API_URL, KBC_STORAGE_TOKEN)
+        app.logger.info("Successfully initialized Keboola Storage Client")
+    else:
+        app.logger.error("CRITICAL (Keboola Client): KBC_API_URL or KBC_STORAGE_TOKEN not set.")
+except TimeoutError:
+    app.logger.error("Keboola Client initialization timed out - continuing without it")
+except Exception as e:
+    app.logger.error(f"Error initializing Keboola Storage Client: {e}", exc_info=True)
 
 bigquery_client = None
 try:
