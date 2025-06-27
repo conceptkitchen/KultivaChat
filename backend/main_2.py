@@ -2,7 +2,7 @@ import os
 import re  # For fallback logic - moved to top
 import uuid
 from flask import Flask, jsonify, request
-from kbcstorage.client import Client as KeboolaStorageClient
+# Removed Keboola client import - using BigQuery workspace only
 from google.cloud import bigquery
 import logging
 import json
@@ -68,8 +68,6 @@ app.logger.setLevel(logging.INFO)
 last_sql_results = None
 
 # --- Load Configuration ---
-KBC_API_URL = os.environ.get('KBC_API_URL')
-KBC_STORAGE_TOKEN = os.environ.get('KBC_STORAGE_TOKEN')
 GOOGLE_APPLICATION_CREDENTIALS_PATH = os.environ.get(
     'GOOGLE_APPLICATION_CREDENTIALS')
 KBC_WORKSPACE_SCHEMA = os.environ.get('KBC_WORKSPACE_SCHEMA')
@@ -81,8 +79,6 @@ KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_ID', 'WORKSPACE_21894820')
 
 # Log configuration status for debugging
 app.logger.info("=== Configuration Check ===")
-app.logger.info(f"KBC_API_URL: {'SET' if KBC_API_URL else 'MISSING'}")
-app.logger.info(f"KBC_STORAGE_TOKEN: {'SET' if KBC_STORAGE_TOKEN else 'MISSING'}")
 app.logger.info(f"GOOGLE_APPLICATION_CREDENTIALS: {'SET' if GOOGLE_APPLICATION_CREDENTIALS_PATH else 'MISSING'}")
 app.logger.info(f"KBC_WORKSPACE_SCHEMA: {'SET' if KBC_WORKSPACE_SCHEMA else 'MISSING'}")
 app.logger.info(f"GEMINI_API_KEY: {'SET' if GEMINI_API_KEY else 'MISSING'}")
@@ -90,9 +86,9 @@ app.logger.info(f"GOOGLE_PROJECT_ID: {GOOGLE_PROJECT_ID}")
 app.logger.info(f"KBC_WORKSPACE_ID: {KBC_WORKSPACE_ID}")
 
 # --- Define System Instruction Constant ---
-SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert Keboola Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored within a Keboola project. This project utilizes Keboola Storage (organized into 'buckets' containing 'tables') for source data, and crucially, a Google BigQuery data warehouse (project ID: `{GOOGLE_PROJECT_ID}`, dataset/workspace schema: `{KBC_WORKSPACE_ID}`) for querying transformed and analysis-ready data.
+SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistant, adept at understanding natural language requests for data. Your primary goal is to help users understand and retrieve insights from their data stored in a Google BigQuery data warehouse (project ID: `{GOOGLE_PROJECT_ID}`, dataset/workspace schema: `{KBC_WORKSPACE_ID}`) containing business intelligence data.
 
-**MANDATORY EXECUTION RULE: For ANY request mentioning table data, you MUST use internal_execute_sql_query ONLY. Do NOT use list_keboola_buckets or list_tables_in_keboola_bucket. Use BigQuery tables directly.**
+**MANDATORY EXECUTION RULE: For ANY request mentioning table data, you MUST use internal_execute_sql_query ONLY. All data access goes through BigQuery workspace tables directly.**
 
 **CRITICAL TABLE SEARCH LOGIC: When users ask for data in natural language (e.g., "show me undiscovered attendees squarespace data"), you MUST:**
 
@@ -306,25 +302,7 @@ def timeout_context(seconds):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
-keboola_storage_client = None
-try:
-    if KBC_API_URL and KBC_STORAGE_TOKEN:
-        app.logger.info(
-            f"Attempting to initialize Keboola Storage Client with URL: {KBC_API_URL}"
-        )
-        with timeout_context(30):  # 30 second timeout
-            keboola_storage_client = KeboolaStorageClient(KBC_API_URL,
-                                                          KBC_STORAGE_TOKEN)
-        app.logger.info("Successfully initialized Keboola Storage Client.")
-    else:
-        app.logger.error(
-            "CRITICAL (Keboola Client): KBC_API_URL or KBC_STORAGE_TOKEN not set."
-        )
-except TimeoutError:
-    app.logger.error("Keboola Storage Client initialization timed out - continuing without it")
-except Exception as e:
-    app.logger.error(f"Error initializing Keboola Storage Client: {e}",
-                     exc_info=True)
+# Removed Keboola Storage Client initialization - using BigQuery workspace only
 
 bigquery_client = None
 try:
@@ -592,194 +570,13 @@ def internal_execute_sql_query(sql_query: str) -> dict:
         }
 
 
-def list_keboola_buckets() -> dict:
-    """Lists all available top-level data categories (buckets) in the Keboola Storage project.
-    Use this as a first step to understand the overall data landscape.
-
-    Returns:
-        dict: A dictionary containing 'status' and either 'data' (list of bucket objects) or 'error_message',
-              and 'display_type', 'display_title' for successful calls.
-    """
-    if not keboola_storage_client:
-        msg = "Keboola Storage client not initialized. Please check your Keboola API credentials."
-        app.logger.error(f"Tool call list_keboola_buckets: {msg}")
-        return {"status": "error", "error_message": msg}
-
-    app.logger.info("Tool Call: list_keboola_buckets")
-    try:
-        buckets_data = keboola_storage_client.buckets.list()
-        bucket_info = []
-        for b in buckets_data or []:
-            bucket_info.append({
-                "id": b.get("id"),
-                "name": b.get("name"),
-                "stage": b.get("stage"),
-                "description": b.get("description", "")
-            })
-        app.logger.info(
-            f"Tool Call: list_keboola_buckets returned {len(bucket_info)} buckets."
-        )
-        return {
-            "status": "success",
-            "data": bucket_info,
-            "display_type": "table",
-            "display_title": "Keboola Storage Buckets"
-        }
-    except Exception as e:
-        app.logger.error(f"Tool Call: Error listing Keboola buckets: {e}",
-                         exc_info=True)
-        return {
-            "status": "error",
-            "error_message": f"Error listing buckets: {str(e)}"
-        }
 
 
-def list_tables_in_keboola_bucket(bucket_id: str) -> dict:
-    """Lists all specific datasets (tables) and their row counts within a chosen Keboola Storage bucket.
-
-    Args:
-        bucket_id (str): The ID of the Keboola Storage bucket (e.g., 'in.c-mydata' or 'out.c-transformeddata').
-
-    Returns:
-        dict: A dictionary containing 'status' and either 'data' (list of table objects) or 'error_message',
-              and 'display_type', 'display_title' for successful calls.
-    """
-    if not keboola_storage_client:
-        msg = "Keboola Storage client not initialized. Please check your Keboola API credentials."
-        app.logger.error(f"Tool call list_tables_in_keboola_bucket: {msg}")
-        return {"status": "error", "error_message": msg}
-
-    app.logger.info(
-        f"Tool Call: list_tables_in_keboola_bucket with bucket_id: {bucket_id}"
-    )
-    try:
-        tables_data = keboola_storage_client.buckets.list_tables(
-            bucket_id=bucket_id)
-        table_info = []
-        for t in tables_data or []:
-            table_info.append({
-                "id": t.get("id"),
-                "name": t.get("name"),
-                "rowsCount": t.get("rowsCount", 0),
-                "primaryKey": t.get("primaryKey", [])
-            })
-        app.logger.info(
-            f"Tool Call: list_tables_in_keboola_bucket returned {len(table_info)} tables."
-        )
-        return {
-            "status": "success",
-            "data": table_info,
-            "display_type": "table",
-            "display_title": f"Tables in Keboola Bucket: {bucket_id}"
-        }
-    except Exception as e:
-        app.logger.error(
-            f"Tool Call: Error listing tables in bucket {bucket_id}: {e}",
-            exc_info=True)
-        return {
-            "status":
-            "error",
-            "error_message":
-            f"Error listing tables in bucket {bucket_id}: {str(e)}"
-        }
 
 
-def get_keboola_table_detail(table_id: str) -> dict:
-    """Retrieves the detailed schema (column names, data types) and metadata for a specific Keboola Storage table.
 
-    Args:
-        table_id (str): The full ID of the Keboola Storage table (e.g., 'in.c-mybucket.mytable').
 
-    Returns:
-        dict: A dictionary containing 'status' and either 'data' (table detail object wrapped in a list) or 'error_message',
-              and 'display_type', 'display_title' for successful calls.
-    """
-    if not keboola_storage_client:
-        msg = "Keboola Storage client not initialized. Please check your Keboola API credentials."
-        app.logger.error(f"Tool call get_keboola_table_detail: {msg}")
-        return {"status": "error", "error_message": msg}
 
-    app.logger.info(
-        f"Tool Call: get_keboola_table_detail with table_id: {table_id}")
-    try:
-        table_detail_response = keboola_storage_client.tables.detail(table_id)
-        app.logger.info(
-            f"Table detail response type: {type(table_detail_response)}, content snippet: {str(table_detail_response)[:200]}"
-        )
-
-        if not isinstance(table_detail_response, dict):
-            app.logger.error(
-                f"API returned unexpected response type: {type(table_detail_response)}. Full response: {table_detail_response}"
-            )
-            return {
-                "status":
-                "error",
-                "error_message":
-                f"API returned unexpected response type for table details: {type(table_detail_response)}"
-            }
-
-        columns_info = []
-        if 'definition' in table_detail_response and isinstance(
-                table_detail_response['definition'].get('columns'), list):
-            app.logger.info(
-                "Parsing columns from table_detail.definition.columns")
-            for col_def in table_detail_response['definition']['columns']:
-                columns_info.append({
-                    "name":
-                    col_def.get("name"),
-                    "type":
-                    col_def.get("baseType", col_def.get("type", "unknown"))
-                })
-        elif table_detail_response.get("columns") and isinstance(
-                table_detail_response.get("columns"),
-                list) and table_detail_response.get("attributes"):
-            app.logger.info(
-                "Parsing columns by matching names with attributes list.")
-            column_names = table_detail_response.get("columns", [])
-            attributes = {
-                attr.get("name"): attr
-                for attr in table_detail_response.get("attributes", [])
-            }
-            for name in column_names:
-                attr = attributes.get(name, {})
-                columns_info.append({
-                    "name": name,
-                    "type": attr.get("type", "unknown")
-                })
-        elif table_detail_response.get("columns") and isinstance(
-                table_detail_response.get("columns"), list):
-            app.logger.warning(
-                f"Only column names found for table {table_id}, type information might be missing."
-            )
-            for col_name in table_detail_response.get("columns", []):
-                columns_info.append({"name": col_name, "type": "unknown"})
-
-        detail_info_data = {
-            "id": table_detail_response.get("id"),
-            "name": table_detail_response.get("name"),
-            "rowsCount": table_detail_response.get("rowsCount", 0),
-            "columns": columns_info,
-            "primaryKey": table_detail_response.get("primaryKey", [])
-        }
-
-        app.logger.info(
-            f"Tool Call: get_keboola_table_detail returned details for table {table_id}."
-        )
-        return {
-            "status": "success",
-            "data": [detail_info_data],
-            "display_type": "table_detail",
-            "display_title": f"Schema for Keboola Table: {table_id}"
-        }
-    except Exception as e:
-        app.logger.error(
-            f"Tool Call: Error getting table detail for {table_id}: {e}",
-            exc_info=True)
-        return {
-            "status": "error",
-            "error_message":
-            f"Error getting table detail for {table_id}: {str(e)}"
-        }
 
 
 def get_current_time() -> dict:
@@ -1868,20 +1665,7 @@ def logout():
     return jsonify({"status": "success"})
 
 
-@app.route('/api/list_buckets', methods=['GET'])
-def list_keboola_buckets_endpoint_direct():
-    result = list_keboola_buckets()
-    if result.get("status") == "error":
-        return jsonify(result), 500
-    return jsonify(result.get("data"))
-
-
-@app.route('/api/buckets/<path:bucket_id>/tables', methods=['GET'])
-def list_tables_in_bucket_endpoint_direct(bucket_id):
-    result = list_tables_in_keboola_bucket(bucket_id=bucket_id)
-    if result.get("status") == "error":
-        return jsonify(result), 500
-    return jsonify(result.get("data"))
+# Removed Keboola bucket endpoints - using BigQuery workspace only
 
 
 @app.route('/api/query_data', methods=['POST'])
