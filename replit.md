@@ -1,25 +1,18 @@
-# Kultivate AI - System Architecture & Configuration
+# Kultivate AI MCP Server - System Architecture & Configuration
 
 ## Overview
 
-Kultivate AI is a full-stack chat application that combines React frontend with Python Flask backend, providing AI-powered data insights through integration with Google Gemini, Keboola Cloud, and BigQuery. The application serves as an intelligent assistant for data visualization, code generation, and API integration.
+Kultivate AI MCP Server is a standalone Model Context Protocol backend service providing AI-powered business intelligence through clean REST API endpoints. The server integrates Google Gemini 2.0 Flash, Keboola Cloud, and BigQuery to deliver sophisticated data analysis capabilities for external frontend applications.
 
 ## System Architecture
 
-### Frontend Architecture
-- **Framework**: React 18 with TypeScript
-- **Styling**: Tailwind CSS with shadcn/ui component library
-- **Routing**: Wouter for client-side routing
-- **State Management**: TanStack Query for server state management
-- **Build Tool**: Vite for development and production builds
-- **UI Components**: Radix UI primitives with custom theming
-
-### Backend Architecture
-- **Primary Server**: Python Flask (port 8081) for AI processing and API integrations
-- **Proxy Server**: Node.js Express (port 5000) for authentication and static file serving
+### MCP Server Architecture
+- **Service Type**: Standalone Model Context Protocol (MCP) backend API
+- **Framework**: Python Flask (port 8081) with REST API endpoints
 - **AI Integration**: Google Gemini 2.0 Flash for natural language processing
-- **Data Sources**: Keboola Cloud API and Google BigQuery
-- **Session Management**: PostgreSQL-backed session storage
+- **Data Sources**: Keboola Cloud API and Google BigQuery workspace
+- **Database**: PostgreSQL for conversation persistence (372+ conversations)
+- **API Design**: Clean REST endpoints for external frontend integration
 
 ### Database Layer
 - **Primary Database**: PostgreSQL (configured via Drizzle ORM)
@@ -111,6 +104,17 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 - **Environment**: Production variables configured in Replit secrets
 
 ## Recent Changes
+
+- **June 27, 2025**: FRONTEND REMOVED - CONVERTED TO STANDALONE MCP SERVER - Complete transformation to API-only backend service
+  - ✅ REMOVED: Entire React frontend (client/, server/, shared/ directories)
+  - ✅ REMOVED: Node.js proxy server and authentication layer
+  - ✅ CREATED: Standalone MCP server (mcp_server.py) with clean REST API endpoints
+  - ✅ MAINTAINED: All 6 AI tools operational (internal_execute_sql_query, execute_complex_business_query, execute_comprehensive_analysis, get_zip_codes_for_city, get_current_time, get_keboola_table_detail)
+  - ✅ CREATED: Comprehensive API documentation (MCP_API_DOCUMENTATION.md) with integration examples
+  - ✅ CONFIGURED: CORS headers for external frontend connections
+  - ✅ VERIFIED: Server successfully runs on port 8081 and responds to API calls
+  - ✅ PRESERVED: 372+ conversations in PostgreSQL database and complete BigQuery/Keboola workspace access
+  - → Backend now serves as pure API service ready for external frontend integration
 
 - **June 27, 2025**: KEBOOLA WORKSPACE ACCESS RESTORED - Critical function for BigQuery workspace connectivity maintained
   - ✅ RESTORED: get_keboola_table_detail function for accessing Keboola BigQuery workspace schema and metadata
