@@ -1534,3 +1534,44 @@ def _execute_general_analysis(query_description: str, query_lower: str) -> dict:
     """
     
     return internal_execute_sql_query(sql_query)
+
+def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overview") -> dict:
+    """Performs comprehensive data analysis on a specific table with advanced insights."""
+    app.logger.info(f"Tool Call: execute_comprehensive_analysis for {table_name}, type: {analysis_type}")
+    
+    try:
+        full_table_name = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{table_name}`"
+        
+        if analysis_type == "overview":
+            queries = [
+                f"SELECT COUNT(*) as total_rows FROM {full_table_name}",
+                f"SELECT * FROM {full_table_name} LIMIT 50"
+            ]
+        elif analysis_type == "aggregations":
+            queries = [
+                f"SELECT SUM(CAST(COALESCE(Total, \"0\") AS FLOAT64)) as total_revenue FROM {full_table_name} WHERE Total IS NOT NULL AND Total != \"\""
+            ]
+        else:
+            queries = [f"SELECT * FROM {full_table_name} LIMIT 10"]
+        
+        results = []
+        for query in queries:
+            result = internal_execute_sql_query(query)
+            if result.get("status") == "success":
+                results.append({
+                    "query": query,
+                    "data": result.get("data", []),
+                    "row_count": len(result.get("data", []))
+                })
+        
+        return {
+            "status": "success",
+            "analysis_type": analysis_type,
+            "table_name": table_name,
+            "results": results
+        }
+        
+    except Exception as e:
+        app.logger.error(f"Error in comprehensive analysis: {e}", exc_info=True)
+        return {"status": "error", "error_message": str(e)}
+
