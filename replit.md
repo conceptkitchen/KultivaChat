@@ -112,6 +112,15 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
+- **June 27, 2025**: KEBOOLA BUCKETS TOOL REMOVED - Simplified to BigQuery workspace only functionality
+  - ✅ REMOVED: All Keboola bucket tools (list_keboola_buckets, list_tables_in_keboola_bucket, get_keboola_table_detail)
+  - ✅ REMOVED: Keboola Storage Client initialization and API endpoints
+  - ✅ UPDATED: System instruction focuses exclusively on BigQuery workspace data access
+  - ✅ SIMPLIFIED: AI tool list now contains only BigQuery-focused tools (internal_execute_sql_query, execute_complex_business_query, execute_comprehensive_analysis, get_zip_codes_for_city, get_current_time)
+  - ✅ CLEANED: Removed all Keboola configuration dependencies (KBC_API_URL, KBC_STORAGE_TOKEN)
+  - ✅ VERIFIED: Backend successfully starts and operates with BigQuery workspace functionality only
+  - → System now provides streamlined data access exclusively through BigQuery workspace tables
+
 - **June 26, 2025**: API SIMPLIFIED TO SINGLE NATURAL LANGUAGE ENDPOINT - Removed redundant endpoints for cleaner architecture
   - ✅ REMOVED: Redundant `/api/v1/data/sql` and `/api/v1/data/tables` endpoints that caused confusion
   - ✅ STREAMLINED: Now only `/api/v1/data/query` exists as the single natural language interface

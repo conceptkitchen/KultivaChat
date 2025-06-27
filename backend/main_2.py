@@ -1,6 +1,7 @@
 import os
 import re  # For fallback logic - moved to top
 import uuid
+import subprocess
 from flask import Flask, jsonify, request
 # Removed Keboola client import - using BigQuery workspace only
 from google.cloud import bigquery
@@ -1303,9 +1304,6 @@ def get_conversations():
     # Fetch actual conversations from database using SQL execution tool
     try:
         # Connect to the same database system used by the Node.js server
-        import subprocess
-        import json
-        import os
         
         database_url = os.getenv('DATABASE_URL')
         if not database_url:
@@ -2739,11 +2737,7 @@ def _analyze_query_complexity(query: str) -> dict:
 
 # --- Main Execution ---
 if __name__ == '__main__':
-    app.logger.info(
-        f"KBC_API_URL from env: {'SET' if KBC_API_URL else 'NOT SET'}")
-    app.logger.info(
-        f"KBC_STORAGE_TOKEN from env: {'SET' if KBC_STORAGE_TOKEN else 'NOT SET'}"
-    )
+    # Removed Keboola configuration logging - using BigQuery workspace only
     app.logger.info(
         f"GOOGLE_APPLICATION_CREDENTIALS_PATH from env: {'SET' if GOOGLE_APPLICATION_CREDENTIALS_PATH else 'NOT SET'}"
     )
@@ -2758,7 +2752,6 @@ if __name__ == '__main__':
             "CRITICAL ERROR: google.genai SDK style could not be imported. Chat functionality will not work."
         )
     elif not all([
-            KBC_API_URL, KBC_STORAGE_TOKEN,
             GOOGLE_APPLICATION_CREDENTIALS_PATH, KBC_WORKSPACE_SCHEMA,
             GEMINI_API_KEY
     ]):
