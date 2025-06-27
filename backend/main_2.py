@@ -3,7 +3,7 @@ import re  # For fallback logic - moved to top
 import uuid
 import subprocess
 from flask import Flask, jsonify, request
-from keboola import Client as KeboolaClient
+import requests
 from google.cloud import bigquery
 import logging
 import json
@@ -305,20 +305,16 @@ def timeout_context(seconds):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, old_handler)
 
-# Initialize Keboola Storage Client for BigQuery workspace access
-keboola_client = None
-try:
-    if KBC_API_URL and KBC_STORAGE_TOKEN:
-        app.logger.info("Attempting to initialize Keboola Storage Client...")
-        with timeout_context(30):  # 30 second timeout
-            keboola_client = KeboolaClient(KBC_API_URL, KBC_STORAGE_TOKEN)
-        app.logger.info("Successfully initialized Keboola Storage Client")
-    else:
-        app.logger.error("CRITICAL (Keboola Client): KBC_API_URL or KBC_STORAGE_TOKEN not set.")
-except TimeoutError:
-    app.logger.error("Keboola Client initialization timed out - continuing without it")
-except Exception as e:
-    app.logger.error(f"Error initializing Keboola Storage Client: {e}", exc_info=True)
+# Keboola Storage API access configuration for BigQuery workspace
+keboola_headers = None
+if KBC_API_URL and KBC_STORAGE_TOKEN:
+    keboola_headers = {
+        'X-StorageApi-Token': KBC_STORAGE_TOKEN,
+        'Content-Type': 'application/json'
+    }
+    app.logger.info("Keboola Storage API configured for BigQuery workspace access")
+else:
+    app.logger.error("CRITICAL: KBC_API_URL or KBC_STORAGE_TOKEN not set - Keboola workspace access unavailable")
 
 bigquery_client = None
 try:
@@ -603,6 +599,68 @@ def get_current_time() -> dict:
     app.logger.info("Tool Call: get_current_time")
     current_time_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
     return {"status": "success", "current_time": current_time_str}
+
+
+def get_keboola_table_detail(bucket_id: str, table_name: str) -> dict:
+    """Get detailed information about a specific table in a Keboola bucket.
+    
+    This function accesses your Keboola BigQuery workspace to retrieve table schema,
+    column information, and sample data for analysis.
+    
+    Args:
+        bucket_id (str): The Keboola bucket ID (e.g., 'out.c-main')
+        table_name (str): The table name within the bucket
+        
+    Returns:
+        dict: Table details including schema, columns, and sample data
+    """
+    app.logger.info(f"Tool Call: get_keboola_table_detail(bucket_id='{bucket_id}', table_name='{table_name}')")
+    
+    try:
+        if not keboola_headers:
+            return {
+                'status': 'error',
+                'error_message': 'Keboola API credentials not configured'
+            }
+            
+        # Get table details from Keboola Storage API
+        table_url = f"{KBC_API_URL}/v2/storage/tables/{bucket_id}.{table_name}"
+        
+        response = requests.get(table_url, headers=keboola_headers, timeout=30)
+        
+        if response.status_code == 200:
+            table_info = response.json()
+            
+            # Format the response for display
+            columns = table_info.get('columns', [])
+            row_count = table_info.get('rowsCount', 0)
+            
+            return {
+                'status': 'success',
+                'data': {
+                    'table_name': table_name,
+                    'bucket_id': bucket_id,
+                    'columns': columns,
+                    'row_count': row_count,
+                    'created': table_info.get('created'),
+                    'last_change_date': table_info.get('lastChangeDate'),
+                    'data_size_bytes': table_info.get('dataSizeBytes', 0)
+                },
+                'display_type': 'table_detail',
+                'display_title': f'Table Details: {bucket_id}.{table_name}'
+            }
+        else:
+            return {
+                'status': 'error',
+                'error_message': f'Failed to retrieve table details: {response.status_code} - {response.text}'
+            }
+            
+    except Exception as e:
+        app.logger.error(f"Error in get_keboola_table_detail: {e}")
+        return {
+            'status': 'error',
+            'error_message': f'Error retrieving table details: {str(e)}'
+        }
 
 
 def get_zip_codes_for_city(
@@ -1257,7 +1315,8 @@ gemini_tool_functions_list = [
     execute_complex_business_query,
     execute_comprehensive_analysis,
     get_zip_codes_for_city,
-    get_current_time
+    get_current_time,
+    get_keboola_table_detail
 ]
 
 # --- Initialize Gemini Client (using genai.Client and GenerateContentConfig) ---
@@ -2492,6 +2551,7 @@ Available tools:
 - internal_execute_sql_query: Execute SQL queries against BigQuery
 - get_current_time: Get current date/time
 - get_zip_codes_for_city: Get zip codes for cities
+- get_keboola_table_detail: Get detailed table information from Keboola Storage API
 
 IMPORTANT: For complex business questions (like "most popular city for donors"):
 1. FIRST discover available tables: SELECT table_name FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES`
