@@ -112,14 +112,14 @@ Kultivate AI is a full-stack chat application that combines React frontend with 
 
 ## Recent Changes
 
-- **June 27, 2025**: KEBOOLA BUCKETS TOOL REMOVED - Simplified to BigQuery workspace only functionality
-  - ✅ REMOVED: All Keboola bucket tools (list_keboola_buckets, list_tables_in_keboola_bucket, get_keboola_table_detail)
-  - ✅ REMOVED: Keboola Storage Client initialization and API endpoints
-  - ✅ UPDATED: System instruction focuses exclusively on BigQuery workspace data access
-  - ✅ SIMPLIFIED: AI tool list now contains only BigQuery-focused tools (internal_execute_sql_query, execute_complex_business_query, execute_comprehensive_analysis, get_zip_codes_for_city, get_current_time)
-  - ✅ CLEANED: Removed all Keboola configuration dependencies (KBC_API_URL, KBC_STORAGE_TOKEN)
-  - ✅ VERIFIED: Backend successfully starts and operates with BigQuery workspace functionality only
-  - → System now provides streamlined data access exclusively through BigQuery workspace tables
+- **June 27, 2025**: KEBOOLA WORKSPACE ACCESS RESTORED - Critical function for BigQuery workspace connectivity maintained
+  - ✅ RESTORED: get_keboola_table_detail function for accessing Keboola BigQuery workspace schema and metadata
+  - ✅ MAINTAINED: Keboola Storage API configuration for workspace table details and column information
+  - ✅ REMOVED: Only redundant bucket listing tools (list_keboola_buckets, list_tables_in_keboola_bucket) 
+  - ✅ PRESERVED: Essential workspace connectivity through get_keboola_table_detail for table schema discovery
+  - ✅ VERIFIED: Backend operational with both BigQuery SQL execution and Keboola workspace metadata access
+  - ✅ ENHANCED: AI tool list includes get_keboola_table_detail alongside core BigQuery tools
+  - → System maintains full BigQuery workspace functionality including table discovery and schema analysis
 
 - **June 26, 2025**: API SIMPLIFIED TO SINGLE NATURAL LANGUAGE ENDPOINT - Removed redundant endpoints for cleaner architecture
   - ✅ REMOVED: Redundant `/api/v1/data/sql` and `/api/v1/data/tables` endpoints that caused confusion
