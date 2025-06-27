@@ -105,6 +105,14 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 27, 2025**: DEPLOYMENT ISSUE RESOLVED - Standalone Python MCP server running successfully
+  - ✅ BYPASSED: npm dependency issue by running Python server directly on port 8081
+  - ✅ CONFIRMED: All environment variables properly configured (GOOGLE_APPLICATION_CREDENTIALS, KBC_WORKSPACE_SCHEMA, GEMINI_API_KEY)
+  - ✅ VERIFIED: BigQuery client successfully initialized with project kbc-use4-839-261b
+  - ✅ OPERATIONAL: Flask MCP server serving on all addresses (0.0.0.0:8081) ready for external API connections
+  - ✅ VALIDATED: Complete configuration check passed - Keboola Storage API configured for BigQuery workspace access
+  - → MCP server fully operational as standalone Python service without npm dependencies
+
 - **June 27, 2025**: CONSOLIDATED INTO SINGLE MAIN_2.PY SERVER - Clean, organized API architecture achieved
   - ✅ CONSOLIDATED: Moved all MCP server endpoints into original main_2.py file for better organization
   - ✅ ELIMINATED: Duplicate Flask servers and conflicting processes (removed separate mcp_server.py)
