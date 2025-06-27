@@ -822,6 +822,71 @@ def _extract_demographics(query_description: str, query_lower: str) -> dict:
     
     return demographics
 
+def _extract_date_range(query_description: str) -> dict:
+    """Extract date range from query descriptions."""
+    import re
+    
+    # Look for year ranges like "2020-2023", "from 2021 to 2024"
+    year_pattern = r'(\d{4})\s*[-to]\s*(\d{4})'
+    match = re.search(year_pattern, query_description)
+    
+    if match:
+        start_year, end_year = match.groups()
+        return {
+            'start_year': start_year,
+            'end_year': end_year,
+            'where_clause': f"AND EXTRACT(YEAR FROM PARSE_DATETIME('%Y-%m-%d', Order_Date)) BETWEEN {start_year} AND {end_year}"
+        }
+    
+    # Look for single years
+    single_year = re.search(r'in (\d{4})', query_description)
+    if single_year:
+        year = single_year.group(1)
+        return {
+            'year': year,
+            'where_clause': f"AND EXTRACT(YEAR FROM PARSE_DATETIME('%Y-%m-%d', Order_Date)) = {year}"
+        }
+    
+    return {}
+
+def _extract_event_patterns(query_description: str, query_lower: str) -> dict:
+    """Extract event names and patterns from queries."""
+    events = []
+    frequency = None
+    
+    # Event name patterns
+    if 'kapwa gardens' in query_lower:
+        events.append('Kapwa Gardens')
+    if 'undscvrd' in query_lower or 'undiscovered' in query_lower:
+        events.append('UNDSCVRD')
+    if 'balay kreative' in query_lower:
+        events.append('Balay Kreative')
+    if 'yum yams' in query_lower:
+        events.append('Yum Yams')
+    
+    # Frequency patterns
+    if 'more than' in query_lower and ('time' in query_lower or 'x' in query_lower):
+        import re
+        freq_match = re.search(r'more than (\d+)', query_lower)
+        if freq_match:
+            frequency = int(freq_match.group(1))
+    
+    return {'events': events, 'frequency': frequency}
+
+def _build_demographics_where_clause(demographics: dict) -> str:
+    """Build WHERE clause from demographics data."""
+    clauses = []
+    
+    if 'identity' in demographics:
+        identity = demographics['identity']
+        clauses.append(f"(LOWER(Identity) LIKE '%{identity.lower()}%' OR LOWER(Ethnicity) LIKE '%{identity.lower()}%')")
+    
+    if 'gender' in demographics:
+        gender = demographics['gender']
+        clauses.append(f"LOWER(Gender) LIKE '%{gender.lower()}%'")
+    
+    return ' AND '.join(clauses)
+
 def _extract_income_threshold(query_description: str, query_lower: str) -> dict:
     """Extract income/sales thresholds from queries."""
     import re
@@ -1361,5 +1426,111 @@ def _handle_attendee_queries(query_description: str, query_lower: str) -> dict:
         ORDER BY unique_attendees DESC
         LIMIT 50
         """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_financial_queries(query_description: str, query_lower: str) -> dict:
+    """Handle financial and revenue analysis queries."""
+    date_range = _extract_date_range(query_description)
+    
+    sql_query = f"""
+    SELECT 
+        Event_Name,
+        SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue,
+        COUNT(DISTINCT Email) as unique_customers,
+        COUNT(*) as total_transactions,
+        AVG(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as avg_transaction_value
+    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+    WHERE Lineitem_price IS NOT NULL
+    AND Lineitem_price != ''
+    {date_range.get('where_clause', '')}
+    GROUP BY Event_Name
+    ORDER BY total_revenue DESC
+    LIMIT 20
+    """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_geographic_queries(query_description: str, query_lower: str) -> dict:
+    """Handle geographic and location-based queries."""
+    date_range = _extract_date_range(query_description)
+    
+    sql_query = f"""
+    SELECT 
+        Billing_City,
+        Billing_State,
+        Billing_Zip_Code,
+        COUNT(DISTINCT Email) as unique_residents,
+        COUNT(*) as total_transactions,
+        SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_spent
+    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+    WHERE Billing_City IS NOT NULL
+    AND Billing_City != ''
+    {date_range.get('where_clause', '')}
+    GROUP BY Billing_City, Billing_State, Billing_Zip_Code
+    ORDER BY unique_residents DESC
+    LIMIT 50
+    """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _handle_event_queries(query_description: str, query_lower: str) -> dict:
+    """Handle event-specific analysis queries."""
+    date_range = _extract_date_range(query_description)
+    event_patterns = _extract_event_patterns(query_description, query_lower)
+    
+    # Multi-event attendance queries
+    if len(event_patterns.get('events', [])) >= 2:
+        events = event_patterns['events']
+        sql_query = f"""
+        SELECT DISTINCT
+            Email,
+            First_Name,
+            Last_Name,
+            COUNT(DISTINCT Event_Name) as events_attended
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE Event_Name IN ('{"', '".join(events)}')
+        {date_range.get('where_clause', '')}
+        GROUP BY Email, First_Name, Last_Name
+        HAVING events_attended >= 2
+        ORDER BY events_attended DESC
+        LIMIT 100
+        """
+    else:
+        # Single event analysis
+        sql_query = f"""
+        SELECT 
+            Event_Name,
+            COUNT(DISTINCT Email) as unique_attendees,
+            COUNT(*) as total_transactions,
+            SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+        WHERE 1=1
+        {date_range.get('where_clause', '')}
+        GROUP BY Event_Name
+        ORDER BY unique_attendees DESC
+        LIMIT 50
+        """
+    
+    return internal_execute_sql_query(sql_query)
+
+
+def _execute_general_analysis(query_description: str, query_lower: str) -> dict:
+    """Execute general data analysis queries."""
+    sql_query = f"""
+    SELECT 
+        Event_Name,
+        COUNT(DISTINCT Email) as unique_attendees,
+        COUNT(*) as total_orders,
+        SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue
+    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
+    WHERE Event_Name IS NOT NULL
+    GROUP BY Event_Name
+    ORDER BY total_revenue DESC
+    LIMIT 20
+    """
     
     return internal_execute_sql_query(sql_query)
