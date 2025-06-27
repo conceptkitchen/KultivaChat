@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 try:
+    import main_2
     from main_2 import (
         internal_execute_sql_query,
         execute_complex_business_query, 
@@ -29,8 +30,10 @@ try:
         get_keboola_table_detail
     )
     logger.info("Successfully imported backend functions")
+    BACKEND_AVAILABLE = True
 except ImportError as e:
     logger.error(f"Failed to import backend functions: {e}")
+    BACKEND_AVAILABLE = False
     # Define fallback functions if import fails
     def internal_execute_sql_query(query):
         return {"error": "Backend functions not available", "query": query}
