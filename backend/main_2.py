@@ -1736,9 +1736,6 @@ def natural_language_query():
         query = data['query']
         app.logger.info(f"Natural language query: {query}")
         
-        # Create Gemini chat session with AI system prompt and tools
-        client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
-        
         # Use simple text-based AI processing for natural language queries
         # For now, detect the query type and route to appropriate function
         query_lower = query.lower()

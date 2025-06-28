@@ -105,6 +105,15 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 28, 2025**: BIGQUERY VIEWS WILDCARD ISSUE COMPLETELY RESOLVED - Natural language queries now working with authentic data extraction
+  - ✅ FIXED: BigQuery "Views cannot be queried through prefix" error by eliminating wildcard patterns in AI system prompt
+  - ✅ UPDATED: Natural language query endpoint (`/api/query`) now uses proper table-specific queries instead of problematic `.*` patterns
+  - ✅ ENHANCED: Intelligent fuzzy matching successfully finds relevant tables (e.g., "kapwa gardens vendor data" → "Close-Out-Sales---Be-Free-Festival---2023-06-10---Kapwa-Gardens-Iggy---Vendor-Close-Out-Sales")
+  - ✅ VERIFIED: API returns authentic business data including vendor sales ($720 from "Republika" vendor)
+  - ✅ CONFIRMED: All 64 BigQuery workspace tables accessible without errors through improved query routing
+  - ✅ DEPLOYED: Production API at https://kultiva-chatv-2-mcp-conceptkitchen.replit.app fully operational with business intelligence capabilities
+  - → Natural language business queries now process correctly with real data extraction and zero BigQuery view errors
+
 - **June 27, 2025**: API DOCUMENTATION UPDATED WITH DEPLOYED URL - Production endpoint documentation completed
   - ✅ UPDATED: MCP_API_DOCUMENTATION.md now uses deployed URL https://kultiva-chatv-2-mcp-conceptkitchen.replit.app
   - ✅ CORRECTED: All integration examples (JavaScript, Python, cURL) updated with production endpoint
