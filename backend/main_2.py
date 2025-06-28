@@ -729,190 +729,229 @@ def get_zip_codes_for_city(
 
 
 def generate_business_intelligence_summary(query_description: str, data_rows: list, table_name: str) -> str:
-    """Generate comprehensive business intelligence summaries with specific insights and actionable data"""
+    """Generate truly actionable business intelligence with specific insights from actual data"""
+    import re
     try:
         if not data_rows:
-            return "No data found for this query."
+            return "No data available for analysis."
         
         query_lower = query_description.lower()
-        summary_parts = []
         
-        # Extract all available data points for comprehensive analysis
-        revenue_amounts = []
-        vendor_names = []
-        event_names = []
-        contact_emails = []
-        phone_numbers = []
-        zip_codes = []
-        cities = []
-        dates = []
-        ethnicities = []
-        product_types = []
-        attendee_counts = []
+        # Deep data analysis - examine ALL fields in ALL records
+        all_vendor_names = set()
+        all_revenue_values = []
+        all_email_addresses = set()
+        all_phone_numbers = set()
+        all_zip_codes = set()
+        all_cities = set()
+        all_events = set()
+        all_demographic_info = set()
+        all_product_categories = set()
         
-        # Scan all data to extract meaningful business information
-        for row in data_rows:
-            for key, value in row.items():
-                if not value or str(value).strip() == '' or str(value) == ' $ -   ':
+        field_analysis = {}
+        populated_records = 0
+        
+        for record_idx, row in enumerate(data_rows):
+            record_has_data = False
+            for field_name, field_value in row.items():
+                if not field_value or str(field_value).strip() in ['', ' $ -   ', 'NULL', 'None', 'N/A']:
                     continue
-                    
-                value_str = str(value).strip()
-                key_lower = key.lower()
                 
-                # Extract revenue/financial data
-                if any(x in key_lower for x in ['total', 'sales', 'revenue', 'amount', 'cash', 'credit']):
-                    if '$' in value_str or any(x in value_str for x in ['$', 'dollar']):
+                record_has_data = True
+                field_str = str(field_value).strip()
+                field_lower = field_name.lower()
+                
+                # Track field usage
+                if field_name not in field_analysis:
+                    field_analysis[field_name] = {'values': set(), 'count': 0}
+                field_analysis[field_name]['values'].add(field_str)
+                field_analysis[field_name]['count'] += 1
+                
+                # Extract specific business data
+                # Revenue/Financial data with multiple patterns
+                if any(term in field_lower for term in ['sales', 'revenue', 'total', 'amount', 'cash', 'credit', 'payment', 'cost', 'price']):
+                    # Look for dollar amounts
+                    dollar_matches = re.findall(r'\$\s*(\d+(?:,\d{3})*(?:\.\d{2})?)', field_str)
+                    for match in dollar_matches:
                         try:
-                            import re
-                            amounts = re.findall(r'\$?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)', value_str.replace(',', ''))
-                            for amount in amounts:
-                                revenue_amounts.append(float(amount))
+                            all_revenue_values.append(float(match.replace(',', '')))
                         except:
                             pass
+                    
+                    # Look for numeric values that might be revenue
+                    if '$' in field_str or any(keyword in field_lower for keyword in ['revenue', 'sales', 'total']):
+                        numeric_matches = re.findall(r'(\d+(?:,\d{3})*(?:\.\d{2})?)', field_str.replace('$', ''))
+                        for match in numeric_matches:
+                            try:
+                                value = float(match.replace(',', ''))
+                                if 0 < value < 100000:  # Reasonable revenue range
+                                    all_revenue_values.append(value)
+                            except:
+                                pass
                 
-                # Extract vendor/business names
-                if any(x in key_lower for x in ['vendor', 'business', 'company', 'name']) and 'email' not in key_lower:
-                    if len(value_str) > 1 and value_str not in ['N/A', 'None', 'NULL']:
-                        vendor_names.append(value_str)
+                # Vendor/Business names
+                if any(term in field_lower for term in ['vendor', 'business', 'company', 'name', 'merchant']) and 'email' not in field_lower:
+                    if len(field_str) > 2 and field_str not in ['TRUE', 'FALSE', '0', '1']:
+                        all_vendor_names.add(field_str)
                 
-                # Extract event information
-                if any(x in key_lower for x in ['event', 'market', 'festival']):
-                    event_names.append(value_str)
+                # Contact information
+                if '@' in field_str and any(term in field_lower for term in ['email', 'contact', 'mail']):
+                    all_email_addresses.add(field_str)
                 
-                # Extract contact information
-                if 'email' in key_lower and '@' in value_str:
-                    contact_emails.append(value_str)
+                # Phone numbers
+                if any(term in field_lower for term in ['phone', 'cell', 'mobile', 'contact']) and re.search(r'\d{3}[-.\s]?\d{3}[-.\s]?\d{4}', field_str):
+                    all_phone_numbers.add(field_str)
                 
-                if any(x in key_lower for x in ['phone', 'cell', 'mobile']) and len(value_str) >= 10:
-                    phone_numbers.append(value_str)
+                # Geographic data
+                if re.match(r'^\d{5}(-\d{4})?$', field_str) and any(term in field_lower for term in ['zip', 'postal', 'code']):
+                    all_zip_codes.add(field_str)
                 
-                # Extract geographic data
-                if any(x in key_lower for x in ['zip', 'postal']):
-                    if value_str.isdigit() and len(value_str) == 5:
-                        zip_codes.append(value_str)
+                if any(term in field_lower for term in ['city', 'location', 'address']) and len(field_str) > 2:
+                    all_cities.add(field_str)
                 
-                if any(x in key_lower for x in ['city', 'location']):
-                    cities.append(value_str)
+                # Event information
+                if any(term in field_lower for term in ['event', 'market', 'festival', 'show']):
+                    all_events.add(field_str)
                 
-                # Extract demographic data
-                if any(x in key_lower for x in ['ethnic', 'race', 'demographic']):
-                    ethnicities.append(value_str)
+                # Demographics
+                if any(term in field_lower for term in ['ethnic', 'race', 'demographic', 'identity']):
+                    all_demographic_info.add(field_str)
                 
-                # Extract product categories
-                if any(x in key_lower for x in ['product', 'category', 'type', 'food']):
-                    product_types.append(value_str)
-        
-        # Build comprehensive business intelligence summary
-        if any(word in query_lower for word in ['revenue', 'money', 'sales', 'made', 'income']):
-            if revenue_amounts:
-                total_revenue = sum(revenue_amounts)
-                avg_revenue = total_revenue / len(revenue_amounts)
-                max_revenue = max(revenue_amounts)
-                min_revenue = min(revenue_amounts)
-                
-                summary_parts.append(f"REVENUE ANALYSIS: Total ${total_revenue:,.2f} from {len(revenue_amounts)} transactions")
-                summary_parts.append(f"Performance metrics: Average ${avg_revenue:,.2f}, Range ${min_revenue:,.2f} - ${max_revenue:,.2f}")
-                
-                # Revenue distribution analysis
-                high_performers = [r for r in revenue_amounts if r > avg_revenue]
-                if high_performers:
-                    summary_parts.append(f"Top performers: {len(high_performers)} transactions above average (${sum(high_performers):,.2f})")
-            else:
-                # Enhanced messaging for sparse financial data
-                summary_parts.append(f"REVENUE ANALYSIS: Examined {len(data_rows)} vendor records from {table_name}")
-                # Provide business context even with sparse data
-                event_info = table_name.replace('-', ' ').replace('_', ' ')
-                if 'close' in event_info.lower() and 'sales' in event_info.lower():
-                    summary_parts.append(f"Data source contains close-out sales information - revenue fields may be in financial columns")
-                summary_parts.append(f"Business recommendation: Data collection process may need improvement for complete financial analysis")
-        
-        elif any(word in query_lower for word in ['top', 'best', 'highest', 'vendors']):
-            unique_vendors = list(set([v for v in vendor_names if v]))
-            if unique_vendors:
-                summary_parts.append(f"TOP VENDORS IDENTIFIED: {len(unique_vendors)} unique businesses")
-                summary_parts.append(f"Leading vendors: {', '.join(unique_vendors[:5])}")
-                if revenue_amounts and len(revenue_amounts) >= len(unique_vendors):
-                    avg_per_vendor = sum(revenue_amounts) / len(unique_vendors)
-                    summary_parts.append(f"Average revenue per vendor: ${avg_per_vendor:,.2f}")
-            else:
-                summary_parts.append(f"Vendor analysis from {len(data_rows)} business records in {table_name}")
-        
-        elif any(word in query_lower for word in ['email', 'contact']):
-            unique_emails = list(set([e for e in contact_emails if e and '@' in e]))
-            if unique_emails:
-                summary_parts.append(f"CONTACT DATABASE: {len(unique_emails)} verified email addresses")
-                domain_counts = {}
-                for email in unique_emails:
-                    domain = email.split('@')[1] if '@' in email else 'unknown'
-                    domain_counts[domain] = domain_counts.get(domain, 0) + 1
-                
-                if domain_counts:
-                    top_domain = max(domain_counts, key=domain_counts.get)
-                    summary_parts.append(f"Most common domain: {top_domain} ({domain_counts[top_domain]} contacts)")
-                
-                summary_parts.append(f"Sample contacts: {', '.join(unique_emails[:3])}")
-            else:
-                summary_parts.append(f"Contact extraction from {len(data_rows)} records - analyzing communication channels")
-        
-        elif any(word in query_lower for word in ['phone', 'cell', 'number']):
-            unique_phones = list(set([p for p in phone_numbers if p]))
-            if unique_phones:
-                summary_parts.append(f"PHONE DIRECTORY: {len(unique_phones)} contact numbers available")
-                summary_parts.append(f"Sample numbers: {', '.join(unique_phones[:3])}")
-            else:
-                summary_parts.append(f"Phone contact analysis from {len(data_rows)} records")
-        
-        elif any(word in query_lower for word in ['zip', 'location', 'city', 'geographic']):
-            unique_zips = list(set([z for z in zip_codes if z]))
-            unique_cities = list(set([c for c in cities if c]))
+                # Product categories
+                if any(term in field_lower for term in ['product', 'category', 'type', 'food', 'service']):
+                    all_product_categories.add(field_str)
             
-            if unique_zips:
-                summary_parts.append(f"GEOGRAPHIC ANALYSIS: {len(unique_zips)} zip codes identified")
-                summary_parts.append(f"Coverage areas: {', '.join(unique_zips[:10])}")
-            
-            if unique_cities:
-                summary_parts.append(f"Cities represented: {', '.join(unique_cities[:5])}")
-            
-            if not unique_zips and not unique_cities:
-                summary_parts.append(f"Geographic data analysis from {len(data_rows)} location records")
+            if record_has_data:
+                populated_records += 1
         
+        # Generate intelligent business insights based on query intent and actual data
+        insights = []
+        
+        # Revenue analysis queries
+        if any(term in query_lower for term in ['money', 'revenue', 'sales', 'made', 'income', 'profit']):
+            if all_revenue_values:
+                total_revenue = sum(all_revenue_values)
+                avg_revenue = total_revenue / len(all_revenue_values)
+                max_revenue = max(all_revenue_values)
+                min_revenue = min(all_revenue_values)
+                
+                insights.append(f"FINANCIAL PERFORMANCE: ${total_revenue:,.2f} total revenue across {len(all_revenue_values)} transactions")
+                insights.append(f"Revenue metrics: Average ${avg_revenue:,.2f}, Range ${min_revenue:,.2f} to ${max_revenue:,.2f}")
+                
+                # Performance distribution
+                above_avg = [r for r in all_revenue_values if r > avg_revenue]
+                if above_avg:
+                    insights.append(f"High performers: {len(above_avg)} transactions above average, totaling ${sum(above_avg):,.2f}")
+                
+                # Vendor correlation if available
+                if all_vendor_names:
+                    insights.append(f"Revenue generated by {len(all_vendor_names)} unique vendors: {', '.join(list(all_vendor_names)[:5])}")
+            else:
+                insights.append(f"Revenue analysis attempted on {populated_records} records - financial data may be in non-standard format")
+                if field_analysis:
+                    financial_fields = [f for f in field_analysis.keys() if any(term in f.lower() for term in ['sales', 'revenue', 'total', 'amount'])]
+                    if financial_fields:
+                        insights.append(f"Potential financial fields identified: {', '.join(financial_fields[:3])}")
+        
+        # Vendor analysis queries
+        elif any(term in query_lower for term in ['vendor', 'top', 'best', 'business', 'merchant']):
+            if all_vendor_names:
+                vendor_list = list(all_vendor_names)
+                insights.append(f"VENDOR ANALYSIS: {len(vendor_list)} unique businesses identified")
+                insights.append(f"Vendors include: {', '.join(vendor_list[:8])}")
+                
+                if all_revenue_values:
+                    avg_per_vendor = sum(all_revenue_values) / len(vendor_list)
+                    insights.append(f"Average revenue per vendor: ${avg_per_vendor:,.2f}")
+                    
+                    # Revenue performance ranking
+                    if len(all_revenue_values) > 1:
+                        sorted_revenues = sorted(all_revenue_values, reverse=True)
+                        insights.append(f"Top revenue: ${sorted_revenues[0]:,.2f}, Median: ${sorted_revenues[len(sorted_revenues)//2]:,.2f}")
+            else:
+                insights.append(f"Vendor identification attempted across {populated_records} records")
+                vendor_fields = [f for f in field_analysis.keys() if any(term in f.lower() for term in ['vendor', 'business', 'name'])]
+                if vendor_fields:
+                    insights.append(f"Business-related fields found: {', '.join(vendor_fields)}")
+        
+        # Contact/email queries
+        elif any(term in query_lower for term in ['email', 'contact', 'address']):
+            if all_email_addresses:
+                email_list = list(all_email_addresses)
+                insights.append(f"CONTACT DATABASE: {len(email_list)} email addresses extracted")
+                
+                # Domain analysis
+                domains = {}
+                for email in email_list:
+                    if '@' in email:
+                        domain = email.split('@')[1]
+                        domains[domain] = domains.get(domain, 0) + 1
+                
+                if domains:
+                    top_domain = max(domains, key=domains.get)
+                    insights.append(f"Email domains: {top_domain} ({domains[top_domain]} contacts), plus {len(domains)-1} others")
+                
+                insights.append(f"Sample contacts: {', '.join(email_list[:4])}")
+            else:
+                insights.append(f"Contact search across {populated_records} records - no email addresses found in standard fields")
+        
+        # Phone number queries
+        elif any(term in query_lower for term in ['phone', 'cell', 'number', 'mobile']):
+            if all_phone_numbers:
+                phone_list = list(all_phone_numbers)
+                insights.append(f"PHONE DIRECTORY: {len(phone_list)} contact numbers identified")
+                insights.append(f"Contact numbers: {', '.join(phone_list[:5])}")
+            else:
+                insights.append(f"Phone number search across {populated_records} records - contact fields may need formatting")
+        
+        # Geographic queries
+        elif any(term in query_lower for term in ['zip', 'location', 'city', 'geographic']):
+            if all_zip_codes:
+                zip_list = list(all_zip_codes)
+                insights.append(f"GEOGRAPHIC COVERAGE: {len(zip_list)} zip codes identified")
+                insights.append(f"Service areas: {', '.join(zip_list[:10])}")
+            
+            if all_cities:
+                city_list = list(all_cities)
+                insights.append(f"Cities represented: {', '.join(city_list[:6])}")
+            
+            if not all_zip_codes and not all_cities:
+                insights.append(f"Geographic analysis of {populated_records} records - location data may be in combined address fields")
+        
+        # General/demographic queries
         else:
-            # General business intelligence for other queries
-            summary_parts.append(f"BUSINESS INTELLIGENCE ANALYSIS: {len(data_rows)} records processed")
+            insights.append(f"COMPREHENSIVE ANALYSIS: {populated_records} records with usable data from {len(data_rows)} total records")
             
-            # Provide specific insights based on available data
-            insights = []
-            if vendor_names:
-                unique_vendors = list(set([v for v in vendor_names if v]))
-                insights.append(f"{len(unique_vendors)} unique vendors")
+            # Multi-dimensional summary
+            summary_metrics = []
+            if all_vendor_names:
+                summary_metrics.append(f"{len(all_vendor_names)} vendors")
+            if all_revenue_values:
+                summary_metrics.append(f"${sum(all_revenue_values):,.2f} total value")
+            if all_email_addresses:
+                summary_metrics.append(f"{len(all_email_addresses)} email contacts")
+            if all_events:
+                summary_metrics.append(f"{len(all_events)} events")
             
-            if revenue_amounts:
-                total_rev = sum(revenue_amounts)
-                insights.append(f"${total_rev:,.2f} total transaction value")
+            if summary_metrics:
+                insights.append(f"Key metrics: {', '.join(summary_metrics)}")
             
-            if contact_emails:
-                unique_emails = list(set([e for e in contact_emails if e and '@' in e]))
-                insights.append(f"{len(unique_emails)} email contacts")
-            
-            if event_names:
-                unique_events = list(set([e for e in event_names if e]))
-                insights.append(f"{len(unique_events)} events/markets")
-            
-            if insights:
-                summary_parts.append(f"Key metrics: {', '.join(insights)}")
-            
-            # Data source context
-            event_context = table_name.replace('-', ' ').replace('_', ' ')
-            summary_parts.append(f"Source: {event_context}")
+            # Data quality assessment
+            completion_rate = (populated_records / len(data_rows)) * 100 if len(data_rows) > 0 else 0
+            insights.append(f"Data quality: {completion_rate:.1f}% record completion rate")
         
-        if not summary_parts:
-            summary_parts.append(f"Business analysis completed: {len(data_rows)} records from {table_name}")
+        # Add data source context
+        event_context = table_name.replace('---', ' ').replace('-', ' ').replace('_', ' ')
+        insights.append(f"Data source: {event_context}")
         
-        return " | ".join(summary_parts)
+        if not insights:
+            return f"Analysis complete: {populated_records} records processed from {table_name} - data extraction patterns may need adjustment"
+        
+        return " | ".join(insights)
         
     except Exception as e:
-        app.logger.error(f"Error in business intelligence summary: {str(e)}")
-        return f"Business intelligence analysis: {len(data_rows)} records processed from {table_name}"
+        app.logger.error(f"Business intelligence error: {str(e)}")
+        return f"Analysis error: Unable to process {len(data_rows)} records from {table_name} - {str(e)}"
 
 
 def execute_complex_business_query(query_description: str) -> dict:
