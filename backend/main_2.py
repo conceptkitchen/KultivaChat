@@ -786,45 +786,65 @@ def execute_complex_business_query(query_description: str) -> dict:
         # Use the first relevant table to build a query
         target_table = relevant_tables[0]
         
-        # Handle different types of queries
-        if any(word in query_lower for word in ['money', 'revenue', 'sales', 'made']):
-            # Revenue/sales queries
-            sql_query = f"""
-                SELECT 
-                    Vendor_Name,
-                    Total_Sales,
-                    Rev_Split_Amountto_KG,
-                    Cash__Credit_Total,
-                    Donation_Amount,
-                    _timestamp
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
-                WHERE Vendor_Name IS NOT NULL 
-                AND Vendor_Name != ''
-                AND Total_Sales IS NOT NULL
-                ORDER BY CAST(REGEXP_REPLACE(COALESCE(Total_Sales, '0'), r'[^0-9.]', '') AS FLOAT64) DESC
-                LIMIT 20
-            """
-        elif any(word in query_lower for word in ['email', 'contact']):
-            # Contact information queries
-            sql_query = f"""
-                SELECT 
-                    Vendor_Name,
-                    Email,
-                    Phone,
-                    Contact_Name
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
-                WHERE Email IS NOT NULL 
-                AND Email != ''
-                LIMIT 20
-            """
+        # First, check what columns are actually available in the table
+        columns_result = internal_execute_sql_query(f"""
+            SELECT column_name 
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS` 
+            WHERE table_name = '{target_table}'
+            ORDER BY ordinal_position
+        """)
+        
+        if columns_result.get('status') != 'success':
+            # Fallback to simple SELECT ALL if we can't get column info
+            sql_query = f"""SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"""
         else:
-            # General vendor information
-            sql_query = f"""
-                SELECT *
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
-                WHERE Vendor_Name IS NOT NULL
-                LIMIT 10
-            """
+            available_columns = [row['column_name'] for row in columns_result['data']]
+            
+            # Handle different types of queries based on available columns
+            if any(word in query_lower for word in ['money', 'revenue', 'sales', 'made']):
+                # Look for revenue-related columns
+                revenue_columns = []
+                for col in available_columns:
+                    if any(term in col.lower() for term in ['total_sales', 'sales', 'revenue', 'cash', 'credit']):
+                        revenue_columns.append(col)
+                
+                if revenue_columns:
+                    select_cols = ', '.join(revenue_columns[:5])  # Limit to 5 columns
+                    sql_query = f"""
+                        SELECT {select_cols}, _timestamp
+                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                        WHERE {revenue_columns[0]} IS NOT NULL 
+                        AND {revenue_columns[0]} != ''
+                        LIMIT 20
+                    """
+                else:
+                    sql_query = f"""SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"""
+                    
+            elif any(word in query_lower for word in ['email', 'contact', 'phone']):
+                # Look for contact-related columns
+                contact_columns = []
+                for col in available_columns:
+                    if any(term in col.lower() for term in ['email', 'phone', 'contact', 'name']):
+                        contact_columns.append(col)
+                
+                if contact_columns:
+                    select_cols = ', '.join(contact_columns[:5])
+                    sql_query = f"""
+                        SELECT {select_cols}
+                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                        WHERE {contact_columns[0]} IS NOT NULL 
+                        AND {contact_columns[0]} != ''
+                        LIMIT 20
+                    """
+                else:
+                    sql_query = f"""SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"""
+            else:
+                # General information - just show all columns
+                sql_query = f"""
+                    SELECT *
+                    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                    LIMIT 10
+                """
         
         result = internal_execute_sql_query(sql_query)
         
@@ -865,852 +885,9 @@ def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overvi
     except Exception as e:
         app.logger.error(f"Error in comprehensive analysis: {e}", exc_info=True)
         return {"status": "error", "error_message": str(e)}
-    
-    # Identity-based patterns
-    identity_patterns = {
-        'middle eastern': ['middle eastern', 'middle-eastern', 'middle east'],
-        'asian': ['asian', 'asian american', 'asian-american'],
-        'latino': ['latino', 'latina', 'hispanic', 'latinx'],
-        'black': ['black', 'african american', 'african-american'],
-        'white': ['white', 'caucasian'],
-        'native': ['native', 'native american', 'indigenous'],
-        'pacific islander': ['pacific islander', 'hawaiian', 'pacific']
-    }
-    
-    for identity, patterns in identity_patterns.items():
-        if any(pattern in query_lower for pattern in patterns):
-            demographics['identity'] = identity
-            break
-    
-    # Gender patterns
-    gender_patterns = {
-        'female': ['female', 'woman', 'women'],
-        'male': ['male', 'man', 'men'],
-        'non-binary': ['non-binary', 'nonbinary', 'non binary']
-    }
-    
-    for gender, patterns in gender_patterns.items():
-        if any(pattern in query_lower for pattern in patterns):
-            demographics['gender'] = gender
-            break
-    
-    return demographics
-
-def _extract_date_range(query_description: str) -> dict:
-    """Extract date range from query descriptions."""
-    import re
-    
-    # Look for year ranges like "2020-2023", "from 2021 to 2024"
-    year_pattern = r'(\d{4})\s*[-to]\s*(\d{4})'
-    match = re.search(year_pattern, query_description)
-    
-    if match:
-        start_year, end_year = match.groups()
-        return {
-            'start_year': start_year,
-            'end_year': end_year,
-            'where_clause': f"AND EXTRACT(YEAR FROM PARSE_DATETIME('%Y-%m-%d', Order_Date)) BETWEEN {start_year} AND {end_year}"
-        }
-    
-    # Look for single years
-    single_year = re.search(r'in (\d{4})', query_description)
-    if single_year:
-        year = single_year.group(1)
-        return {
-            'year': year,
-            'where_clause': f"AND EXTRACT(YEAR FROM PARSE_DATETIME('%Y-%m-%d', Order_Date)) = {year}"
-        }
-    
-    return {}
-
-def _extract_event_patterns(query_description: str, query_lower: str) -> dict:
-    """Extract event names and patterns from queries."""
-    events = []
-    frequency = None
-    
-    # Event name patterns
-    if 'kapwa gardens' in query_lower:
-        events.append('Kapwa Gardens')
-    if 'undscvrd' in query_lower or 'undiscovered' in query_lower:
-        events.append('UNDSCVRD')
-    if 'balay kreative' in query_lower:
-        events.append('Balay Kreative')
-    if 'yum yams' in query_lower:
-        events.append('Yum Yams')
-    
-    # Frequency patterns
-    if 'more than' in query_lower and ('time' in query_lower or 'x' in query_lower):
-        import re
-        freq_match = re.search(r'more than (\d+)', query_lower)
-        if freq_match:
-            frequency = int(freq_match.group(1))
-    
-    return {'events': events, 'frequency': frequency}
-
-def _build_demographics_where_clause(demographics: dict) -> str:
-    """Build WHERE clause from demographics data."""
-    clauses = []
-    
-    if 'identity' in demographics:
-        identity = demographics['identity']
-        clauses.append(f"(LOWER(Identity) LIKE '%{identity.lower()}%' OR LOWER(Ethnicity) LIKE '%{identity.lower()}%')")
-    
-    if 'gender' in demographics:
-        gender = demographics['gender']
-        clauses.append(f"LOWER(Gender) LIKE '%{gender.lower()}%'")
-    
-    return ' AND '.join(clauses)
-
-def _extract_income_threshold(query_description: str, query_lower: str) -> dict:
-    """Extract income/sales thresholds from queries."""
-    import re
-    
-    threshold = {}
-    
-    # Look for dollar amounts
-    dollar_matches = re.findall(r'\$?(\d+(?:,\d{3})*(?:\.\d{2})?)', query_description)
-    if dollar_matches:
-        amount = float(dollar_matches[0].replace(',', ''))
-        
-        if 'more than' in query_lower or 'greater than' in query_lower or 'above' in query_lower:
-            threshold['operator'] = '>'
-            threshold['amount'] = amount
-        elif 'less than' in query_lower or 'under' in query_lower or 'below' in query_lower:
-            threshold['operator'] = '<'
-            threshold['amount'] = amount
-        elif 'at least' in query_lower or 'minimum' in query_lower:
-            threshold['operator'] = '>='
-            threshold['amount'] = amount
-    
-    return threshold
-
-def _extract_contact_fields(query_lower: str) -> list:
-    """Identify what contact information is being requested."""
-    fields = []
-    
-    if 'email' in query_lower:
-        fields.extend(['Email', 'email', 'email_address', 'Email_Address'])
-    
-    if any(term in query_lower for term in ['phone', 'cell', 'mobile', 'number']):
-        fields.extend(['Phone', 'phone', 'cell_phone', 'Cell_Phone', 'Mobile', 'mobile', 'Phone_Number', 'phone_number'])
-    
-    return fields
-
-def _extract_event_patterns(query_description: str, query_lower: str) -> dict:
-    """Enhanced event pattern detection."""
-    events = {}
-    
-    # Event name patterns
-    event_patterns = {
-        'kapwa gardens': ['kapwa gardens', 'kapwa-gardens', 'kapwa'],
-        'balay kreative': ['balay kreative', 'balay-kreative', 'balay'],
-        'undscvrd': ['undscvrd', 'undiscovered', 'undiscvrd'],
-        'yum yams': ['yum yams', 'yum-yams', 'yumyams']
-    }
-    
-    for event_name, patterns in event_patterns.items():
-        if any(pattern in query_lower for pattern in patterns):
-            if 'events' not in events:
-                events['events'] = []
-            events['events'].append(event_name)
-    
-    # Multi-event detection
-    if len(events.get('events', [])) > 1:
-        events['multi_event'] = True
-    
-    # Event frequency detection
-    frequency_patterns = re.findall(r'more than (\d+)x|(\d+)\+ times|attended.*(\d+)', query_lower)
-    if frequency_patterns:
-        events['frequency_threshold'] = max([int(match[0] or match[1] or match[2]) for match in frequency_patterns if any(match)])
-    
-    return events
-
-def _build_demographics_where_clause(demographics: dict) -> str:
-    """Build SQL WHERE clause for demographic filtering."""
-    clauses = []
-    
-    if 'identity' in demographics:
-        identity = demographics['identity']
-        # Try multiple potential field names for identity
-        identity_clause = f"""
-        (LOWER(COALESCE(Ethnicity, Race, Identity, Demographics, '')) LIKE '%{identity.lower()}%'
-         OR LOWER(COALESCE(Race_Ethnicity, Demographic_Info, Background, '')) LIKE '%{identity.lower()}%')
-        """
-        clauses.append(identity_clause)
-    
-    if 'gender' in demographics:
-        gender = demographics['gender']
-        gender_clause = f"""
-        (LOWER(COALESCE(Gender, gender, Sex, '')) LIKE '%{gender.lower()}%')
-        """
-        clauses.append(gender_clause)
-    
-    return ' AND ' + ' AND '.join(clauses) if clauses else ''
-
-def _handle_vendor_queries(query_description: str, query_lower: str) -> dict:
-    """Handle vendor-specific business intelligence queries with enhanced demographics and contact extraction."""
-    
-    # Get available queryable tables first to avoid hitting views
-    queryable_tables = _get_queryable_tables()
-    if not queryable_tables:
-        return {"status": "error", "error_message": "Could not retrieve queryable tables"}
-    
-    # Filter tables for vendor-related data
-    vendor_tables = [t for t in queryable_tables if any(keyword in t.lower() for keyword in ['vendor', 'close-out', 'sales'])]
-    available_tables = _get_queryable_tables()
-    if not available_tables:
-        return {"status": "error", "error_message": "No queryable tables available"}
-    
-    # Use first relevant table for vendor queries (avoiding wildcards)
-    vendor_table = None
-    for table in available_tables:
-        if any(keyword in table.lower() for keyword in ['vendor', 'attendees', 'orders', 'sales']):
-            vendor_table = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{table}`"
-            break
-    
-    if not vendor_table:
-        vendor_table = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{available_tables[0]}`"
-    
-    # Extract date ranges and demographics
-    date_range = _extract_date_range(query_description)
-    demographics = _extract_demographics(query_description, query_lower)
-    income_threshold = _extract_income_threshold(query_description, query_lower)
-    
-    # Revenue queries for vendors
-    if 'money' in query_lower or 'revenue' in query_lower or 'sales' in query_lower:
-        if 'event' in query_lower and ('date' in query_lower or any(year in query_description for year in ['2020', '2021', '2022', '2023', '2024'])):
-            # "How much money was made by vendors at this event on this date"
-            sql_query = f"""
-            SELECT 
-                Event_Name,
-                Event_Date,
-                SUM(CAST(Lineitem_price AS FLOAT64)) as total_vendor_revenue,
-                COUNT(DISTINCT Order_ID) as total_orders,
-                COUNT(*) as total_items
-            FROM {vendor_table}
-            WHERE Event_Date IS NOT NULL 
-            AND Lineitem_price IS NOT NULL 
-            AND Lineitem_price != ''
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Event_Name, Event_Date
-            ORDER BY total_vendor_revenue DESC
-            LIMIT 20
-            """
-            
-        elif 'top' in query_lower and ('vendor' in query_lower or 'sellers' in query_lower):
-            # "Who are the top 5 vendors from this event from date to date"  
-            sql_query = f"""
-            SELECT 
-                Vendor_Name,
-                Event_Name,
-                SUM(CAST(Lineitem_price AS FLOAT64)) as vendor_revenue,
-                COUNT(DISTINCT Order_ID) as orders_count,
-                AVG(CAST(Lineitem_price AS FLOAT64)) as avg_order_value
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE Vendor_Name IS NOT NULL
-            AND Lineitem_price IS NOT NULL 
-            AND Lineitem_price != ''
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Vendor_Name, Event_Name
-            ORDER BY vendor_revenue DESC
-            LIMIT 10
-            """
-            
-        else:
-            # General vendor revenue analysis
-            sql_query = f"""
-            SELECT 
-                Event_Name,
-                COUNT(DISTINCT Vendor_Name) as unique_vendors,
-                SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue,
-                AVG(CAST(Lineitem_price AS FLOAT64)) as avg_revenue_per_item
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE Lineitem_price IS NOT NULL 
-            AND Lineitem_price != ''
-            GROUP BY Event_Name
-            ORDER BY total_revenue DESC
-            LIMIT 15
-            """
-    
-    # Geographic vendor queries
-    elif 'zip code' in query_lower or 'zip' in query_lower:
-        sql_query = f"""
-        SELECT 
-            Billing_Zip_Code as vendor_zip,
-            COUNT(DISTINCT Vendor_Name) as vendor_count,
-            COUNT(*) as total_orders,
-            SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Billing_Zip_Code IS NOT NULL
-        AND Billing_Zip_Code != ''
-        {date_range['where_clause'] if date_range else ''}
-        GROUP BY Billing_Zip_Code
-        ORDER BY vendor_count DESC
-        LIMIT 20
-        """
-    
-    # Enhanced contact queries with demographics and income filtering
-    elif any(contact_term in query_lower for contact_term in ['email', 'phone', 'cell', 'contact']):
-        contact_fields = _extract_contact_fields(query_lower)
-        demographics_clause = _build_demographics_where_clause(demographics)
-        
-        # Income threshold filtering for vendors
-        income_clause = ""
-        if income_threshold:
-            income_clause = f" AND CAST(COALESCE(Lineitem_price, '0') AS FLOAT64) {income_threshold['operator']} {income_threshold['amount']}"
-        
-        # Build contact field selection
-        contact_select = []
-        if any('email' in field.lower() for field in contact_fields):
-            contact_select.extend(['Email', 'email', 'Email_Address'])
-        if any('phone' in field.lower() or 'cell' in field.lower() for field in contact_fields):
-            contact_select.extend(['Phone', 'Cell_Phone', 'Mobile', 'Phone_Number'])
-        
-        if not contact_select:
-            contact_select = ['Email']  # Default to email
-        
-        # Remove duplicates and create COALESCE for each field type
-        email_fields = [f for f in contact_select if 'email' in f.lower()]
-        phone_fields = [f for f in contact_select if any(term in f.lower() for term in ['phone', 'cell', 'mobile'])]
-        
-        select_clause = "Vendor_Name"
-        if email_fields:
-            select_clause += f", COALESCE({', '.join(email_fields)}) as contact_email"
-        if phone_fields:
-            select_clause += f", COALESCE({', '.join(phone_fields)}) as contact_phone"
-        
-        # Simplified GROUP BY for contact queries
-        group_fields = ['Vendor_Name', 'Event_Name']
-        if email_fields:
-            group_fields.append('Email')
-        if phone_fields:
-            group_fields.append('Phone')
-        
-        sql_query = f"""
-        SELECT DISTINCT
-            {select_clause},
-            Event_Name,
-            SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_sales,
-            COUNT(*) as transaction_count
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Vendor_Name IS NOT NULL
-        {demographics_clause}
-        {income_clause}
-        {date_range['where_clause'] if date_range else ''}
-        AND (Email IS NOT NULL OR Phone IS NOT NULL OR Cell_Phone IS NOT NULL)
-        GROUP BY {', '.join(group_fields)}
-        ORDER BY total_sales DESC
-        LIMIT 50
-        """
-    
-    # Multi-event participation queries
-    elif 'kapwa gardens' in query_lower and 'undscvrd' in query_lower:
-        sql_query = f"""
-        WITH vendor_events AS (
-            SELECT DISTINCT
-                Vendor_Name,
-                Event_Name,
-                CASE 
-                    WHEN LOWER(Event_Name) LIKE '%kapwa%' THEN 'Kapwa Gardens'
-                    WHEN LOWER(Event_Name) LIKE '%undscvrd%' THEN 'UNDSCVRD'
-                    ELSE 'Other'
-                END as event_category,
-                SUM(CAST(Lineitem_price AS FLOAT64)) as vendor_revenue
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE Vendor_Name IS NOT NULL
-            AND Lineitem_price IS NOT NULL
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Vendor_Name, Event_Name
-        )
-        SELECT 
-            Vendor_Name,
-            COUNT(DISTINCT event_category) as event_types_participated,
-            SUM(vendor_revenue) as total_revenue,
-            STRING_AGG(DISTINCT Event_Name, ', ') as events_list
-        FROM vendor_events
-        WHERE event_category IN ('Kapwa Gardens', 'UNDSCVRD')
-        GROUP BY Vendor_Name
-        HAVING COUNT(DISTINCT event_category) = 2
-        AND SUM(vendor_revenue) >= 500
-        ORDER BY total_revenue DESC
-        """
-    
-    else:
-        # Default vendor analysis
-        sql_query = f"""
-        SELECT 
-            Vendor_Name,
-            COUNT(DISTINCT Event_Name) as events_participated,
-            SUM(CAST(Lineitem_price AS FLOAT64)) as total_revenue,
-            COUNT(*) as total_items_sold
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Vendor_Name IS NOT NULL
-        GROUP BY Vendor_Name
-        ORDER BY total_revenue DESC
-        LIMIT 20
-        """
-    
-    return internal_execute_sql_query(sql_query)
 
 
-def _handle_attendee_queries(query_description: str, query_lower: str) -> dict:
-    """Handle attendee/donor-specific business intelligence queries with enhanced analytics."""
-    
-    date_range = _extract_date_range(query_description)
-    demographics = _extract_demographics(query_description, query_lower)
-    income_threshold = _extract_income_threshold(query_description, query_lower)
-    event_patterns = _extract_event_patterns(query_description, query_lower)
-    
-    # Geographic attendee queries
-    if 'zip code' in query_lower or 'city' in query_lower:
-        if 'sf' in query_lower or 'san francisco' in query_lower:
-            sql_query = f"""
-            SELECT 
-                Billing_City,
-                Billing_Zip_Code,
-                COUNT(*) as attendee_count,
-                COUNT(DISTINCT Email) as unique_attendees
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE (LOWER(Billing_City) LIKE '%san francisco%' 
-                OR LOWER(Billing_City) LIKE '%sf%'
-                OR Billing_Zip_Code IN ('94102', '94103', '94104', '94105', '94107', '94108', '94109', '94110', '94111', '94112', '94114', '94115', '94116', '94117', '94118', '94121', '94122', '94123', '94124', '94127', '94129', '94130', '94131', '94132', '94133', '94134', '94158'))
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Billing_City, Billing_Zip_Code
-            ORDER BY attendee_count DESC
-            """
-            
-        elif 'daly city' in query_lower:
-            sql_query = f"""
-            SELECT 
-                Billing_City,
-                Billing_Zip_Code,
-                COUNT(*) as attendee_count,
-                COUNT(DISTINCT Email) as unique_attendees,
-                STRING_AGG(DISTINCT Event_Name, ', ') as events_attended
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE (LOWER(Billing_City) LIKE '%daly city%'
-                OR Billing_Zip_Code IN ('94014', '94015', '94016', '94017'))
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Billing_City, Billing_Zip_Code
-            ORDER BY attendee_count DESC
-            """
-            
-        else:
-            # General geographic analysis
-            sql_query = f"""
-            SELECT 
-                Billing_City as attendee_city,
-                COUNT(*) as total_attendees,
-                COUNT(DISTINCT Email) as unique_attendees,
-                COUNT(DISTINCT Event_Name) as events_attended
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE Billing_City IS NOT NULL
-            AND Billing_City != ''
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Billing_City
-            ORDER BY total_attendees DESC
-            LIMIT 20
-            """
-    
-    # Enhanced donation/giving queries with thresholds
-    elif 'gave' in query_lower or 'donation' in query_lower or 'donor' in query_lower:
-        demographics_clause = _build_demographics_where_clause(demographics)
-        
-        # Handle donation threshold queries like "gave more than $1"
-        donation_clause = ""
-        if income_threshold:
-            donation_clause = f" AND CAST(COALESCE(Lineitem_price, '0') AS FLOAT64) {income_threshold['operator']} {income_threshold['amount']}"
-        
-        sql_query = f"""
-        SELECT 
-            Event_Name,
-            Billing_City,
-            COUNT(DISTINCT Email) as unique_donors,
-            SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_donations,
-            AVG(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as avg_donation,
-            COUNT(*) as total_transactions
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Email IS NOT NULL
-        {demographics_clause}
-        {donation_clause}
-        {date_range['where_clause'] if date_range else ''}
-        GROUP BY Event_Name, Billing_City
-        ORDER BY total_donations DESC
-        LIMIT 50
-        """
-    
-    # Grant application correlation queries
-    elif 'grant' in query_lower or 'application' in query_lower:
-        event_clause = ""
-        if event_patterns.get('events'):
-            event_names = "', '".join(event_patterns['events'])
-            event_conditions = " OR ".join([f"LOWER(Event_Name) LIKE '%{name.lower()}%'" for name in event_patterns['events']])
-            event_clause = f" AND ({event_conditions})"
-        
-        frequency_clause = ""
-        if event_patterns.get('frequency_threshold'):
-            frequency_clause = f" HAVING event_count > {event_patterns['frequency_threshold']}"
-        
-        demographics_clause = _build_demographics_where_clause(demographics)
-        
-        sql_query = f"""
-        WITH grant_applicants AS (
-            SELECT DISTINCT Email, Name, City, Demographics
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE (LOWER(Event_Name) LIKE '%grant%' 
-                OR LOWER(Event_Name) LIKE '%application%'
-                OR LOWER(Event_Name) LIKE '%balay%')
-            {demographics_clause}
-        ),
-        event_attendance AS (
-            SELECT 
-                Email,
-                COUNT(DISTINCT Event_Name) as event_count,
-                STRING_AGG(DISTINCT Event_Name, ', ') as events_attended,
-                MAX(Event_Date) as last_attendance
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE Email IN (SELECT Email FROM grant_applicants)
-            {event_clause}
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Email
-            {frequency_clause}
-        )
-        SELECT 
-            g.Email,
-            g.Name,
-            g.City,
-            g.Demographics,
-            e.event_count,
-            e.events_attended,
-            e.last_attendance
-        FROM grant_applicants g
-        LEFT JOIN event_attendance e ON g.Email = e.Email
-        ORDER BY e.event_count DESC
-        LIMIT 100
-        """
-    
-    # Multi-event attendance queries
-    elif any(event in query_lower for event in ['balay kreative', 'undscvrd', 'kapwa gardens']) and 'attended' in query_lower:
-        demographics_clause = _build_demographics_where_clause(demographics)
-        
-        # Handle multi-event participation
-        if len(event_patterns.get('events', [])) >= 2:
-            events_list = [event.replace(' ', '%') for event in event_patterns['events']]
-            
-            sql_query = f"""
-            WITH attendee_events AS (
-                SELECT 
-                    Email,
-                    Name,
-                    Billing_City,
-                    Event_Name,
-                    CASE 
-                        WHEN LOWER(Event_Name) LIKE '%balay%' THEN 'Balay Kreative'
-                        WHEN LOWER(Event_Name) LIKE '%undscvrd%' THEN 'UNDSCVRD'
-                        WHEN LOWER(Event_Name) LIKE '%kapwa%' THEN 'Kapwa Gardens'
-                        ELSE 'Other'
-                    END as event_category
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-                WHERE Email IS NOT NULL
-                {demographics_clause}
-                {date_range['where_clause'] if date_range else ''}
-            )
-            SELECT 
-                Email,
-                Name,
-                Billing_City,
-                COUNT(DISTINCT event_category) as event_types_attended,
-                STRING_AGG(DISTINCT Event_Name, ', ') as all_events,
-                COUNT(DISTINCT Event_Name) as total_events_attended
-            FROM attendee_events
-            WHERE event_category IN ('Balay Kreative', 'UNDSCVRD', 'Kapwa Gardens')
-            GROUP BY Email, Name, Billing_City
-            HAVING COUNT(DISTINCT event_category) >= 2
-            ORDER BY event_types_attended DESC, total_events_attended DESC
-            LIMIT 100
-            """
-        else:
-            # Single event attendance
-            event_filter = event_patterns['events'][0] if event_patterns.get('events') else 'balay'
-            
-            sql_query = f"""
-            SELECT 
-                Email,
-                Name,
-                Billing_City,
-                COUNT(DISTINCT Event_Name) as events_attended,
-                STRING_AGG(DISTINCT Event_Name, ', ') as event_list,
-                MAX(Event_Date) as last_attendance
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-            WHERE Email IS NOT NULL
-            AND LOWER(Event_Name) LIKE '%{event_filter.lower()}%'
-            {demographics_clause}
-            {date_range['where_clause'] if date_range else ''}
-            GROUP BY Email, Name, Billing_City
-            ORDER BY events_attended DESC
-            LIMIT 100
-            """
-    
-    # Contact extraction for attendees
-    elif any(contact_term in query_lower for contact_term in ['email', 'contact']):
-        demographics_clause = _build_demographics_where_clause(demographics)
-        city_filter = ""
-        
-        # City-specific filtering
-        if 'daly city' in query_lower:
-            city_filter = " AND (LOWER(Billing_City) LIKE '%daly city%' OR Billing_Zip_Code IN ('94014', '94015', '94016', '94017'))"
-        elif any(city in query_lower for city in ['sf', 'san francisco']):
-            city_filter = " AND (LOWER(Billing_City) LIKE '%san francisco%' OR LOWER(Billing_City) LIKE '%sf%')"
-        
-        sql_query = f"""
-        SELECT DISTINCT
-            Email,
-            Name,
-            Billing_City,
-            Billing_Zip_Code,
-            COUNT(DISTINCT Event_Name) as events_attended,
-            STRING_AGG(DISTINCT Event_Name, ', ') as event_list
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Email IS NOT NULL
-        AND Email LIKE '%@%'
-        {demographics_clause}
-        {city_filter}
-        {date_range['where_clause'] if date_range else ''}
-        GROUP BY Email, Name, Billing_City, Billing_Zip_Code
-        ORDER BY events_attended DESC
-        LIMIT 100
-        """
-    
-    # Default attendee count and demographics
-    else:
-        demographics_clause = _build_demographics_where_clause(demographics)
-        
-        sql_query = f"""
-        SELECT 
-            Event_Name,
-            COUNT(DISTINCT Email) as unique_attendees,
-            COUNT(*) as total_registrations,
-            SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue,
-            AVG(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as avg_transaction_value
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Email IS NOT NULL
-        {demographics_clause}
-        {date_range['where_clause'] if date_range else ''}
-        GROUP BY Event_Name
-        ORDER BY unique_attendees DESC
-        LIMIT 50
-        """
-    
-    return internal_execute_sql_query(sql_query)
-
-
-def _handle_financial_queries(query_description: str, query_lower: str) -> dict:
-    """Handle financial and revenue analysis queries."""
-    date_range = _extract_date_range(query_description)
-    
-    sql_query = f"""
-    SELECT 
-        Event_Name,
-        SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue,
-        COUNT(DISTINCT Email) as unique_customers,
-        COUNT(*) as total_transactions,
-        AVG(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as avg_transaction_value
-    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-    WHERE Lineitem_price IS NOT NULL
-    AND Lineitem_price != ''
-    {date_range.get('where_clause', '')}
-    GROUP BY Event_Name
-    ORDER BY total_revenue DESC
-    LIMIT 20
-    """
-    
-    return internal_execute_sql_query(sql_query)
-
-
-def _handle_geographic_queries(query_description: str, query_lower: str) -> dict:
-    """Handle geographic and location-based queries."""
-    date_range = _extract_date_range(query_description)
-    
-    sql_query = f"""
-    SELECT 
-        Billing_City,
-        Billing_State,
-        Billing_Zip_Code,
-        COUNT(DISTINCT Email) as unique_residents,
-        COUNT(*) as total_transactions,
-        SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_spent
-    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-    WHERE Billing_City IS NOT NULL
-    AND Billing_City != ''
-    {date_range.get('where_clause', '')}
-    GROUP BY Billing_City, Billing_State, Billing_Zip_Code
-    ORDER BY unique_residents DESC
-    LIMIT 50
-    """
-    
-    return internal_execute_sql_query(sql_query)
-
-
-def _handle_event_queries(query_description: str, query_lower: str) -> dict:
-    """Handle event-specific analysis queries."""
-    date_range = _extract_date_range(query_description)
-    event_patterns = _extract_event_patterns(query_description, query_lower)
-    
-    # Multi-event attendance queries
-    if len(event_patterns.get('events', [])) >= 2:
-        events = event_patterns['events']
-        sql_query = f"""
-        SELECT DISTINCT
-            Email,
-            First_Name,
-            Last_Name,
-            COUNT(DISTINCT Event_Name) as events_attended
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE Event_Name IN ('{"', '".join(events)}')
-        {date_range.get('where_clause', '')}
-        GROUP BY Email, First_Name, Last_Name
-        HAVING events_attended >= 2
-        ORDER BY events_attended DESC
-        LIMIT 100
-        """
-    else:
-        # Single event analysis
-        sql_query = f"""
-        SELECT 
-            Event_Name,
-            COUNT(DISTINCT Email) as unique_attendees,
-            COUNT(*) as total_transactions,
-            SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue
-        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-        WHERE 1=1
-        {date_range.get('where_clause', '')}
-        GROUP BY Event_Name
-        ORDER BY unique_attendees DESC
-        LIMIT 50
-        """
-    
-    return internal_execute_sql_query(sql_query)
-
-
-def _execute_general_analysis(query_description: str, query_lower: str) -> dict:
-    """Execute general data analysis queries."""
-    sql_query = f"""
-    SELECT 
-        Event_Name,
-        COUNT(DISTINCT Email) as unique_attendees,
-        COUNT(*) as total_orders,
-        SUM(CAST(COALESCE(Lineitem_price, '0') AS FLOAT64)) as total_revenue
-    FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.*`
-    WHERE Event_Name IS NOT NULL
-    GROUP BY Event_Name
-    ORDER BY total_revenue DESC
-    LIMIT 20
-    """
-    
-    return internal_execute_sql_query(sql_query)
-
-def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overview") -> dict:
-    """Performs comprehensive data analysis on a specific table with advanced insights."""
-    app.logger.info(f"Tool Call: execute_comprehensive_analysis for {table_name}, type: {analysis_type}")
-    
-    try:
-        full_table_name = f"`{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA}.{table_name}`"
-        
-        if analysis_type == "overview":
-            queries = [
-                f"SELECT COUNT(*) as total_rows FROM {full_table_name}",
-                f"SELECT * FROM {full_table_name} LIMIT 50"
-            ]
-        elif analysis_type == "aggregations":
-            queries = [
-                f"SELECT SUM(CAST(COALESCE(Total, \"0\") AS FLOAT64)) as total_revenue FROM {full_table_name} WHERE Total IS NOT NULL AND Total != \"\""
-            ]
-        else:
-            queries = [f"SELECT * FROM {full_table_name} LIMIT 10"]
-        
-        results = []
-        for query in queries:
-            result = internal_execute_sql_query(query)
-            if result.get("status") == "success":
-                results.append({
-                    "query": query,
-                    "data": result.get("data", []),
-                    "row_count": len(result.get("data", []))
-                })
-        
-        return {
-            "status": "success",
-            "analysis_type": analysis_type,
-            "table_name": table_name,
-            "results": results
-        }
-        
-    except Exception as e:
-        app.logger.error(f"Error in comprehensive analysis: {e}", exc_info=True)
-        return {"status": "error", "error_message": str(e)}
-
-
-# --- MCP Server API Endpoints ---
-
-# --- Define Tool Functions List for Gemini AI ---
-gemini_tool_functions_list = [
-    {
-        "name": "internal_execute_sql_query",
-        "description": "Execute SQL queries against BigQuery workspace tables. Use this for direct data retrieval and table queries.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "sql_query": {
-                    "type": "string",
-                    "description": "BigQuery SQL SELECT query to execute. Must use fully qualified table names."
-                }
-            },
-            "required": ["sql_query"]
-        }
-    },
-    {
-        "name": "execute_complex_business_query", 
-        "description": "Execute complex business intelligence queries with multi-table joins and advanced analytics.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "query_description": {
-                    "type": "string",
-                    "description": "Natural language description of the business query to execute"
-                }
-            },
-            "required": ["query_description"]
-        }
-    },
-    {
-        "name": "get_zip_codes_for_city",
-        "description": "Get zip codes for a specific city. Useful for geographic filtering.",
-        "parameters": {
-            "type": "object", 
-            "properties": {
-                "city_name": {
-                    "type": "string",
-                    "description": "Name of the city (e.g., 'San Francisco', 'Daly City')"
-                },
-                "state_code": {
-                    "type": "string",
-                    "description": "2-letter state code (e.g., 'CA')"
-                }
-            },
-            "required": ["city_name"]
-        }
-    },
-    {
-        "name": "get_current_time",
-        "description": "Get the current date and time. Use for time-based queries.",
-        "parameters": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    }
-]
-
+# Flask Routes - MCP Server API Endpoints
 @app.after_request
 def after_request(response):
     """Add CORS headers for external API access"""
@@ -1723,56 +900,61 @@ def after_request(response):
 def root():
     """MCP Server root endpoint"""
     return jsonify({
-        "service": "Kultivate AI MCP Server",
+        "name": "Kultivate AI MCP Server",
         "version": "1.0.0",
-        "description": "Business Intelligence API for data analysis",
+        "description": "Business Intelligence API with natural language query processing",
         "endpoints": {
-            "/health": "Server health check",
-            "/api/query": "Natural language data queries",
-            "/api/sql": "Direct SQL execution",
-            "/api/tables": "Table discovery and schema",
-            "/api/tools": "Available analysis tools"
-        }
+            "health": "/health",
+            "tools": "/tools",
+            "query": "/api/query",
+            "sql": "/api/sql", 
+            "tables": "/api/tables",
+            "analysis": "/api/analysis",
+            "geography": "/api/geography"
+        },
+        "documentation": "https://kultiva-chatv-2-mcp-conceptkitchen.replit.app",
+        "status": "operational"
     })
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    return jsonify({
-        "status": "healthy",
-        "service": "kultivate-mcp-server",
-        "timestamp": get_current_time()['current_time']
-    })
+    return jsonify({"status": "healthy", "service": "MCP Server"})
 
-@app.route('/api/tools', methods=['GET'])
+@app.route('/tools', methods=['GET'])
 def list_tools():
     """List available MCP tools"""
     return jsonify({
         "tools": [
             {
-                "name": "sql_query",
-                "description": "Execute SQL queries against BigQuery workspace",
-                "endpoint": "/api/sql"
+                "name": "internal_execute_sql_query",
+                "description": "Execute BigQuery SQL queries",
+                "parameters": ["sql_query"]
             },
             {
-                "name": "business_query", 
-                "description": "Complex business intelligence analysis",
-                "endpoint": "/api/query"
+                "name": "execute_complex_business_query",
+                "description": "Execute complex business intelligence queries",
+                "parameters": ["query_description"]
             },
             {
-                "name": "table_discovery",
-                "description": "Discover available tables and schemas",
-                "endpoint": "/api/tables"
+                "name": "execute_comprehensive_analysis",
+                "description": "Perform comprehensive data analysis",
+                "parameters": ["table_name", "analysis_type"]
             },
             {
-                "name": "geographic_analysis",
-                "description": "City and zip code analysis",
-                "endpoint": "/api/query"
+                "name": "get_zip_codes_for_city",
+                "description": "Get zip codes for cities",
+                "parameters": ["city_name", "state_code"]
             },
             {
-                "name": "keboola_metadata",
-                "description": "Keboola table schema and metadata",
-                "endpoint": "/api/keboola/table"
+                "name": "get_current_time",
+                "description": "Get current date and time",
+                "parameters": []
+            },
+            {
+                "name": "get_keboola_table_detail",
+                "description": "Get Keboola table metadata",
+                "parameters": ["bucket_id", "table_name"]
             }
         ]
     })
@@ -1798,25 +980,23 @@ def natural_language_query():
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({"error": "Missing 'query' parameter"}), 400
-            
-        query = data['query']
-        app.logger.info(f"Natural language query: {query}")
         
-        # Use simple text-based AI processing for natural language queries
-        # For now, detect the query type and route to appropriate function
+        query = data['query']
         query_lower = query.lower()
         
-        # Check for table discovery requests
-        if any(pattern in query_lower for pattern in ['show me tables', 'list tables', 'what tables', 'available tables']):
-            result = internal_execute_sql_query(f"""
-                SELECT table_name, table_type, creation_time
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+        app.logger.info(f"Natural language query: {query}")
+        
+        # Route the query directly to appropriate processing function
+        if any(keyword in query_lower for keyword in ['table', 'tables', 'list']):
+            # Table discovery request
+            tables_result = internal_execute_sql_query(f"""
+                SELECT table_name 
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
                 ORDER BY table_name
             """)
-            return jsonify(result)
+            return jsonify(tables_result)
         
-        # Check for specific data requests (like "show me kapwa gardens vendor data")
-        elif any(keyword in query_lower for keyword in ['show me', 'display', 'get data', 'data from']):
+        elif any(keyword in query_lower for keyword in ['show me', 'data', 'kapwa', 'vendor', 'balay']):
             # Use fuzzy table matching to find relevant tables
             tables_result = internal_execute_sql_query(f"""
                 SELECT table_name 
@@ -1925,17 +1105,5 @@ def geographic_lookup():
         return jsonify({"error": str(e)}), 500
 
 
-# --- Main Server Execution ---
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8081))
-    print(f"🚀 Kultivate AI MCP Server starting on port {port}")
-    print("📊 Ready for external API connections")
-    
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=False,
-        use_reloader=False,
-        threaded=True
-    )
-
+    app.run(host='0.0.0.0', port=8081, debug=False)
