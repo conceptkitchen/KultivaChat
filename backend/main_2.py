@@ -1586,6 +1586,65 @@ def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overvi
 
 # --- MCP Server API Endpoints ---
 
+# --- Define Tool Functions List for Gemini AI ---
+gemini_tool_functions_list = [
+    {
+        "name": "internal_execute_sql_query",
+        "description": "Execute SQL queries against BigQuery workspace tables. Use this for direct data retrieval and table queries.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "sql_query": {
+                    "type": "string",
+                    "description": "BigQuery SQL SELECT query to execute. Must use fully qualified table names."
+                }
+            },
+            "required": ["sql_query"]
+        }
+    },
+    {
+        "name": "execute_complex_business_query", 
+        "description": "Execute complex business intelligence queries with multi-table joins and advanced analytics.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query_description": {
+                    "type": "string",
+                    "description": "Natural language description of the business query to execute"
+                }
+            },
+            "required": ["query_description"]
+        }
+    },
+    {
+        "name": "get_zip_codes_for_city",
+        "description": "Get zip codes for a specific city. Useful for geographic filtering.",
+        "parameters": {
+            "type": "object", 
+            "properties": {
+                "city_name": {
+                    "type": "string",
+                    "description": "Name of the city (e.g., 'San Francisco', 'Daly City')"
+                },
+                "state_code": {
+                    "type": "string",
+                    "description": "2-letter state code (e.g., 'CA')"
+                }
+            },
+            "required": ["city_name"]
+        }
+    },
+    {
+        "name": "get_current_time",
+        "description": "Get the current date and time. Use for time-based queries.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    }
+]
+
 @app.after_request
 def after_request(response):
     """Add CORS headers for external API access"""
@@ -1680,56 +1739,59 @@ def natural_language_query():
         # Create Gemini chat session with AI system prompt and tools
         client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
         
-        chat_session = client.models.generate_content(
-            model=f"models/{GEMINI_MODEL}",
-            contents=[google_genai_types.Content(
-                role="user", 
-                parts=[google_genai_types.Part(text=query)]
-            )],
-            config=google_genai_types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION_PROMPT,
-                tools=[gemini_tool_functions_list],
-                temperature=0.1,
-                max_output_tokens=4096
-            )
-        )
+        # Use simple text-based AI processing for natural language queries
+        # For now, detect the query type and route to appropriate function
+        query_lower = query.lower()
         
-        # Process AI response and execute any tool calls
-        ai_response = chat_session.text if hasattr(chat_session, 'text') else ""
+        # Check for table discovery requests
+        if any(pattern in query_lower for pattern in ['show me tables', 'list tables', 'what tables', 'available tables']):
+            result = internal_execute_sql_query(f"""
+                SELECT table_name, table_type, creation_time
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+                ORDER BY table_name
+            """)
+            return jsonify(result)
         
-        # Check for function calls in the response
-        if hasattr(chat_session, 'candidates') and chat_session.candidates:
-            candidate = chat_session.candidates[0]
-            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                for part in candidate.content.parts:
-                    if hasattr(part, 'function_call'):
-                        function_call = part.function_call
-                        function_name = function_call.name
-                        function_args = dict(function_call.args) if function_call.args else {}
-                        
-                        app.logger.info(f"Executing function: {function_name} with args: {function_args}")
-                        
-                        # Execute the appropriate function
-                        if function_name == "internal_execute_sql_query":
-                            result = internal_execute_sql_query(function_args.get('sql_query', ''))
-                            return jsonify(result)
-                        elif function_name == "execute_complex_business_query":
-                            result = execute_complex_business_query(function_args.get('query_description', query))
-                            return jsonify(result)
-                        elif function_name == "get_zip_codes_for_city":
-                            result = get_zip_codes_for_city(
-                                function_args.get('city_name', ''),
-                                function_args.get('state_code')
-                            )
-                            return jsonify(result)
-                        elif function_name == "get_current_time":
-                            result = get_current_time()
-                            return jsonify(result)
+        # Check for specific data requests (like "show me kapwa gardens vendor data")
+        elif any(keyword in query_lower for keyword in ['show me', 'display', 'get data', 'data from']):
+            # Use fuzzy table matching to find relevant tables
+            tables_result = internal_execute_sql_query(f"""
+                SELECT table_name 
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+                ORDER BY table_name
+            """)
+            
+            if tables_result.get('status') == 'success' and tables_result.get('data'):
+                table_names = [row['table_name'] for row in tables_result['data']]
+                
+                # Find best matching table for the query
+                best_match = None
+                keywords = ['kapwa', 'gardens', 'vendor', 'balay', 'kreative', 'undiscovered', 'yum', 'yams']
+                
+                for table_name in table_names:
+                    table_lower = table_name.lower()
+                    match_score = sum(1 for keyword in keywords if keyword in query_lower and keyword in table_lower)
+                    if match_score > 0:
+                        if not best_match or match_score > best_match[1]:
+                            best_match = (table_name, match_score)
+                
+                if best_match:
+                    # Query the matched table
+                    result = internal_execute_sql_query(f"""
+                        SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{best_match[0]}` 
+                        LIMIT 10
+                    """)
+                    return jsonify(result)
         
-        # If no function calls, return AI text response
+        # For complex business queries, use the complex business query function
+        elif any(keyword in query_lower for keyword in ['revenue', 'analysis', 'attendees', 'vendors', 'how much', 'how many']):
+            result = execute_complex_business_query(query)
+            return jsonify(result)
+        
+        # Default response for queries we can't handle yet
         return jsonify({
             "status": "success",
-            "response": ai_response,
+            "response": f"I understand you're asking: '{query}'. This is a natural language query endpoint. For best results, try queries like 'show me tables', 'show me kapwa gardens data', or specific business questions about revenue and attendees.",
             "data": None
         })
         
