@@ -6,7 +6,7 @@ The Kultivate AI MCP (Model Context Protocol) Server is a standalone backend API
 
 ## Base URL
 ```
-http://localhost:8081
+https://kultiva-chatv-2-mcp-conceptkitchen.replit.app
 ```
 
 ## Authentication
@@ -234,11 +234,11 @@ Common HTTP status codes:
 ### JavaScript/Node.js
 ```javascript
 // Health check
-const response = await fetch('http://localhost:8081/health');
+const response = await fetch('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/health');
 const health = await response.json();
 
 // Natural language query
-const queryResponse = await fetch('http://localhost:8081/api/query', {
+const queryResponse = await fetch('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ query: "Show me sales data" })
@@ -251,11 +251,11 @@ const results = await queryResponse.json();
 import requests
 
 # Table discovery
-response = requests.get('http://localhost:8081/api/tables')
+response = requests.get('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/tables')
 tables = response.json()
 
 # SQL execution
-sql_response = requests.post('http://localhost:8081/api/sql', 
+sql_response = requests.post('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/sql', 
   json={'query': 'SELECT * FROM table LIMIT 10'})
 data = sql_response.json()
 ```
@@ -263,15 +263,15 @@ data = sql_response.json()
 ### cURL
 ```bash
 # Health check
-curl -X GET http://localhost:8081/health
+curl -X GET https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/health
 
 # Natural language query
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Show me revenue trends"}'
 
 # SQL execution
-curl -X POST http://localhost:8081/api/sql \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/sql \
   -H "Content-Type: application/json" \
   -d '{"query": "SELECT table_name FROM INFORMATION_SCHEMA.TABLES"}'
 ```

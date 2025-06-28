@@ -105,6 +105,12 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 27, 2025**: API DOCUMENTATION UPDATED WITH DEPLOYED URL - Production endpoint documentation completed
+  - ✅ UPDATED: MCP_API_DOCUMENTATION.md now uses deployed URL https://kultiva-chatv-2-mcp-conceptkitchen.replit.app
+  - ✅ CORRECTED: All integration examples (JavaScript, Python, cURL) updated with production endpoint
+  - ✅ VERIFIED: API documentation now production-ready for external frontend integration
+  - → Complete API documentation available with deployed URL for external applications
+
 - **June 27, 2025**: DEPLOYMENT ISSUE RESOLVED - Shell scripts fixed, npm dependency eliminated
   - ✅ FIXED: Updated start_fullstack.sh and deploy.sh scripts to remove npm commands and use Python server directly
   - ✅ BYPASSED: npm dependency issue by running Python server directly on port 8081
