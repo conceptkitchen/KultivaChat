@@ -105,6 +105,15 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 28, 2025**: API DOCUMENTATION SIMPLIFIED TO SINGLE ENDPOINT - Dummy-proof natural language query interface completed
+  - ✅ SIMPLIFIED: Updated documentation to focus on single `/api/query` endpoint for maximum usability
+  - ✅ CREATED: SIMPLE_API_DOCUMENTATION.md with plain English examples and integration guides
+  - ✅ ELIMINATED: Multiple confusing endpoints - now just one natural language interface
+  - ✅ ENHANCED: Programming language examples (JavaScript, Python, PHP) for easy integration
+  - ✅ VALIDATED: Dummy-proof API usage confirmed - ask questions in plain English, get business intelligence
+  - ✅ DOCUMENTED: Complete usage guide with real examples and actual API responses
+  - → Single endpoint API ready for external applications with comprehensive business intelligence capabilities
+
 - **June 28, 2025**: ENHANCED BUSINESS INTELLIGENCE TRANSFORMATION COMPLETE - All 22 queries now provide comprehensive analysis with specific financial metrics
   - ✅ TRANSFORMED: Responses upgraded from generic "Found X records" to detailed analysis with specific dollar amounts and vendor names
   - ✅ IMPLEMENTED: Advanced data extraction engine that identifies revenue amounts, vendor names, contact info, and geographic data
