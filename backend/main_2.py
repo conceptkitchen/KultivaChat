@@ -728,6 +728,99 @@ def get_zip_codes_for_city(
     }
 
 
+def generate_business_intelligence_summary(query_description: str, data_rows: list, table_name: str) -> str:
+    """Generate smart business intelligence summaries from raw data"""
+    try:
+        if not data_rows:
+            return "No data found for this query."
+        
+        query_lower = query_description.lower()
+        summary_parts = []
+        
+        # Analyze revenue and financial data
+        if any(word in query_lower for word in ['money', 'revenue', 'sales', 'made']):
+            revenue_data = []
+            vendor_data = []
+            
+            for row in data_rows:
+                # Extract revenue information
+                for key, value in row.items():
+                    if 'total_sales' in key.lower() or 'sales' in key.lower():
+                        if value and str(value).strip() and value != '' and '$' in str(value):
+                            try:
+                                # Extract dollar amount
+                                clean_value = str(value).replace('$', '').replace(',', '').replace(' ', '').strip()
+                                if clean_value and clean_value != '-':
+                                    revenue_data.append(float(clean_value))
+                            except:
+                                pass
+                    
+                    # Extract vendor names
+                    if 'vendor_name' in key.lower() or 'name' in key.lower():
+                        if value and str(value).strip():
+                            vendor_data.append(str(value).strip())
+            
+            if revenue_data:
+                total_revenue = sum(revenue_data)
+                avg_revenue = total_revenue / len(revenue_data)
+                max_revenue = max(revenue_data)
+                summary_parts.append(f"Revenue Analysis: ${total_revenue:,.2f} total revenue from {len(revenue_data)} transactions")
+                summary_parts.append(f"Average transaction: ${avg_revenue:,.2f}, Highest transaction: ${max_revenue:,.2f}")
+            
+            if vendor_data:
+                unique_vendors = list(set([v for v in vendor_data if v and v != '']))
+                if unique_vendors:
+                    summary_parts.append(f"Vendors involved: {len(unique_vendors)} unique vendors including {', '.join(unique_vendors[:5])}")
+        
+        # Analyze contact data
+        elif any(word in query_lower for word in ['email', 'phone', 'contact']):
+            emails = []
+            phones = []
+            
+            for row in data_rows:
+                for key, value in row.items():
+                    if 'email' in key.lower() and value and '@' in str(value):
+                        emails.append(str(value).strip())
+                    elif 'phone' in key.lower() and value and str(value).strip():
+                        phones.append(str(value).strip())
+            
+            if emails:
+                unique_emails = list(set([e for e in emails if e and e != '']))
+                summary_parts.append(f"Contact Information: {len(unique_emails)} email addresses found")
+                if unique_emails[:3]:
+                    summary_parts.append(f"Sample emails: {', '.join(unique_emails[:3])}")
+            
+            if phones:
+                unique_phones = list(set([p for p in phones if p and p != '']))
+                summary_parts.append(f"Phone numbers: {len(unique_phones)} contact numbers available")
+        
+        # General analysis for other queries
+        else:
+            summary_parts.append(f"Data Analysis: {len(data_rows)} records found in {table_name}")
+            
+            # Count non-empty fields
+            total_fields = 0
+            populated_fields = 0
+            
+            for row in data_rows:
+                for key, value in row.items():
+                    total_fields += 1
+                    if value and str(value).strip() and str(value) != '' and str(value) != ' $ -   ':
+                        populated_fields += 1
+            
+            if total_fields > 0:
+                completion_rate = (populated_fields / total_fields) * 100
+                summary_parts.append(f"Data quality: {completion_rate:.1f}% of fields contain data")
+        
+        if not summary_parts:
+            summary_parts.append(f"Found {len(data_rows)} records from {table_name.split('---')[0] if '---' in table_name else table_name}")
+        
+        return ". ".join(summary_parts) + "."
+        
+    except Exception as e:
+        return f"Analysis completed: {len(data_rows)} records found from {table_name}"
+
+
 def execute_complex_business_query(query_description: str) -> dict:
     """Executes complex business intelligence queries using actual table schemas.
     
@@ -848,10 +941,20 @@ def execute_complex_business_query(query_description: str) -> dict:
         
         result = internal_execute_sql_query(sql_query)
         
-        if result.get('status') == 'success':
-            # Add context about which table was queried
-            result['table_queried'] = target_table
-            result['query_context'] = query_description
+        if result.get('status') == 'success' and result.get('data'):
+            # Generate business intelligence summary instead of raw data
+            data_rows = result['data']
+            
+            # Analyze the data and provide business insights
+            analysis = generate_business_intelligence_summary(query_description, data_rows, target_table)
+            
+            return {
+                'status': 'success',
+                'business_intelligence': analysis,
+                'data_source': target_table,
+                'records_analyzed': len(data_rows),
+                'query_context': query_description
+            }
         
         return result
         
@@ -987,7 +1090,13 @@ def natural_language_query():
         app.logger.info(f"Natural language query: {query}")
         
         # Route the query directly to appropriate processing function
-        if any(keyword in query_lower for keyword in ['table', 'tables', 'list']):
+        
+        # For complex business queries (prioritize this over simple table display)
+        if any(keyword in query_lower for keyword in ['revenue', 'analysis', 'attendees', 'vendors', 'how much', 'how many', 'which', 'who', 'what', 'top', 'most', 'zip code', 'email', 'phone', 'cell', 'identify', 'gave', 'live', 'participated', 'applied', 'money', 'made']):
+            result = execute_complex_business_query(query)
+            return jsonify(result)
+        
+        elif any(keyword in query_lower for keyword in ['table', 'tables', 'list']):
             # Table discovery request
             tables_result = internal_execute_sql_query(f"""
                 SELECT table_name 
@@ -996,8 +1105,8 @@ def natural_language_query():
             """)
             return jsonify(tables_result)
         
-        elif any(keyword in query_lower for keyword in ['show me', 'data', 'kapwa', 'vendor', 'balay']):
-            # Use fuzzy table matching to find relevant tables
+        elif any(keyword in query_lower for keyword in ['show me', 'data']) and not any(keyword in query_lower for keyword in ['revenue', 'money', 'top', 'how much']):
+            # Simple table display for basic "show me data" requests
             tables_result = internal_execute_sql_query(f"""
                 SELECT table_name 
                 FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
@@ -1025,11 +1134,6 @@ def natural_language_query():
                         LIMIT 10
                     """)
                     return jsonify(result)
-        
-        # For complex business queries, use the complex business query function
-        elif any(keyword in query_lower for keyword in ['revenue', 'analysis', 'attendees', 'vendors', 'how much', 'how many', 'which', 'who', 'what', 'top', 'most', 'zip code', 'email', 'phone', 'cell', 'identify', 'gave', 'live', 'participated', 'applied']):
-            result = execute_complex_business_query(query)
-            return jsonify(result)
         
         # Default response for queries we can't handle yet
         return jsonify({
