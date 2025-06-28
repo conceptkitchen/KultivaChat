@@ -79,6 +79,7 @@ KBC_STORAGE_TOKEN = os.getenv('KBC_STORAGE_TOKEN')
 # Add configuration variables for project and workspace IDs
 GOOGLE_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID', 'kbc-use4-839-261b')
 KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_ID', 'WORKSPACE_21894820')
+GEMINI_MODEL = "gemini-2.0-flash-exp"
 
 # Log configuration status for debugging
 app.logger.info("=== Configuration Check ===")
@@ -1667,28 +1668,73 @@ def execute_sql():
 
 @app.route('/api/query', methods=['POST'])
 def natural_language_query():
-    """Process natural language business queries"""
+    """Process natural language business queries using Gemini AI"""
     try:
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({"error": "Missing 'query' parameter"}), 400
             
         query = data['query']
+        app.logger.info(f"Natural language query: {query}")
         
-        # Route to appropriate analysis tool based on query complexity
-        if any(keyword in query.lower() for keyword in ['complex', 'analysis', 'revenue', 'attendees']):
-            result = execute_complex_business_query(query)
-        else:
-            result = internal_execute_sql_query(f"""
-                SELECT table_name 
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-                WHERE table_name LIKE '%{query}%'
-                LIMIT 10
-            """)
-            
-        return jsonify(result)
+        # Create Gemini chat session with AI system prompt and tools
+        client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
+        
+        chat_session = client.models.generate_content(
+            model=f"models/{GEMINI_MODEL}",
+            contents=[google_genai_types.Content(
+                role="user", 
+                parts=[google_genai_types.Part(text=query)]
+            )],
+            config=google_genai_types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION_PROMPT,
+                tools=[gemini_tool_functions_list],
+                temperature=0.1,
+                max_output_tokens=4096
+            )
+        )
+        
+        # Process AI response and execute any tool calls
+        ai_response = chat_session.text if hasattr(chat_session, 'text') else ""
+        
+        # Check for function calls in the response
+        if hasattr(chat_session, 'candidates') and chat_session.candidates:
+            candidate = chat_session.candidates[0]
+            if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                for part in candidate.content.parts:
+                    if hasattr(part, 'function_call'):
+                        function_call = part.function_call
+                        function_name = function_call.name
+                        function_args = dict(function_call.args) if function_call.args else {}
+                        
+                        app.logger.info(f"Executing function: {function_name} with args: {function_args}")
+                        
+                        # Execute the appropriate function
+                        if function_name == "internal_execute_sql_query":
+                            result = internal_execute_sql_query(function_args.get('sql_query', ''))
+                            return jsonify(result)
+                        elif function_name == "execute_complex_business_query":
+                            result = execute_complex_business_query(function_args.get('query_description', query))
+                            return jsonify(result)
+                        elif function_name == "get_zip_codes_for_city":
+                            result = get_zip_codes_for_city(
+                                function_args.get('city_name', ''),
+                                function_args.get('state_code')
+                            )
+                            return jsonify(result)
+                        elif function_name == "get_current_time":
+                            result = get_current_time()
+                            return jsonify(result)
+        
+        # If no function calls, return AI text response
+        return jsonify({
+            "status": "success",
+            "response": ai_response,
+            "data": None
+        })
         
     except Exception as e:
+        app.logger.error(f"Error in natural language query: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/tables', methods=['GET'])
