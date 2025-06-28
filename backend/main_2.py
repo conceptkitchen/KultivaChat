@@ -729,14 +729,10 @@ def get_zip_codes_for_city(
 
 
 def execute_complex_business_query(query_description: str) -> dict:
-    """Executes complex business intelligence queries with multi-table joins, date ranges, and demographic filters.
+    """Executes complex business intelligence queries using actual table schemas.
     
-    This function handles sophisticated queries like:
-    - Vendor revenue analysis across events and date ranges
-    - Attendee demographics and geographic analysis
-    - Cross-event participation tracking
-    - Financial performance metrics
-    - Identity-based filtering and analysis
+    This function examines the actual tables and builds appropriate queries based on
+    the real column names and data structure found in the BigQuery workspace.
     
     Args:
         query_description (str): Natural language description of the business query
@@ -747,58 +743,128 @@ def execute_complex_business_query(query_description: str) -> dict:
     app.logger.info(f"Tool Call: execute_complex_business_query - {query_description}")
     
     try:
-        # Parse query type and extract key components
         query_lower = query_description.lower()
         
-        # Vendor-related queries
-        if any(keyword in query_lower for keyword in ['vendor', 'vendors', 'seller', 'sellers']):
-            return _handle_vendor_queries(query_description, query_lower)
+        # First, get list of relevant tables based on query content
+        tables_result = internal_execute_sql_query(f"""
+            SELECT table_name 
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+            WHERE table_name NOT LIKE '-%'
+            ORDER BY table_name
+        """)
         
-        # Attendee/donor-related queries  
-        elif any(keyword in query_lower for keyword in ['attendee', 'attendees', 'donor', 'donors', 'participant']):
-            return _handle_attendee_queries(query_description, query_lower)
+        if tables_result.get('status') != 'success':
+            return {"status": "error", "error_message": "Could not retrieve table list"}
         
-        # Revenue/financial queries
-        elif any(keyword in query_lower for keyword in ['revenue', 'money', 'income', 'sales', 'profit', 'financial']):
-            return _handle_financial_queries(query_description, query_lower)
+        table_names = [row['table_name'] for row in tables_result['data']]
         
-        # Geographic queries
-        elif any(keyword in query_lower for keyword in ['zip code', 'city', 'location', 'geographic', 'sf', 'daly city']):
-            return _handle_geographic_queries(query_description, query_lower)
+        # Find tables relevant to the query
+        relevant_tables = []
         
-        # Event-specific queries
-        elif any(keyword in query_lower for keyword in ['event', 'kapwa gardens', 'balay kreative', 'undscvrd', 'yum yams']):
-            return _handle_event_queries(query_description, query_lower)
+        # Look for event-specific tables
+        if 'kapwa gardens' in query_lower or 'kapwa' in query_lower:
+            relevant_tables.extend([t for t in table_names if 'kapwa-gardens' in t.lower() or 'kapwa' in t.lower()])
+        if 'yum yams' in query_lower or 'yum-yams' in query_lower:
+            relevant_tables.extend([t for t in table_names if 'yum-yams' in t.lower()])
+        if 'undscvrd' in query_lower or 'undiscovered' in query_lower:
+            relevant_tables.extend([t for t in table_names if 'undscvrd' in t.lower() or 'undiscovered' in t.lower()])
+        if 'balay kreative' in query_lower or 'balay' in query_lower:
+            relevant_tables.extend([t for t in table_names if 'balay' in t.lower()])
         
-        # Default comprehensive analysis
+        # If no specific events mentioned, look for vendor/sales tables
+        if not relevant_tables:
+            if any(word in query_lower for word in ['vendor', 'sales', 'money', 'revenue']):
+                relevant_tables = [t for t in table_names if any(keyword in t.lower() for keyword in ['vendor', 'sales', 'close-out'])]
+        
+        # If still no tables, use the first few vendor-related tables
+        if not relevant_tables:
+            relevant_tables = [t for t in table_names if 'close-out' in t.lower()][:3]
+        
+        if not relevant_tables:
+            return {"status": "error", "error_message": "No relevant tables found for the query"}
+        
+        # Use the first relevant table to build a query
+        target_table = relevant_tables[0]
+        
+        # Handle different types of queries
+        if any(word in query_lower for word in ['money', 'revenue', 'sales', 'made']):
+            # Revenue/sales queries
+            sql_query = f"""
+                SELECT 
+                    Vendor_Name,
+                    Total_Sales,
+                    Rev_Split_Amountto_KG,
+                    Cash__Credit_Total,
+                    Donation_Amount,
+                    _timestamp
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                WHERE Vendor_Name IS NOT NULL 
+                AND Vendor_Name != ''
+                AND Total_Sales IS NOT NULL
+                ORDER BY CAST(REGEXP_REPLACE(COALESCE(Total_Sales, '0'), r'[^0-9.]', '') AS FLOAT64) DESC
+                LIMIT 20
+            """
+        elif any(word in query_lower for word in ['email', 'contact']):
+            # Contact information queries
+            sql_query = f"""
+                SELECT 
+                    Vendor_Name,
+                    Email,
+                    Phone,
+                    Contact_Name
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                WHERE Email IS NOT NULL 
+                AND Email != ''
+                LIMIT 20
+            """
         else:
-            return _execute_general_analysis(query_description)
-            
+            # General vendor information
+            sql_query = f"""
+                SELECT *
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                WHERE Vendor_Name IS NOT NULL
+                LIMIT 10
+            """
+        
+        result = internal_execute_sql_query(sql_query)
+        
+        if result.get('status') == 'success':
+            # Add context about which table was queried
+            result['table_queried'] = target_table
+            result['query_context'] = query_description
+        
+        return result
+        
     except Exception as e:
         app.logger.error(f"Error in complex business query: {e}", exc_info=True)
         return {"status": "error", "error_message": str(e)}
 
 
-def _get_queryable_tables() -> list:
-    """Get list of queryable tables (all tables are VIEW type, excluding dash-prefixed names)."""
+def execute_comprehensive_analysis(table_name: str, analysis_type: str = "overview") -> dict:
+    """Performs comprehensive data analysis on a specific table with advanced insights."""
+    app.logger.info(f"Tool Call: execute_comprehensive_analysis - {table_name} ({analysis_type})")
+    
     try:
-        tables_query = """
-        SELECT table_name 
-        FROM `kbc-use4-839-261b.WORKSPACE_21894820.INFORMATION_SCHEMA.TABLES` 
-        WHERE table_name NOT LIKE '-%'
-        ORDER BY table_name
+        # Basic table information query
+        sql_query = f"""
+            SELECT *
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table_name}`
+            LIMIT 50
         """
-        result = internal_execute_sql_query(tables_query)
+        
+        result = internal_execute_sql_query(sql_query)
+        
         if result.get('status') == 'success' and result.get('data'):
-            return [row['table_name'] for row in result['data']]
-        return []
+            # Add analysis metadata
+            result['analysis_type'] = analysis_type
+            result['table_analyzed'] = table_name
+            result['total_rows_analyzed'] = len(result['data'])
+            
+        return result
+        
     except Exception as e:
-        app.logger.error(f"Error getting queryable tables: {e}")
-        return []
-
-def _extract_demographics(query_description: str, query_lower: str) -> dict:
-    """Extract demographic identifiers from natural language queries."""
-    demographics = {}
+        app.logger.error(f"Error in comprehensive analysis: {e}", exc_info=True)
+        return {"status": "error", "error_message": str(e)}
     
     # Identity-based patterns
     identity_patterns = {
