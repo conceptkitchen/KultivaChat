@@ -818,7 +818,13 @@ def generate_business_intelligence_summary(query_description: str, data_rows: li
                 if high_performers:
                     summary_parts.append(f"Top performers: {len(high_performers)} transactions above average (${sum(high_performers):,.2f})")
             else:
-                summary_parts.append(f"Revenue data examined from {len(data_rows)} records - extracting financial metrics from {table_name}")
+                # Enhanced messaging for sparse financial data
+                summary_parts.append(f"REVENUE ANALYSIS: Examined {len(data_rows)} vendor records from {table_name}")
+                # Provide business context even with sparse data
+                event_info = table_name.replace('-', ' ').replace('_', ' ')
+                if 'close' in event_info.lower() and 'sales' in event_info.lower():
+                    summary_parts.append(f"Data source contains close-out sales information - revenue fields may be in financial columns")
+                summary_parts.append(f"Business recommendation: Data collection process may need improvement for complete financial analysis")
         
         elif any(word in query_lower for word in ['top', 'best', 'highest', 'vendors']):
             unique_vendors = list(set([v for v in vendor_names if v]))
