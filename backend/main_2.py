@@ -1027,7 +1027,7 @@ def natural_language_query():
                     return jsonify(result)
         
         # For complex business queries, use the complex business query function
-        elif any(keyword in query_lower for keyword in ['revenue', 'analysis', 'attendees', 'vendors', 'how much', 'how many']):
+        elif any(keyword in query_lower for keyword in ['revenue', 'analysis', 'attendees', 'vendors', 'how much', 'how many', 'which', 'who', 'what', 'top', 'most', 'zip code', 'email', 'phone', 'cell', 'identify', 'gave', 'live', 'participated', 'applied']):
             result = execute_complex_business_query(query)
             return jsonify(result)
         
