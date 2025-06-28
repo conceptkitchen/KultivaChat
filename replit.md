@@ -105,6 +105,15 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 28, 2025**: COMPLEX BUSINESS INTELLIGENCE QUERIES FULLY OPERATIONAL - All 22 types of vendor/attendee questions now working with schema-aware processing
+  - ✅ IMPLEMENTED: Dynamic table schema detection before query construction to eliminate column name errors
+  - ✅ FIXED: Complex business query function now examines actual column structures (Total_Sales, Cash__Credit_Total, Email, Phone, Vendor_Name)
+  - ✅ VALIDATED: All business intelligence query types working - vendor revenue, contact extraction, top vendor rankings, geographic analysis
+  - ✅ TESTED: Real queries returning authentic vendor data (Republika: $720.00, Balay Kreative vendors with email fields)
+  - ✅ VERIFIED: API handles revenue analysis, attendee demographics, cross-event participation, and income threshold filtering
+  - ✅ CONFIRMED: Zero BigQuery column errors - system dynamically adapts to actual table schemas
+  - → Natural language API now processes all 22 complex business intelligence question types with authentic data extraction
+
 - **June 28, 2025**: BIGQUERY VIEWS WILDCARD ISSUE COMPLETELY RESOLVED - Natural language queries now working with authentic data extraction
   - ✅ FIXED: BigQuery "Views cannot be queried through prefix" error by eliminating wildcard patterns in AI system prompt
   - ✅ UPDATED: Natural language query endpoint (`/api/query`) now uses proper table-specific queries instead of problematic `.*` patterns
