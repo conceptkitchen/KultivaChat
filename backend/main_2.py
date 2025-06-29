@@ -987,24 +987,77 @@ def execute_complex_business_query(query_description: str) -> dict:
         # Find tables relevant to the query
         relevant_tables = []
         
-        # Look for event-specific tables
-        if 'kapwa gardens' in query_lower or 'kapwa' in query_lower:
-            relevant_tables.extend([t for t in table_names if 'kapwa-gardens' in t.lower() or 'kapwa' in t.lower()])
-        if 'yum yams' in query_lower or 'yum-yams' in query_lower:
-            relevant_tables.extend([t for t in table_names if 'yum-yams' in t.lower()])
-        if 'undscvrd' in query_lower or 'undiscovered' in query_lower:
-            relevant_tables.extend([t for t in table_names if 'undscvrd' in t.lower() or 'undiscovered' in t.lower()])
-        if 'balay kreative' in query_lower or 'balay' in query_lower:
-            relevant_tables.extend([t for t in table_names if 'balay' in t.lower()])
+        # INTELLIGENT DYNAMIC TABLE CATEGORIZATION
+        def categorize_table_by_content(table_name: str) -> str:
+            """Dynamically determine data source type by analyzing table name patterns"""
+            name_lower = table_name.lower()
+            
+            # Check for data source indicators in table names
+            if any(indicator in name_lower for indicator in ['typeform', 'form-responses', 'submissions']):
+                return 'typeform'
+            elif any(indicator in name_lower for indicator in ['squarespace', 'website-forms', 'online-forms']):
+                return 'squarespace'
+            elif any(indicator in name_lower for indicator in ['close-out', 'closeout', 'sales', 'revenue', 'vendor-close']):
+                return 'closeout_sales'
+            else:
+                return 'other'
         
-        # If no specific events mentioned, look for vendor/sales tables
+        # Categorize all tables dynamically
+        table_categories = {}
+        for table in table_names:
+            category = categorize_table_by_content(table)
+            if category not in table_categories:
+                table_categories[category] = []
+            table_categories[category].append(table)
+        
+        app.logger.info(f"Dynamic table categorization: {[(k, len(v)) for k, v in table_categories.items()]}")
+        
+        # SMART DATA SOURCE MATCHING
+        # 1. FIRST PRIORITY: Data source type matching
+        if 'typeform' in query_lower:
+            relevant_tables = table_categories.get('typeform', [])
+            app.logger.info(f"Typeform-specific query detected, found {len(relevant_tables)} typeform tables")
+        elif 'squarespace' in query_lower:
+            relevant_tables = table_categories.get('squarespace', [])
+            app.logger.info(f"Squarespace-specific query detected, found {len(relevant_tables)} squarespace tables")
+        elif any(keyword in query_lower for keyword in ['closeout', 'close-out', 'sales sheet', 'revenue']):
+            relevant_tables = table_categories.get('closeout_sales', [])
+            app.logger.info(f"Closeout sales query detected, found {len(relevant_tables)} closeout tables")
+        
+        # 2. SECOND PRIORITY: Event/vendor specific matching (if no data type specified)
+        if not relevant_tables:
+            event_tables = []
+            if 'kapwa gardens' in query_lower or 'kapwa' in query_lower:
+                event_tables.extend([t for t in table_names if 'kapwa-gardens' in t.lower() or 'kapwa' in t.lower()])
+            if 'yum yams' in query_lower or 'yum-yams' in query_lower:
+                event_tables.extend([t for t in table_names if 'yum-yams' in t.lower()])
+            if 'undscvrd' in query_lower or 'undiscovered' in query_lower:
+                event_tables.extend([t for t in table_names if 'undscvrd' in t.lower() or 'undiscovered' in t.lower()])
+            if 'balay kreative' in query_lower or 'balay' in query_lower:
+                event_tables.extend([t for t in table_names if 'balay' in t.lower()])
+            relevant_tables = event_tables
+        
+        # 3. THIRD PRIORITY: Query intent-based matching using all categories
         if not relevant_tables:
             if any(word in query_lower for word in ['vendor', 'sales', 'money', 'revenue']):
-                relevant_tables = [t for t in table_names if any(keyword in t.lower() for keyword in ['vendor', 'sales', 'close-out'])]
+                # Prefer closeout sales for financial queries
+                relevant_tables = table_categories.get('closeout_sales', [])
+                if not relevant_tables:
+                    relevant_tables = table_categories.get('other', [])
+            elif any(word in query_lower for word in ['contact', 'email', 'phone', 'application']):
+                # For contact queries, try all data sources
+                relevant_tables = (table_categories.get('typeform', []) + 
+                                 table_categories.get('squarespace', []) + 
+                                 table_categories.get('closeout_sales', []))
         
-        # If still no tables, use the first few vendor-related tables
+        # 4. FINAL FALLBACK: Use most recent or largest tables from any category
         if not relevant_tables:
-            relevant_tables = [t for t in table_names if 'close-out' in t.lower()][:3]
+            all_tables = []
+            for category_tables in table_categories.values():
+                all_tables.extend(category_tables)
+            # Sort by table name (often contains dates) and take most recent
+            relevant_tables = sorted(all_tables, reverse=True)[:3]
+            app.logger.info(f"Using fallback tables: {relevant_tables[:3]}")
         
         if not relevant_tables:
             return {"status": "error", "error_message": "No relevant tables found for the query"}
