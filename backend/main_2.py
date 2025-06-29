@@ -586,7 +586,7 @@ def internal_execute_sql_query(query: str) -> dict:
             ]
             
             is_comprehensive = any(keyword in query_lower for keyword in comprehensive_keywords)
-            app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} - Query: {query[:100]}")
+            app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} for keywords: {[k for k in comprehensive_keywords if k in query_lower]} - Query: {query[:100]}")
             
             # STEP 1: INTELLIGENT TABLE DISCOVERY
             # Determine data source type based on query context
@@ -622,7 +622,7 @@ def internal_execute_sql_query(query: str) -> dict:
             if not results:
                 return {"status": "error", "error_message": "No relevant tables found for the query"}
             
-            relevant_tables = [row['table_name'] for row in results]
+            relevant_tables = [dict(row)['table_name'] for row in results]
             
             # STEP 2: SCHEMA ANALYSIS FOR TOP TABLES
             # Analyze schemas of top tables to understand column structures
@@ -643,7 +643,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 execution_time = time.time() - start_time
                 app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(schema_results)} rows.")
                 
-                schema_info[table] = [row['column_name'] for row in schema_results]
+                schema_info[table] = [dict(row)['column_name'] for row in schema_results]
             
             # STEP 3: COMPREHENSIVE MULTI-TABLE ANALYSIS
             if is_comprehensive:
@@ -814,7 +814,8 @@ def internal_execute_sql_query(query: str) -> dict:
             start_time = time.time()
             
             query_job = bigquery_client.query(final_query)
-            results = list(query_job.result())
+            results = query_job.result(timeout=60)
+            results = list(results)
                 
             execution_time = time.time() - start_time
             app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(results)} rows.")
