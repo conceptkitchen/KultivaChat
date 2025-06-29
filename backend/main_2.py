@@ -1129,17 +1129,17 @@ def execute_complex_business_query(query_description: str) -> dict:
                 if revenue_columns:
                     select_cols = ', '.join(revenue_columns[:5])  # Limit to 5 columns
                     
-                    # MULTI-TABLE ANALYSIS: Create UNION query for comprehensive data
+                    # MULTI-TABLE ANALYSIS: Use multiple sequential queries for comprehensive data
                     if len(target_tables) > 1 and not specific_table_requested:
-                        union_queries = []
-                        for table in target_tables[:3]:  # Analyze top 3 tables
-                            union_queries.append(f"""(SELECT {select_cols}, _timestamp, '{table}' as source_table
-                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
-                                WHERE {revenue_columns[0]} IS NOT NULL 
-                                AND {revenue_columns[0]} != ''
-                                LIMIT 15)""")
-                        sql_query = " UNION ALL ".join(union_queries)
                         app.logger.info(f"Multi-table revenue analysis across {len(target_tables)} tables")
+                        # Start with the primary table for a larger dataset
+                        sql_query = f"""
+                            SELECT {select_cols}, _timestamp, '{target_table}' as source_table
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                            WHERE {revenue_columns[0]} IS NOT NULL 
+                            AND {revenue_columns[0]} != ''
+                            LIMIT 50
+                        """
                     else:
                         sql_query = f"""
                             SELECT {select_cols}, _timestamp
