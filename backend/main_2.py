@@ -1062,8 +1062,15 @@ def execute_complex_business_query(query_description: str) -> dict:
         if not relevant_tables:
             return {"status": "error", "error_message": "No relevant tables found for the query"}
         
-        # Use the first relevant table to build a query
-        target_table = relevant_tables[0]
+        # ENHANCED: Use multiple relevant tables for comprehensive analysis
+        # Prioritize by data freshness and relevance, but analyze multiple sources
+        if len(relevant_tables) > 1:
+            app.logger.info(f"Multiple relevant tables found ({len(relevant_tables)}), will analyze top 3 for comprehensive results")
+            target_tables = relevant_tables[:3]  # Analyze top 3 most relevant tables
+        else:
+            target_tables = relevant_tables
+            
+        target_table = target_tables[0]  # Start with primary table for column analysis
         
         # First, check what columns are actually available in the table
         columns_result = internal_execute_sql_query(f"""
@@ -1089,13 +1096,28 @@ def execute_complex_business_query(query_description: str) -> dict:
                 
                 if revenue_columns:
                     select_cols = ', '.join(revenue_columns[:5])  # Limit to 5 columns
-                    sql_query = f"""
-                        SELECT {select_cols}, _timestamp
-                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
-                        WHERE {revenue_columns[0]} IS NOT NULL 
-                        AND {revenue_columns[0]} != ''
-                        LIMIT 20
-                    """
+                    
+                    # MULTI-TABLE ANALYSIS: Create UNION query for comprehensive data
+                    if len(target_tables) > 1:
+                        union_queries = []
+                        for table in target_tables[:3]:  # Analyze top 3 tables
+                            union_queries.append(f"""
+                                SELECT {select_cols}, _timestamp, '{table}' as source_table
+                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                                WHERE {revenue_columns[0]} IS NOT NULL 
+                                AND {revenue_columns[0]} != ''
+                                LIMIT 15
+                            """)
+                        sql_query = " UNION ALL ".join(union_queries)
+                        app.logger.info(f"Multi-table revenue analysis across {len(target_tables)} tables")
+                    else:
+                        sql_query = f"""
+                            SELECT {select_cols}, _timestamp
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                            WHERE {revenue_columns[0]} IS NOT NULL 
+                            AND {revenue_columns[0]} != ''
+                            LIMIT 20
+                        """
                 else:
                     sql_query = f"""SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"""
                     
