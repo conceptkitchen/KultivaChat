@@ -1237,20 +1237,64 @@ def execute_complex_business_query(query_description: str) -> dict:
                 if revenue_columns:
                     select_cols = ', '.join(revenue_columns[:5])  # Limit to 5 columns
                     
-                    # TRUE MULTI-TABLE ANALYSIS: Query ALL relevant tables for comprehensive data
+                    # TRUE MULTI-TABLE ANALYSIS: Query each table separately to handle different schemas
                     if len(target_tables) > 1 and not specific_table_requested:
                         app.logger.info(f"TRUE multi-table revenue analysis across {len(target_tables)} tables")
-                        # Build UNION query across ALL relevant tables with proper parentheses
-                        union_parts = []
+                        
+                        # Query each table separately and aggregate results 
+                        all_revenue_data = []
+                        total_revenue = 0
+                        transaction_count = 0
+                        
                         for table in target_tables[:5]:  # Limit to 5 tables for performance
-                            union_parts.append(f"""(
-                                SELECT {select_cols}, _timestamp, '{table}' as source_table
-                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                            # Get column schema for each table
+                            table_columns_result = internal_execute_sql_query(f"""
+                                SELECT column_name 
+                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS` 
+                                WHERE table_name = '{table}'
+                                ORDER BY ordinal_position
+                            """)
+                            
+                            if table_columns_result.get('status') == 'success':
+                                table_columns = [row['column_name'] for row in table_columns_result['data']]
+                                # Find revenue columns in this specific table
+                                table_revenue_cols = [col for col in table_columns if any(term in col.lower() for term in ['total_sales', 'sales', 'revenue', 'cash', 'credit'])]
+                                
+                                if table_revenue_cols:
+                                    # Query this table with its specific columns
+                                    table_query = f"""
+                                        SELECT {', '.join(table_revenue_cols[:3])}, '{table}' as source_table
+                                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                                        WHERE {table_revenue_cols[0]} IS NOT NULL 
+                                        AND {table_revenue_cols[0]} != ''
+                                        LIMIT 20
+                                    """
+                                    table_result = internal_execute_sql_query(table_query)
+                                    if table_result.get('status') == 'success' and table_result.get('data'):
+                                        all_revenue_data.extend(table_result['data'])
+                                        transaction_count += len(table_result['data'])
+                        
+                        # Process aggregated multi-table data
+                        if all_revenue_data:
+                            # Generate business intelligence from aggregated multi-table data
+                            analysis = generate_business_intelligence_summary(query_description, all_revenue_data, f"Multi-table analysis: {len(target_tables)} tables")
+                            
+                            return {
+                                'status': 'success',
+                                'business_intelligence': analysis,
+                                'data_source': f"{len(target_tables)} tables analyzed: {', '.join([t.split('---')[0] for t in target_tables[:3]])}...",
+                                'records_analyzed': len(all_revenue_data),
+                                'query_context': query_description
+                            }
+                        else:
+                            # Fallback to single table query
+                            sql_query = f"""
+                                SELECT {select_cols}, _timestamp
+                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
                                 WHERE {revenue_columns[0]} IS NOT NULL 
                                 AND {revenue_columns[0]} != ''
-                                LIMIT 20
-                            )""")
-                        sql_query = " UNION ALL ".join(union_parts)
+                                LIMIT 50
+                            """
                     else:
                         sql_query = f"""
                             SELECT {select_cols}, _timestamp
