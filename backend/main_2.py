@@ -564,6 +564,7 @@ def internal_execute_sql_query(query: str) -> dict:
     
     try:
         # ENHANCED BUSINESS INTELLIGENCE: Detect if this is a natural language business question
+        original_query = query  # Preserve original query for detection
         query_lower = query.lower()
         
         # Check if this is a natural language query needing intelligent processing
@@ -575,17 +576,17 @@ def internal_execute_sql_query(query: str) -> dict:
         
         is_business_query = any(indicator in query_lower for indicator in business_indicators)
         
+        # DETECT COMPREHENSIVE ANALYSIS REQUESTS (check original query)
+        comprehensive_keywords = [
+            'across all', 'all events', 'compare events', 'which event', 'best event',
+            'most money', 'highest revenue', 'compare', 'breakdown', 'all tables',
+            'made the most', 'top event', 'highest earning', 'compare revenue'
+        ]
+        
+        is_comprehensive = any(keyword in query_lower for keyword in comprehensive_keywords)
+        
         if is_business_query:
             app.logger.info(f"Enhanced business intelligence query: {query}")
-            
-            # DETECT COMPREHENSIVE ANALYSIS REQUESTS
-            comprehensive_keywords = [
-                'across all', 'all events', 'compare events', 'which event', 'best event',
-                'most money', 'highest revenue', 'compare', 'breakdown', 'all tables',
-                'made the most', 'top event', 'highest earning', 'compare revenue'
-            ]
-            
-            is_comprehensive = any(keyword in query_lower for keyword in comprehensive_keywords)
             app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} for keywords: {[k for k in comprehensive_keywords if k in query_lower]} - Query: {query[:100]}")
             
             # STEP 1: INTELLIGENT TABLE DISCOVERY
@@ -622,7 +623,18 @@ def internal_execute_sql_query(query: str) -> dict:
             if not results:
                 return {"status": "error", "error_message": "No relevant tables found for the query"}
             
-            relevant_tables = [dict(row)['table_name'] for row in results]
+            relevant_tables = []
+            for row in results:
+                try:
+                    if hasattr(row, 'table_name'):
+                        relevant_tables.append(row.table_name)
+                    elif hasattr(row, '_fields') and 'table_name' in row._fields:
+                        relevant_tables.append(row[0])  # First field is table_name
+                    else:
+                        relevant_tables.append(str(row).split('\t')[0])  # Fallback parsing
+                except Exception as e:
+                    app.logger.warning(f"Could not extract table name from row: {row}, error: {e}")
+                    continue
             
             # STEP 2: SCHEMA ANALYSIS FOR TOP TABLES
             # Analyze schemas of top tables to understand column structures
@@ -643,7 +655,19 @@ def internal_execute_sql_query(query: str) -> dict:
                 execution_time = time.time() - start_time
                 app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(schema_results)} rows.")
                 
-                schema_info[table] = [dict(row)['column_name'] for row in schema_results]
+                columns = []
+                for row in schema_results:
+                    try:
+                        if hasattr(row, 'column_name'):
+                            columns.append(row.column_name)
+                        elif hasattr(row, '_fields') and 'column_name' in row._fields:
+                            columns.append(row[0])  # First field is column_name
+                        else:
+                            columns.append(str(row).split('\t')[0])  # Fallback parsing
+                    except Exception as e:
+                        app.logger.warning(f"Could not extract column name from row: {row}, error: {e}")
+                        continue
+                schema_info[table] = columns
             
             # STEP 3: COMPREHENSIVE MULTI-TABLE ANALYSIS
             if is_comprehensive:
