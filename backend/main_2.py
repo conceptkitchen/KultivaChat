@@ -1086,7 +1086,8 @@ def execute_complex_business_query(query_description: str) -> dict:
         workspace_phrases = ['workspace overview', 'how many tables', 'show me my', 'current workspace', 'table count', 'workspace breakdown']
         has_workspace_phrase = any(phrase in query_lower for phrase in workspace_phrases)
         
-        if workspace_indicators >= 3 or has_workspace_phrase:  # Enhanced detection criteria
+        # Only show workspace overview if NOT a data extraction request
+        if not wants_data_extraction and (workspace_indicators >= 3 or has_workspace_phrase):
             total_tables = len(table_names)
             category_summary = []
             for category, tables in table_categories.items():
@@ -1102,6 +1103,20 @@ def execute_complex_business_query(query_description: str) -> dict:
                 "records_analyzed": total_tables,
                 "query_context": query_description
             }
+        
+        # DETECT DATA EXTRACTION INTENT vs WORKSPACE OVERVIEW
+        data_extraction_keywords = [
+            'show me data', 'show data', 'display data', 'get data', 'extract data',
+            'show me information', 'show information', 'data from', 'information from',
+            'contents of', 'records from', 'rows from', 'entries from',
+            'what\'s in', 'see the data', 'view data', 'pull data'
+        ]
+        
+        wants_data_extraction = any(keyword in query_lower for keyword in data_extraction_keywords)
+        
+        # If this is clearly a data extraction request, skip workspace overview logic
+        if wants_data_extraction:
+            app.logger.info(f"Data extraction request detected: {query_description}")
         
         # SMART DATA SOURCE MATCHING
         # 1. FIRST PRIORITY: Data source type matching
@@ -1447,17 +1462,10 @@ def natural_language_query():
             """)
             return jsonify(tables_result)
         
-        elif any(keyword in query_lower for keyword in ['show me', 'data']) and not any(keyword in query_lower for keyword in ['revenue', 'money', 'top', 'how much']):
-            # Simple table display for basic "show me data" requests
-            tables_result = internal_execute_sql_query(f"""
-                SELECT table_name 
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-                ORDER BY table_name
-            """)
-            
-            if tables_result.get('status') == 'success' and tables_result.get('data'):
-                table_names = [row['table_name'] for row in tables_result['data']]
-                
+        elif any(keyword in query_lower for keyword in ['show me', 'data']):
+            # Data extraction requests - route to complex business query function
+            result = execute_complex_business_query(query)
+            return jsonify(result)
                 # ENHANCED INTELLIGENT DATA SOURCE CATEGORIZATION
                 def categorize_table_by_patterns(table_name: str) -> str:
                     """Dynamically categorize tables by your three main data sources"""
