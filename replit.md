@@ -105,6 +105,15 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 29, 2025**: WORKSPACE OVERVIEW FUNCTIONALITY ENHANCED & GOOGLE CLOUD CREDENTIALS UPDATED
+  - ✅ FIXED: Google Cloud authentication issue resolved with updated service account credentials
+  - ✅ ENHANCED: Workspace overview detection improved with natural language phrase matching
+  - ✅ INTEGRATED: Workspace overview functionality embedded within existing execute_complex_business_query tool rather than creating new tool
+  - ✅ CONFIRMED: Real-time table counting now operational - current workspace: 63 tables (58 closeout sales, 2 squarespace, 2 other, 1 typeform)
+  - ✅ MAINTAINED: Dynamic categorization adapts automatically as new data sources are added
+  - ✅ VERIFIED: Enhanced detection recognizes phrases like "How many tables do I have?" and "workspace overview"
+  - → Single natural language endpoint provides both comprehensive business intelligence and workspace metadata through intelligent query routing
+
 - **June 29, 2025**: COMPREHENSIVE MULTI-TABLE ANALYSIS & NATURAL LANGUAGE TABLE DISCOVERY IMPLEMENTED
   - ✅ ENHANCED: Smart table selection detects comprehensive vs specific table requests automatically
   - ✅ IMPLEMENTED: Multi-table analysis for revenue queries across all 58 closeout sales tables

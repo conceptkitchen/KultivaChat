@@ -1079,8 +1079,14 @@ def execute_complex_business_query(query_description: str) -> dict:
             pass
         
         # Check for workspace overview intent by analyzing query context
-        workspace_indicators = len([word for word in query_lower.split() if word in ['workspace', 'tables', 'count', 'overview', 'many', 'total', 'breakdown']])
-        if workspace_indicators >= 2:  # Multiple workspace-related terms suggest overview question
+        workspace_keywords = ['workspace', 'tables', 'count', 'overview', 'many', 'total', 'breakdown', 'current', 'show', 'how']
+        workspace_indicators = len([word for word in query_lower.split() if word in workspace_keywords])
+        
+        # Enhanced detection for workspace overview questions
+        workspace_phrases = ['workspace overview', 'how many tables', 'show me my', 'current workspace', 'table count', 'workspace breakdown']
+        has_workspace_phrase = any(phrase in query_lower for phrase in workspace_phrases)
+        
+        if workspace_indicators >= 3 or has_workspace_phrase:  # Enhanced detection criteria
             total_tables = len(table_names)
             category_summary = []
             for category, tables in table_categories.items():
