@@ -4,7 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["python311Packages.psycopg2", "screen", "sptk"]
+packages = ["glibcLocales", "python311Packages.psycopg2", "screen", "sptk"]
 
 [deployment]
 deploymentTarget = "autoscale"

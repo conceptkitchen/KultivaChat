@@ -1760,6 +1760,198 @@ def geographic_lookup():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# === DASHBOARD API ENDPOINTS ===
+
+def load_csv_fallback_data(csv_filename):
+    """Load financial data from CSV fallback files"""
+    import csv
+    try:
+        csv_path = os.path.join(os.path.dirname(__file__), csv_filename)
+        data = []
+        with open(csv_path, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(dict(row))
+        return data
+    except Exception as e:
+        app.logger.error(f"Error loading CSV fallback {csv_filename}: {e}")
+        return []
+
+def query_dashboard_bigquery(sql_query):
+    """Execute query on dashboard BigQuery workspace with CSV fallback"""
+    if dashboard_bigquery_client:
+        try:
+            query_job = dashboard_bigquery_client.query(sql_query)
+            results = query_job.result()
+            return [dict(row) for row in results]
+        except Exception as e:
+            app.logger.error(f"Dashboard BigQuery error: {e}")
+    
+    # CSV fallback
+    app.logger.info("Using CSV fallback for dashboard data")
+    kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
+    undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
+    return kapwa_data + undiscovered_data
+
+@app.route('/api/dashboard/financial-summary', methods=['GET'])
+def dashboard_financial_summary():
+    """Get financial summary for dashboard visualization"""
+    try:
+        # Try BigQuery first, fall back to CSV
+        if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD:
+            sql_query = f"""
+            SELECT 
+                'Kapwa Gardens' as event_type,
+                SUM(CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                COUNT(*) as vendor_count
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD}.kapwa_gardens_financial_data`
+            UNION ALL
+            SELECT 
+                'UNDISCOVERED' as event_type,
+                SUM(CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                COUNT(*) as vendor_count
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD}.undiscovered_financial_data`
+            """
+            results = query_dashboard_bigquery(sql_query)
+        else:
+            # CSV fallback calculation
+            kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
+            undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
+            
+            # Calculate Kapwa Gardens totals
+            kapwa_revenue = sum(float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) for row in kapwa_data)
+            kapwa_count = len([row for row in kapwa_data if float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) > 0])
+            
+            # Calculate UNDISCOVERED totals
+            undiscovered_revenue = sum(float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) for row in undiscovered_data)
+            undiscovered_count = len([row for row in undiscovered_data if float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) > 0])
+            
+            results = [
+                {"event_type": "Kapwa Gardens", "total_revenue": kapwa_revenue, "vendor_count": kapwa_count},
+                {"event_type": "UNDISCOVERED", "total_revenue": undiscovered_revenue, "vendor_count": undiscovered_count}
+            ]
+        
+        return jsonify({
+            "status": "success",
+            "data": results,
+            "source": "dashboard_workspace" if dashboard_bigquery_client else "csv_fallback"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/dashboard/vendor-performance', methods=['GET'])
+def dashboard_vendor_performance():
+    """Get top performing vendors for dashboard charts"""
+    try:
+        # Try BigQuery first, fall back to CSV
+        if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD:
+            sql_query = f"""
+            SELECT 
+                vendor_name,
+                event_name,
+                CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64) as revenue
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD}.kapwa_gardens_financial_data`
+            WHERE vendor_name IS NOT NULL AND vendor_name != ''
+            ORDER BY revenue DESC
+            LIMIT 20
+            """
+            results = query_dashboard_bigquery(sql_query)
+        else:
+            # CSV fallback
+            all_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv') + load_csv_fallback_data('undiscovered_dashboard_data.csv')
+            
+            vendor_performance = []
+            for row in all_data:
+                if row.get('vendor_name') and row.get('vendor_name').strip():
+                    revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+                    if revenue > 0:
+                        vendor_performance.append({
+                            "vendor_name": row.get('vendor_name'),
+                            "event_name": row.get('event_name', 'Unknown'),
+                            "revenue": revenue
+                        })
+            
+            # Sort by revenue and take top 20
+            results = sorted(vendor_performance, key=lambda x: x['revenue'], reverse=True)[:20]
+        
+        return jsonify({
+            "status": "success", 
+            "data": results,
+            "source": "dashboard_workspace" if dashboard_bigquery_client else "csv_fallback"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/dashboard/event-timeline', methods=['GET'])
+def dashboard_event_timeline():
+    """Get events timeline for dashboard visualization"""
+    try:
+        # CSV fallback (since we have event dates in CSV)
+        all_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv') + load_csv_fallback_data('undiscovered_dashboard_data.csv')
+        
+        events_by_date = {}
+        for row in all_data:
+            event_date = row.get('event_date')
+            event_name = row.get('event_name', 'Unknown Event')
+            if event_date and event_date != '':
+                revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+                
+                if event_date not in events_by_date:
+                    events_by_date[event_date] = {
+                        "date": event_date,
+                        "event_name": event_name,
+                        "total_revenue": 0,
+                        "vendor_count": 0
+                    }
+                
+                events_by_date[event_date]["total_revenue"] += revenue
+                if revenue > 0:
+                    events_by_date[event_date]["vendor_count"] += 1
+        
+        # Sort by date
+        results = sorted(events_by_date.values(), key=lambda x: x['date'])
+        
+        return jsonify({
+            "status": "success",
+            "data": results,
+            "source": "csv_fallback"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/dashboard/revenue-breakdown', methods=['GET'])
+def dashboard_revenue_breakdown():
+    """Get revenue breakdown by event type for pie charts"""
+    try:
+        kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
+        undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
+        
+        # Calculate revenue by event
+        event_revenue = {}
+        
+        for row in kapwa_data:
+            event_name = row.get('event_name', 'Unknown Kapwa Event')
+            revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+            event_revenue[event_name] = event_revenue.get(event_name, 0) + revenue
+        
+        for row in undiscovered_data:
+            event_name = row.get('event_name', 'UNDISCOVERED SF')
+            revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+            event_revenue[event_name] = event_revenue.get(event_name, 0) + revenue
+        
+        # Format for chart
+        results = [{"event_name": name, "revenue": revenue} for name, revenue in event_revenue.items() if revenue > 0]
+        results = sorted(results, key=lambda x: x['revenue'], reverse=True)
+        
+        return jsonify({
+            "status": "success",
+            "data": results,
+            "total_revenue": sum(item['revenue'] for item in results),
+            "source": "csv_fallback"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8081, debug=False)
