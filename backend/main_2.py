@@ -539,88 +539,318 @@ def find_best_table_match(user_input: str, available_tables: list) -> str:
 
 
 # --- Tool Functions (Ensure good docstrings and type hints for ADK/Gemini Automatic Function Calling) ---
-def internal_execute_sql_query(sql_query: str) -> dict:
-    """Enhanced BigQuery SQL execution tool with comprehensive multi-table analysis capabilities.
+def internal_execute_sql_query(query: str) -> dict:
+    """Enhanced comprehensive business intelligence tool with automatic table discovery and multi-table analysis.
     
-    This tool automatically handles:
-    1. Table discovery across the entire workspace (38+ tables)
-    2. Schema examination for multiple tables when needed
-    3. Multi-table joins and comprehensive business intelligence queries
-    4. Authentic vendor name and financial data extraction
-    
-    For business intelligence queries, this tool will:
-    - Query ALL relevant tables, not just one
-    - Extract authentic vendor names, amounts, and financial metrics
-    - Perform cross-table analysis for comprehensive insights
-    - Handle complex aggregations across multiple data sources
-    
-    Workspace: `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}` 
-    Contains: 28 closeout sales tables, 9 squarespace forms, 1 typeform data
+    This tool performs sophisticated data analysis by:
+    1. Automatically discovering relevant tables based on query context
+    2. Examining table schemas to understand column structures
+    3. Performing multi-table analysis when comprehensive insights are requested
+    4. Handling currency formatting and data cleaning automatically
+    5. Providing authentic business intelligence from real data sources
     
     Args:
-        sql_query (str): BigQuery SQL query - can be table discovery, schema analysis, or business data query
-        
+        query (str): SQL query or natural language description requiring data analysis
+    
     Returns:
-        dict: Results with 'status' and 'data' containing authentic business intelligence
+        dict: Query results with comprehensive analysis and authentic data
     """
     if not bigquery_client:
         msg = "BigQuery client not initialized. Please provide your Google Cloud credentials file to enable data querying."
         app.logger.error(f"Tool call internal_execute_sql_query: {msg}")
         return {"status": "error", "error_message": msg}
     
-    app.logger.info(f"Tool Call: internal_execute_sql_query with query: {sql_query}")
+    app.logger.info(f"Tool Call: internal_execute_sql_query with query: {query[:200]}...")
     
     try:
-        # Enhanced timeout and connection handling for repeated requests
-        import time
-        start_time = time.time()
+        # ENHANCED BUSINESS INTELLIGENCE: Detect if this is a natural language business question
+        query_lower = query.lower()
         
-        # Execute query with proper timeout handling
-        query_job = bigquery_client.query(sql_query)
-        results = query_job.result(timeout=60)
+        # Check if this is a natural language query needing intelligent processing
+        business_indicators = [
+            'show me', 'how much', 'who are', 'which event', 'what vendor', 'revenue', 'sales',
+            'attendee', 'contact', 'email', 'phone', 'made money', 'top vendor', 'best event',
+            'across all', 'from all', 'compare', 'total from', 'breakdown'
+        ]
         
-        rows_list = []
-        row_count = 0
+        is_business_query = any(indicator in query_lower for indicator in business_indicators)
         
-        # Process results with memory-efficient iteration
-        for row in results:
-            row_dict = {}
-            for key, value in dict(row).items():
-                if hasattr(value, '__class__') and 'Decimal' in str(type(value)):
-                    row_dict[key] = float(value)
-                else:
-                    row_dict[key] = value
-            rows_list.append(row_dict)
-            row_count += 1
+        if is_business_query:
+            app.logger.info(f"Enhanced business intelligence query: {query}")
             
-            # Prevent memory issues with very large result sets
-            if row_count >= 1000:
-                app.logger.warning(f"Result set truncated at {row_count} rows to prevent memory issues")
-                break
+            # DETECT COMPREHENSIVE ANALYSIS REQUESTS
+            comprehensive_keywords = [
+                'across all', 'all events', 'compare events', 'which event', 'best event',
+                'most money', 'highest revenue', 'compare', 'breakdown', 'all tables',
+                'made the most', 'top event', 'highest earning', 'compare revenue'
+            ]
+            
+            is_comprehensive = any(keyword in query_lower for keyword in comprehensive_keywords)
+            app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} - Query: {query[:100]}")
+            
+            # STEP 1: INTELLIGENT TABLE DISCOVERY
+            # Determine data source type based on query context
+            if any(keyword in query_lower for keyword in ['attendee', 'contact', 'email', 'phone', 'squarespace', 'typeform']):
+                # Contact/attendee data query
+                table_discovery_query = f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%attendee%' 
+        OR LOWER(table_name) LIKE '%squarespace%'
+        OR LOWER(table_name) LIKE '%typeform%'
+        ORDER BY table_name
+        """
+            else:
+                # Revenue/sales data query (default)
+                table_discovery_query = f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%close%out%sales%' 
+        OR LOWER(table_name) LIKE '%vendor%'
+        OR LOWER(table_name) LIKE '%sales%'
+        ORDER BY table_name
+        """
         
-        execution_time = time.time() - start_time
-        app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(rows_list)} rows.")
+            # Execute table discovery
+            start_time = time.time()
+            
+            with bigquery_client.query(table_discovery_query) as query_job:
+                results = list(query_job)
+                
+            execution_time = time.time() - start_time
+            app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(results)} rows.")
+            
+            if not results:
+                return {"status": "error", "error_message": "No relevant tables found for the query"}
+            
+            relevant_tables = [row['table_name'] for row in results]
+            
+            # STEP 2: SCHEMA ANALYSIS FOR TOP TABLES
+            # Analyze schemas of top tables to understand column structures
+            schema_analysis_limit = 10 if is_comprehensive else 5
+            schema_info = {}
+            
+            for table in relevant_tables[:schema_analysis_limit]:
+                schema_query = f"""
+                SELECT column_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS` 
+                WHERE table_name = '{table}' 
+                ORDER BY ordinal_position
+                """
+                
+                start_time = time.time()
+                with bigquery_client.query(schema_query) as schema_job:
+                    schema_results = list(schema_job)
+                execution_time = time.time() - start_time
+                app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(schema_results)} rows.")
+                
+                schema_info[table] = [row['column_name'] for row in schema_results]
+            
+            # STEP 3: COMPREHENSIVE MULTI-TABLE ANALYSIS
+            if is_comprehensive:
+                app.logger.info(f"COMPREHENSIVE ANALYSIS: Processing {len(schema_info)} tables for multi-table insights")
+                
+                # Find all tables with revenue columns for expanded analysis
+                revenue_tables = []
+                for table, columns in schema_info.items():
+                    revenue_cols = [col for col in columns if any(term in col.lower() for term in ['total_sales', 'sales', 'revenue', 'cash', 'credit'])]
+                    if revenue_cols:
+                        revenue_tables.append((table, revenue_cols[0]))
+                
+                if revenue_tables:
+                    app.logger.info(f"EXPANDED MULTI-TABLE REVENUE ANALYSIS: Found {len(revenue_tables)} tables with revenue data")
+                    
+                    # Query each table separately and aggregate results for comprehensive comparison
+                    all_revenue_data = []
+                    total_comprehensive_revenue = 0
+                    total_comprehensive_transactions = 0
+                    
+                    for table, revenue_column in revenue_tables[:15]:  # Expanded from 8 to 15 tables for broader analysis
+                        # Enhanced table query with more detailed event extraction
+                        table_query = f"""
+                        SELECT 
+                            '{table}' as table_source,
+                            CASE 
+                                WHEN '{table}' LIKE '2023-%' THEN SUBSTRING('{table}', 1, 10)
+                                WHEN '{table}' LIKE '2024-%' THEN SUBSTRING('{table}', 1, 10)
+                                WHEN '{table}' LIKE '2022-%' THEN SUBSTRING('{table}', 1, 10)
+                                ELSE 'Unknown-Date'
+                            END as event_date,
+                            CASE
+                                WHEN '{table}' LIKE '%Kapwa-Gardens%' THEN 'Kapwa Gardens'
+                                WHEN '{table}' LIKE '%UNDISCOVERED%' THEN 'UNDISCOVERED SF'
+                                WHEN '{table}' LIKE '%Balay-Kreative%' THEN 'Balay Kreative'
+                                WHEN '{table}' LIKE '%Lovers-Mart%' THEN 'Lovers Mart'
+                                WHEN '{table}' LIKE '%Yum-Yams%' THEN 'Yum Yams'
+                                WHEN '{table}' LIKE '%Dye-Hard%' THEN 'Dye Hard'
+                                WHEN '{table}' LIKE '%Halo-Halo%' THEN 'Halo Halo Holidays'
+                                WHEN '{table}' LIKE '%Many-Styles%' THEN 'Many Styles'
+                                WHEN '{table}' LIKE '%Be-Free%' THEN 'Be Free Festival'
+                                ELSE REGEXP_EXTRACT('{table}', r'---(.*?)---')
+                            END as event_name,
+                            COUNT(*) as record_count,
+                            SUM(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                            AVG(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as average_revenue,
+                            MIN(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as min_revenue,
+                            MAX(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as max_revenue
+                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                        WHERE {revenue_column} IS NOT NULL
+                        AND CAST({revenue_column} AS STRING) NOT LIKE '%REF%'
+                        AND CAST({revenue_column} AS STRING) != ''
+                        AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != ''
+                        AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != '0'
+                        AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != '0.0'
+                        """
+                        
+                        try:
+                            start_time = time.time()
+                            with bigquery_client.query(table_query) as table_job:
+                                table_results = list(table_job)
+                            execution_time = time.time() - start_time
+                            app.logger.info(f"Expanded multi-table query for {table}: executed in {execution_time:.2f}s, returned {len(table_results)} rows.")
+                            
+                            if table_results and table_results[0]['total_revenue'] and table_results[0]['total_revenue'] > 0:
+                                all_revenue_data.extend(table_results)
+                                total_comprehensive_revenue += table_results[0]['total_revenue']
+                                total_comprehensive_transactions += table_results[0]['record_count']
+                        except Exception as table_error:
+                            app.logger.warning(f"Skipping table {table} due to error: {table_error}")
+                            continue
+                    
+                    if all_revenue_data:
+                        # Sort by total revenue to find highest performing events
+                        all_revenue_data.sort(key=lambda x: x['total_revenue'] or 0, reverse=True)
+                        
+                        # Add comprehensive summary as first record
+                        comprehensive_summary = {
+                            "table_source": "COMPREHENSIVE_ANALYSIS_SUMMARY",
+                            "event_date": "2020-2024",
+                            "event_name": "All Events Combined",
+                            "record_count": total_comprehensive_transactions,
+                            "total_revenue": total_comprehensive_revenue,
+                            "average_revenue": total_comprehensive_revenue / total_comprehensive_transactions if total_comprehensive_transactions > 0 else 0,
+                            "min_revenue": min([x['total_revenue'] for x in all_revenue_data if x['total_revenue']]),
+                            "max_revenue": max([x['total_revenue'] for x in all_revenue_data if x['total_revenue']]),
+                            "tables_analyzed": len(all_revenue_data)
+                        }
+                        
+                        # Insert summary at the beginning
+                        all_revenue_data.insert(0, comprehensive_summary)
+                        
+                        return {
+                            "status": "success",
+                            "data": all_revenue_data,
+                            "analysis_type": "expanded_comprehensive_multi_table",
+                            "tables_analyzed": len(all_revenue_data) - 1,  # Subtract 1 for summary record
+                            "comprehensive_revenue": total_comprehensive_revenue,
+                            "comprehensive_transactions": total_comprehensive_transactions
+                        }
+                    else:
+                        app.logger.warning("No revenue data found in expanded comprehensive analysis, falling back to single table")
+                        # Fall through to single table analysis
+                else:
+                    app.logger.warning("No revenue columns found in expanded comprehensive analysis, falling back to single table")
+                    # Fall through to single table analysis
+            
+            # STEP 3: SINGLE TABLE QUERY CONSTRUCTION BASED ON INTENT
+            # Detect if this is a simple data display or complex analysis request
+            if any(keyword in query_lower for keyword in ['show me data', 'display data', 'see data', 'view data']):
+                # Simple data display - just show records from most relevant table
+                target_table = relevant_tables[0]
+                columns = schema_info.get(target_table, [])
+                
+                if columns:
+                    # Select appropriate columns based on query context
+                    if any(keyword in query_lower for keyword in ['contact', 'email', 'phone']):
+                        contact_cols = [col for col in columns if any(term in col.lower() for term in ['email', 'phone', 'contact', 'name'])]
+                        if contact_cols:
+                            final_query = f"SELECT {', '.join(contact_cols[:5])} FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                        else:
+                            final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                    else:
+                        final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                else:
+                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+            
+            else:
+                # BUSINESS INTELLIGENCE ANALYSIS (SINGLE TABLE)
+                # Find tables with revenue columns for financial analysis
+                revenue_tables = []
+                for table, columns in schema_info.items():
+                    revenue_cols = [col for col in columns if any(term in col.lower() for term in ['total_sales', 'sales', 'revenue', 'cash', 'credit'])]
+                    if revenue_cols:
+                        revenue_tables.append((table, revenue_cols[0]))  # Use first revenue column
+                
+                if revenue_tables:
+                    # Use the first revenue table for analysis
+                    target_table, revenue_column = revenue_tables[0]
+                    
+                    # Enhanced revenue analysis with proper currency handling
+                    final_query = f"""
+                SELECT 
+                    '{target_table}' as table_source,
+                    COUNT(*) as record_count,
+                    SUM(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                    AVG(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as average_revenue,
+                    MIN(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as min_revenue,
+                    MAX(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as max_revenue
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                WHERE {revenue_column} IS NOT NULL
+                AND CAST({revenue_column} AS STRING) NOT LIKE '%REF%'
+                AND CAST({revenue_column} AS STRING) != ''
+                AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != ''
+                """
+                else:
+                    # Fallback to simple data display
+                    target_table = relevant_tables[0]
+                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
         
-        # Store results globally for fallback extraction
-        global last_sql_results
-        last_sql_results = rows_list
+        else:
+            # Direct SQL query - execute as provided
+            final_query = query
         
-        result_payload = {"status": "success", "data": rows_list}
-        return result_payload
+        # STEP 4: EXECUTE FINAL QUERY (for non-comprehensive analysis)
+        if not (is_business_query and is_comprehensive):
+            start_time = time.time()
+            
+            with bigquery_client.query(final_query) as query_job:
+                results = list(query_job)
+                
+            execution_time = time.time() - start_time
+            app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(results)} rows.")
+            
+            # Convert results to list of dictionaries
+            data = []
+            if results:
+                # Get column names from the first row
+                columns = list(results[0].keys())
+                
+                for row in results:
+                    row_dict = {}
+                    for col in columns:
+                        value = row[col]
+                        # Handle various data types
+                        if hasattr(value, 'isoformat'):  # datetime objects
+                            row_dict[col] = value.isoformat()
+                        elif isinstance(value, (int, float, str, bool)) or value is None:
+                            row_dict[col] = value
+                        else:
+                            row_dict[col] = str(value)
+                    data.append(row_dict)
+            
+            # Store results globally for fallback extraction
+            global last_sql_results
+            last_sql_results = data
+            
+            return {
+                "status": "success",
+                "data": data,
+                "query_executed": final_query[:200] + "..." if len(final_query) > 200 else final_query
+            }
         
     except Exception as e:
-        app.logger.error(f"Tool Call: Error executing BigQuery query for internal_execute_sql_query: {e}", exc_info=True)
-        
-        # Enhanced error handling with connection diagnostics
-        error_msg = str(e)
-        if "timeout" in error_msg.lower() or "deadline" in error_msg.lower():
-            error_msg = f"Query timeout after 45 seconds - try simplifying the query or adding LIMIT clause: {error_msg}"
-        elif "connection" in error_msg.lower() or "network" in error_msg.lower():
-            error_msg = f"BigQuery connection issue - this may resolve on retry: {error_msg}"
-        
+        app.logger.error(f"BigQuery execution error: {str(e)}", exc_info=True)
         return {
-            "status": "error",
-            "error_message": f"Error executing BigQuery query: {error_msg}"
+            "status": "error", 
+            "error_message": str(e),
+            "query_attempted": query[:200] + "..." if len(query) > 200 else query
         }
 
 
