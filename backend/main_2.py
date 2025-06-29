@@ -671,6 +671,66 @@ def get_keboola_table_detail(bucket_id: str, table_name: str) -> dict:
         }
 
 
+def get_workspace_overview() -> dict:
+    """Get comprehensive overview of the BigQuery workspace including table counts and categorization.
+    
+    Returns:
+        dict: Workspace overview with table counts, categories, and data source breakdown
+    """
+    try:
+        # Get all tables from the workspace
+        table_query = f"""
+            SELECT table_name 
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+            WHERE table_name NOT LIKE '-%'
+            ORDER BY table_name
+        """
+        
+        result = internal_execute_sql_query(table_query)
+        if result.get('status') != 'success':
+            return {"status": "error", "error_message": "Could not retrieve workspace tables"}
+        
+        table_names = [row['table_name'] for row in result['data']]
+        
+        # Dynamic categorization
+        def categorize_table(table_name: str) -> str:
+            name_lower = table_name.lower()
+            if any(indicator in name_lower for indicator in ['typeform', 'form-responses', 'submissions']):
+                return 'typeform'
+            elif any(indicator in name_lower for indicator in ['squarespace', 'website-forms', 'online-forms']):
+                return 'squarespace'
+            elif any(indicator in name_lower for indicator in ['close-out', 'closeout', 'sales', 'revenue', 'vendor-close']):
+                return 'closeout_sales'
+            else:
+                return 'other'
+        
+        # Categorize tables
+        table_categories = {}
+        for table in table_names:
+            category = categorize_table(table)
+            if category not in table_categories:
+                table_categories[category] = []
+            table_categories[category].append(table)
+        
+        # Create summary
+        total_tables = len(table_names)
+        category_summary = []
+        for category, tables in table_categories.items():
+            category_summary.append(f"{len(tables)} {category.replace('_', ' ')} tables")
+        
+        summary = f"WORKSPACE OVERVIEW: {total_tables} total tables in your BigQuery workspace | Breakdown: {', '.join(category_summary)} | Dynamic categorization adapts automatically as you add new data sources"
+        
+        return {
+            "status": "success",
+            "total_tables": total_tables,
+            "categories": table_categories,
+            "summary": summary,
+            "all_tables": table_names
+        }
+        
+    except Exception as e:
+        return {"status": "error", "error_message": f"Error getting workspace overview: {str(e)}"}
+
 def get_zip_codes_for_city(
         city_name: str,
         state_code: Optional[str] = None) -> dict:  # CORRECTED SIGNATURE
@@ -1011,6 +1071,9 @@ def execute_complex_business_query(query_description: str) -> dict:
             table_categories[category].append(table)
         
         app.logger.info(f"Dynamic table categorization: {[(k, len(v)) for k, v in table_categories.items()]}")
+        
+        # DYNAMIC TABLE DISCOVERY: Let AI understand table count questions naturally
+        # No hardcoded patterns - the AI should interpret workspace questions intelligently
         
         # SMART DATA SOURCE MATCHING
         # 1. FIRST PRIORITY: Data source type matching
