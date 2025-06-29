@@ -1,0 +1,51 @@
+Last login: Sun Jun 29 05:40:38 on ttys000
+Error processing line 1 of /Users/rjmoscardon/miniconda3/lib/python3.11/site-packages/google_generativeai-0.8.4-py3.12-nspkg.pth:
+
+  Traceback (most recent call last):
+    File "<frozen site>", line 195, in addpackage
+    File "<string>", line 1, in <module>
+    File "<frozen importlib._bootstrap>", line 570, in module_from_spec
+  AttributeError: 'NoneType' object has no attribute 'loader'
+
+Remainder of file ignored
+(base) rjmoscardon@MacBookAir ~ % curl -X POST "https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How much money did vendors make?"}' | python3 -m json.tool
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0Error processing line 1 of /Users/rjmoscardon/miniconda3/lib/python3.11/site-packages/google_generativeai-0.8.4-py3.12-nspkg.pth:
+
+  Traceback (most recent call last):
+    File "<frozen site>", line 195, in addpackage
+    File "<string>", line 1, in <module>
+    File "<frozen importlib._bootstrap>", line 570, in module_from_spec
+  AttributeError: 'NoneType' object has no attribute 'loader'
+
+Remainder of file ignored
+100    45    0     0  100    45      0      4  0:00:11  0:00:09  0:00:02     0
+100   573  100   528  100    45     30      2  0:00:22  0:00:17  0:00:05   129
+{
+    "business_intelligence": "FINANCIAL PERFORMANCE: $33,371.36 total revenue across 104 transactions | Revenue metrics: Average $320.88, Range $4.00 to $861.09 | High performers: 56 transactions above average, totaling $28,735.36 | Data source: 2023 02 11 Lovers Mart   Close Out Sales Kapwa Gardens START HERE Vendor Close Out Sal",
+    "data_source": "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal",
+    "query_context": "How much money did vendors make?",
+    "records_analyzed": 19,
+    "status": "success"
+}
+(base) rjmoscardon@MacBookAir ~ % 
+(base) rjmoscardon@MacBookAir ~ % curl -X POST "https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Show me revenue from Kapwa Gardens events"}'
+{"business_intelligence":"FINANCIAL PERFORMANCE: $33,371.36 total revenue across 104 transactions | Revenue metrics: Average $320.88, Range $4.00 to $861.09 | High performers: 56 transactions above average, totaling $28,735.36 | Data source: 2023 02 11 Lovers Mart   Close Out Sales Kapwa Gardens START HERE Vendor Close Out Sal","data_source":"2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal","query_context":"Show me revenue from Kapwa Gardens events","records_analyzed":19,"status":"success"}
+(base) rjmoscardon@MacBookAir ~ % curl -X POST "https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What email addresses do we have?"}'
+{"business_intelligence":"CONTACT DATABASE: 17 email addresses extracted | Email domains: gmail.com (10 contacts), plus 7 others | Sample contacts: sam@thesisofalexandria.com, sugarcubemarsh@gmail.com, smoochbysarina@gmail.com, rachel.lozada64@gmail.com | Data source: 2023 02 11 Lovers Mart   Close Out Sales Kapwa Gardens START HERE Vendor Close Out Sal","data_source":"2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal","query_context":"What email addresses do we have?","records_analyzed":20,"status":"success"}
+(base) rjmoscardon@MacBookAir ~ % curl -X POST "https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Who are our top vendors?"}'
+{"business_intelligence":"VENDOR ANALYSIS: 21 unique businesses identified | Vendors include: Joshua Alas, Samson Chen, $75.00, Art By Joshwa, Lea Sabado, $50.00, $69.00, Bindlestiff | Average revenue per vendor: $1,660.76 | Top revenue: $8,270.84, Median: $106.25 | Data source: 2023 02 11 Lovers Mart   Close Out Sales Kapwa Gardens START HERE Vendor Close Out Sal","data_source":"2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal","query_context":"Who are our top vendors?","records_analyzed":10,"status":"success"}
+(base) rjmoscardon@MacBookAir ~ % curl -X POST "https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How much money did vendors make?"}'
+{"business_intelligence":"FINANCIAL PERFORMANCE: $33,371.36 total revenue across 104 transactions | Revenue metrics: Average $320.88, Range $4.00 to $861.09 | High performers: 56 transactions above average, totaling $28,735.36 | Data source: 2023 02 11 Lovers Mart   Close Out Sales Kapwa Gardens START HERE Vendor Close Out Sal","data_source":"2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal","query_context":"How much money did vendors make?","records_analyzed":19,"status":"success"}
+(base) rjmoscardon@MacBookAir ~ % 
