@@ -1053,9 +1053,9 @@ def execute_complex_business_query(query_description: str) -> dict:
             name_lower = table_name.lower()
             
             # Check for data source indicators in table names
-            if any(indicator in name_lower for indicator in ['typeform', 'form-responses', 'submissions']):
+            if any(indicator in name_lower for indicator in ['typeform', 'form-responses', 'submissions', 'answers_unioned']):
                 return 'typeform'
-            elif any(indicator in name_lower for indicator in ['squarespace', 'website-forms', 'online-forms']):
+            elif any(indicator in name_lower for indicator in ['squarespace', 'website-forms', 'online-forms', 'balay-kreative', 'attendees', 'vendors']):
                 return 'squarespace'
             elif any(indicator in name_lower for indicator in ['close-out', 'closeout', 'sales', 'revenue', 'vendor-close']):
                 return 'closeout_sales'
