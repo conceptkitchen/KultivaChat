@@ -1133,13 +1133,11 @@ def execute_complex_business_query(query_description: str) -> dict:
                     if len(target_tables) > 1 and not specific_table_requested:
                         union_queries = []
                         for table in target_tables[:3]:  # Analyze top 3 tables
-                            union_queries.append(f"""
-                                SELECT {select_cols}, _timestamp, '{table}' as source_table
+                            union_queries.append(f"""(SELECT {select_cols}, _timestamp, '{table}' as source_table
                                 FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
                                 WHERE {revenue_columns[0]} IS NOT NULL 
                                 AND {revenue_columns[0]} != ''
-                                LIMIT 15
-                            """)
+                                LIMIT 15)""")
                         sql_query = " UNION ALL ".join(union_queries)
                         app.logger.info(f"Multi-table revenue analysis across {len(target_tables)} tables")
                     else:
@@ -1167,13 +1165,11 @@ def execute_complex_business_query(query_description: str) -> dict:
                     if len(target_tables) > 1 and not specific_table_requested:
                         union_queries = []
                         for table in target_tables[:3]:
-                            union_queries.append(f"""
-                                SELECT {select_cols}, '{table}' as source_table
+                            union_queries.append(f"""SELECT {select_cols}, '{table}' as source_table
                                 FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
                                 WHERE {contact_columns[0]} IS NOT NULL 
                                 AND {contact_columns[0]} != ''
-                                LIMIT 12
-                            """)
+                                LIMIT 12""")
                         sql_query = " UNION ALL ".join(union_queries)
                         app.logger.info(f"Multi-table contact analysis across {len(target_tables)} tables")
                     else:
