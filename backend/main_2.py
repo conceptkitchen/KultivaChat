@@ -1302,21 +1302,84 @@ def natural_language_query():
             if tables_result.get('status') == 'success' and tables_result.get('data'):
                 table_names = [row['table_name'] for row in tables_result['data']]
                 
-                # Find best matching table for the query
-                best_match = None
-                keywords = ['kapwa', 'gardens', 'vendor', 'balay', 'kreative', 'undiscovered', 'yum', 'yams']
+                # INTELLIGENT DATA SOURCE CATEGORIZATION
+                def categorize_table_by_patterns(table_name: str) -> str:
+                    """Dynamically categorize tables by your three main data sources"""
+                    name_lower = table_name.lower()
+                    
+                    # 1. Close-out sales sheets (various events and vendors)
+                    if any(pattern in name_lower for pattern in ['close-out', 'closeout', 'sales', 'vendor-close', 'market-recap']):
+                        return 'closeout_sales'
+                    
+                    # 2. Squarespace vendor and attendee forms  
+                    elif any(pattern in name_lower for pattern in ['squarespace', 'vendor-export', 'attendees-export', 'all-data-orders']):
+                        return 'squarespace'
+                    
+                    # 3. Typeform Balay Kreative responses
+                    elif any(pattern in name_lower for pattern in ['typeform', 'balay-kreative', 'form-responses', 'survey']):
+                        return 'typeform'
+                    
+                    # Other event-related tables
+                    else:
+                        return 'other'
                 
-                for table_name in table_names:
-                    table_lower = table_name.lower()
-                    match_score = sum(1 for keyword in keywords if keyword in query_lower and keyword in table_lower)
-                    if match_score > 0:
-                        if not best_match or match_score > best_match[1]:
-                            best_match = (table_name, match_score)
+                # Categorize all available tables
+                categorized_tables = {
+                    'closeout_sales': [],
+                    'squarespace': [], 
+                    'typeform': [],
+                    'other': []
+                }
                 
-                if best_match:
-                    # Query the matched table
+                for table in table_names:
+                    category = categorize_table_by_patterns(table)
+                    categorized_tables[category].append(table)
+                
+                app.logger.info(f"Table categorization: {[(k, len(v)) for k, v in categorized_tables.items()]}")
+                
+                # SMART TABLE SELECTION based on query intent
+                selected_table = None
+                
+                # Match data source type first
+                if 'typeform' in query_lower or 'balay' in query_lower:
+                    if categorized_tables['typeform']:
+                        selected_table = categorized_tables['typeform'][0]
+                        app.logger.info(f"Selected typeform table: {selected_table}")
+                elif 'squarespace' in query_lower or 'export' in query_lower:
+                    if categorized_tables['squarespace']:
+                        selected_table = categorized_tables['squarespace'][0]
+                        app.logger.info(f"Selected squarespace table: {selected_table}")
+                elif 'closeout' in query_lower or 'sales' in query_lower:
+                    if categorized_tables['closeout_sales']:
+                        selected_table = categorized_tables['closeout_sales'][0]
+                        app.logger.info(f"Selected closeout sales table: {selected_table}")
+                
+                # If no specific data source, match by event/vendor keywords
+                if not selected_table:
+                    event_keywords = ['kapwa', 'gardens', 'balay', 'kreative', 'undiscovered', 'yum', 'yams']
+                    best_match = None
+                    best_score = 0
+                    
+                    for table_name in table_names:
+                        table_lower = table_name.lower()
+                        score = sum(1 for keyword in event_keywords if keyword in query_lower and keyword in table_lower)
+                        if score > best_score:
+                            best_score = score
+                            best_match = table_name
+                    
+                    selected_table = best_match
+                
+                # Fallback to most relevant table by category preference
+                if not selected_table:
+                    for category in ['closeout_sales', 'squarespace', 'typeform', 'other']:
+                        if categorized_tables[category]:
+                            selected_table = categorized_tables[category][0]
+                            break
+                
+                if selected_table:
+                    app.logger.info(f"Final table selection: {selected_table}")
                     result = internal_execute_sql_query(f"""
-                        SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{best_match[0]}` 
+                        SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{selected_table}` 
                         LIMIT 10
                     """)
                     return jsonify(result)
