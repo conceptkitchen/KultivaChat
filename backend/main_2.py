@@ -1302,24 +1302,24 @@ def natural_language_query():
             if tables_result.get('status') == 'success' and tables_result.get('data'):
                 table_names = [row['table_name'] for row in tables_result['data']]
                 
-                # INTELLIGENT DATA SOURCE CATEGORIZATION
+                # ENHANCED INTELLIGENT DATA SOURCE CATEGORIZATION
                 def categorize_table_by_patterns(table_name: str) -> str:
                     """Dynamically categorize tables by your three main data sources"""
                     name_lower = table_name.lower()
                     
-                    # 1. Close-out sales sheets (various events and vendors)
-                    if any(pattern in name_lower for pattern in ['close-out', 'closeout', 'sales', 'vendor-close', 'market-recap']):
-                        return 'closeout_sales'
-                    
-                    # 2. Squarespace vendor and attendee forms  
-                    elif any(pattern in name_lower for pattern in ['squarespace', 'vendor-export', 'attendees-export', 'all-data-orders']):
-                        return 'squarespace'
-                    
-                    # 3. Typeform Balay Kreative responses
-                    elif any(pattern in name_lower for pattern in ['typeform', 'balay-kreative', 'form-responses', 'survey']):
+                    # 1. Typeform Balay Kreative responses (check first for specificity)
+                    if any(pattern in name_lower for pattern in ['answers_unioned', 'balay-kreative', 'typeform']):
                         return 'typeform'
                     
-                    # Other event-related tables
+                    # 2. Squarespace vendor and attendee forms
+                    elif any(pattern in name_lower for pattern in ['squarespace', 'vendor-export', 'attendees-export', 'undiscovered---attendees-export', 'undiscovered-vendor-export']):
+                        return 'squarespace'
+                    
+                    # 3. Close-out sales sheets (broadest category)
+                    elif any(pattern in name_lower for pattern in ['close-out', 'closeout', 'sales', 'vendor-close', 'market-recap', 'lovers-mart', 'halo-halo', 'kapwa-gardens']):
+                        return 'closeout_sales'
+                    
+                    # Other tables
                     else:
                         return 'other'
                 
