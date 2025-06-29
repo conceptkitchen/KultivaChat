@@ -4,7 +4,7 @@
 This document provides comprehensive testing instructions for the enhanced multi-table business intelligence API that processes up to 16 authenticated BigQuery tables simultaneously for sophisticated cross-event analysis.
 
 ## API Endpoint
-**Base URL**: `http://localhost:8081`  
+**Base URL**: `https://kultiva-chatv-2-mcp-conceptkitchen.replit.app`  
 **Primary Endpoint**: `/api/query`  
 **Method**: POST  
 **Content-Type**: application/json
@@ -28,7 +28,7 @@ This document provides comprehensive testing instructions for the enhanced multi
 
 ### 1. Comprehensive Revenue Analysis
 ```bash
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Show me total revenue across all Kapwa Gardens events"}'
 ```
@@ -41,7 +41,7 @@ curl -X POST http://localhost:8081/api/query \
 
 ### 2. Cross-Event Performance Comparison
 ```bash
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Which Kapwa Gardens event made the most money?"}'
 ```
@@ -54,7 +54,7 @@ curl -X POST http://localhost:8081/api/query \
 
 ### 3. Vendor Intelligence Analysis
 ```bash
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Who are the top vendors across all Kapwa Gardens events?"}'
 ```
@@ -67,7 +67,7 @@ curl -X POST http://localhost:8081/api/query \
 
 ### 4. Time-Series Performance Analysis
 ```bash
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Compare Kapwa Gardens revenue from 2023 vs 2024"}'
 ```
@@ -80,7 +80,7 @@ curl -X POST http://localhost:8081/api/query \
 
 ### 5. Geographic Market Analysis
 ```bash
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Show me vendor locations and market coverage for Kapwa Gardens"}'
 ```
@@ -138,17 +138,17 @@ SUM(CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
 ### Complex Business Intelligence Queries
 ```bash
 # Revenue threshold analysis
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Which Kapwa Gardens vendors made over $500?"}'
 
 # Multi-event participation tracking
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Show me vendors who participated in multiple Kapwa Gardens events"}'
 
 # Performance trend analysis
-curl -X POST http://localhost:8081/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "How has Kapwa Gardens revenue changed over time?"}'
 ```
@@ -178,9 +178,9 @@ curl -X POST http://localhost:8081/api/query \
 
 ## Production Deployment Testing
 
-For production testing, replace `localhost:8081` with your deployed URL:
+The API is deployed and ready for testing at:
 ```bash
-curl -X POST https://your-deployed-url.replit.app/api/query \
+curl -X POST https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/query \
   -H "Content-Type: application/json" \
   -d '{"query": "Show me comprehensive Kapwa Gardens business intelligence"}'
 ```
