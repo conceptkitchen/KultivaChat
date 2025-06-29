@@ -583,11 +583,11 @@ def internal_execute_sql_query(query: str) -> dict:
             'made the most', 'top event', 'highest earning', 'compare revenue'
         ]
         
-        is_comprehensive = any(keyword in query_lower for keyword in comprehensive_keywords)
+        is_comprehensive = any(keyword in original_query.lower() for keyword in comprehensive_keywords)
         
         if is_business_query:
-            app.logger.info(f"Enhanced business intelligence query: {query}")
-            app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} for keywords: {[k for k in comprehensive_keywords if k in query_lower]} - Query: {query[:100]}")
+            app.logger.info(f"Enhanced business intelligence query: {original_query}")
+            app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} for keywords: {[k for k in comprehensive_keywords if k in original_query.lower()]} - Original query: {original_query[:100]}")
             
             # STEP 1: INTELLIGENT TABLE DISCOVERY
             # Determine data source type based on query context
@@ -1424,8 +1424,21 @@ def natural_language_query():
         query = data['query'].lower()
         app.logger.info(f"Enhanced business intelligence query: {query}")
         
-        # Smart query routing for comprehensive business intelligence
-        if any(keyword in query for keyword in ['revenue', 'money', 'sales', 'vendor', 'total', 'income', 'financial']):
+        # Enhanced comprehensive multi-table analysis routing
+        comprehensive_keywords = [
+            'across all', 'all events', 'compare events', 'which event', 'best event',
+            'most money', 'highest revenue', 'compare', 'breakdown', 'all tables',
+            'made the most', 'top event', 'highest earning', 'compare revenue'
+        ]
+        
+        is_comprehensive = any(keyword in query for keyword in comprehensive_keywords)
+        
+        if is_comprehensive:
+            app.logger.info(f"COMPREHENSIVE ANALYSIS REQUEST detected with keywords: {[k for k in comprehensive_keywords if k in query]}")
+            # Use enhanced internal tool for comprehensive multi-table analysis
+            result = internal_execute_sql_query(data['query'])
+            return jsonify(result)
+        elif any(keyword in query for keyword in ['revenue', 'money', 'sales', 'vendor', 'total', 'income', 'financial']):
             return process_revenue_analysis(query)
         elif any(keyword in query for keyword in ['attendee', 'contact', 'email', 'phone', 'participant']):
             return process_attendee_analysis(query)
