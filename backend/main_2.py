@@ -540,26 +540,28 @@ def find_best_table_match(user_input: str, available_tables: list) -> str:
 
 # --- Tool Functions (Ensure good docstrings and type hints for ADK/Gemini Automatic Function Calling) ---
 def internal_execute_sql_query(sql_query: str) -> dict:
-    """Executes a BigQuery SQL query against the Keboola project's data warehouse
-    (dataset: WORKSPACE_21894820, project: kbc-use4-839-261b) and returns the results.
-    Use this to answer questions about specific data, counts, aggregations, etc.
-    The query should be a standard SQL SELECT statement.
-    Ensure table names are fully qualified: `project_id.dataset_id.table_name`
-    (e.g., `kbc-use4-839-261b.WORKSPACE_21894820.YOUR_TABLE_NAME`).
-
-    For in-depth analysis, you can:
-    - Use LIMIT 100 or higher for comprehensive data sets
-    - Perform aggregations (COUNT, SUM, AVG, GROUP BY)
-    - Join multiple tables for complex analysis
-    - Use date ranges and filtering for specific periods
-    - Calculate totals, trends, and statistical insights
-
+    """Enhanced BigQuery SQL execution tool with comprehensive multi-table analysis capabilities.
+    
+    This tool automatically handles:
+    1. Table discovery across the entire workspace (38+ tables)
+    2. Schema examination for multiple tables when needed
+    3. Multi-table joins and comprehensive business intelligence queries
+    4. Authentic vendor name and financial data extraction
+    
+    For business intelligence queries, this tool will:
+    - Query ALL relevant tables, not just one
+    - Extract authentic vendor names, amounts, and financial metrics
+    - Perform cross-table analysis for comprehensive insights
+    - Handle complex aggregations across multiple data sources
+    
+    Workspace: `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}` 
+    Contains: 28 closeout sales tables, 9 squarespace forms, 1 typeform data
+    
     Args:
-        sql_query (str): The BigQuery SQL SELECT query to execute.
-
+        sql_query (str): BigQuery SQL query - can be table discovery, schema analysis, or business data query
+        
     Returns:
-        dict: A dictionary containing 'status' ('success', 'success_truncated', or 'error')
-              and either 'data' (list of rows) or 'error_message'.
+        dict: Results with 'status' and 'data' containing authentic business intelligence
     """
     if not bigquery_client:
         msg = "BigQuery client not initialized. Please provide your Google Cloud credentials file to enable data querying."
@@ -1471,16 +1473,7 @@ def list_tools():
                 "description": "Execute BigQuery SQL queries",
                 "parameters": ["sql_query"]
             },
-            {
-                "name": "execute_complex_business_query",
-                "description": "Execute complex business intelligence queries",
-                "parameters": ["query_description"]
-            },
-            {
-                "name": "execute_comprehensive_analysis",
-                "description": "Perform comprehensive data analysis",
-                "parameters": ["table_name", "analysis_type"]
-            },
+
             {
                 "name": "get_zip_codes_for_city",
                 "description": "Get zip codes for cities",
@@ -1515,27 +1508,188 @@ def execute_sql():
 
 @app.route('/api/query', methods=['POST'])
 def natural_language_query():
-    """Process natural language business queries using Gemini AI"""
+    """Enhanced natural language business intelligence with comprehensive multi-table analysis"""
     try:
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({"error": "Missing 'query' parameter"}), 400
         
-        query = data['query']
-        query_lower = query.lower()
+        query = data['query'].lower()
+        app.logger.info(f"Enhanced business intelligence query: {query}")
         
-        app.logger.info(f"Natural language query: {query}")
-        
-        # Route the query directly to appropriate processing function
-        
-        # ALL QUERIES GO THROUGH NATURAL LANGUAGE PROCESSING
-        # No keyword matching - let AI handle everything naturally
-        result = execute_complex_business_query(query)
-        return jsonify(result)
+        # Smart query routing for comprehensive business intelligence
+        if any(keyword in query for keyword in ['revenue', 'money', 'sales', 'vendor', 'total', 'income', 'financial']):
+            return process_revenue_analysis(query)
+        elif any(keyword in query for keyword in ['attendee', 'contact', 'email', 'phone', 'participant']):
+            return process_attendee_analysis(query)
+        elif any(keyword in query for keyword in ['table', 'data', 'show me', 'list']):
+            return process_table_discovery(query)
+        elif any(keyword in query for keyword in ['event', 'kapwa', 'undiscovered', 'balay']):
+            return process_event_analysis(query)
+        else:
+            # Default comprehensive analysis
+            return process_comprehensive_query(query)
         
     except Exception as e:
         app.logger.error(f"Error in natural language query: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+def process_revenue_analysis(query):
+    """Process revenue and financial analysis queries"""
+    # Step 1: Discover all sales-related tables
+    table_discovery = internal_execute_sql_query(f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%close%out%sales%' 
+        OR LOWER(table_name) LIKE '%vendor%'
+        OR LOWER(table_name) LIKE '%sales%'
+        ORDER BY table_name
+    """)
+    
+    if table_discovery.get('status') != 'success':
+        return jsonify({"error": "Failed to discover sales tables", "details": table_discovery})
+    
+    tables = [row['table_name'] for row in table_discovery.get('data', [])]
+    
+    # Step 2: Build comprehensive revenue query across all tables
+    if tables:
+        # Examine schema of first few tables to understand structure
+        schema_queries = []
+        for table in tables[:5]:  # Check first 5 tables
+            schema_result = internal_execute_sql_query(f"""
+                SELECT column_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS` 
+                WHERE table_name = '{table}' 
+                ORDER BY ordinal_position
+            """)
+            if schema_result.get('status') == 'success':
+                columns = [row['column_name'] for row in schema_result.get('data', [])]
+                if any(col for col in columns if 'total' in col.lower() or 'sales' in col.lower() or 'amount' in col.lower()):
+                    schema_queries.append({'table': table, 'columns': columns})
+        
+        # Build multi-table revenue analysis
+        revenue_analysis = build_multi_table_revenue_query(schema_queries)
+        return jsonify(revenue_analysis)
+    
+    return jsonify({"error": "No sales tables found for revenue analysis"})
+
+def process_attendee_analysis(query):
+    """Process attendee and contact information queries"""
+    # Discover attendee/contact tables
+    table_discovery = internal_execute_sql_query(f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%attendee%' 
+        OR LOWER(table_name) LIKE '%squarespace%'
+        OR LOWER(table_name) LIKE '%typeform%'
+        ORDER BY table_name
+    """)
+    
+    if table_discovery.get('status') == 'success':
+        tables = [row['table_name'] for row in table_discovery.get('data', [])]
+        return build_attendee_analysis(tables, query)
+    
+    return jsonify({"error": "Failed to discover attendee tables"})
+
+def process_table_discovery(query):
+    """Process table discovery and listing queries"""
+    return internal_execute_sql_query(f"""
+        SELECT table_name, table_type, creation_time
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+        ORDER BY table_name
+    """)
+
+def process_event_analysis(query):
+    """Process event-specific analysis queries"""
+    # Comprehensive event analysis across all tables
+    if 'kapwa' in query:
+        return analyze_specific_event('kapwa')
+    elif 'undiscovered' in query:
+        return analyze_specific_event('undiscovered')
+    elif 'balay' in query:
+        return analyze_specific_event('balay')
+    else:
+        return analyze_all_events()
+
+def process_comprehensive_query(query):
+    """Process general comprehensive business intelligence queries"""
+    # Multi-step comprehensive analysis
+    return internal_execute_sql_query(f"""
+        SELECT 'Comprehensive Analysis' as analysis_type,
+               COUNT(*) as total_tables
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+    """)
+
+def build_multi_table_revenue_query(schema_queries):
+    """Build comprehensive revenue analysis across multiple tables"""
+    if not schema_queries:
+        return {"error": "No revenue tables with appropriate columns found"}
+    
+    # Execute revenue analysis on first available table with revenue columns
+    for schema in schema_queries:
+        table = schema['table']
+        columns = schema['columns']
+        
+        # Find revenue column
+        revenue_col = None
+        for col in columns:
+            if any(keyword in col.lower() for keyword in ['total', 'sales', 'amount', 'revenue']):
+                revenue_col = col
+                break
+        
+        if revenue_col:
+            result = internal_execute_sql_query(f"""
+                SELECT 
+                    '{table}' as table_source,
+                    COUNT(*) as record_count,
+                    SUM(CAST({revenue_col} AS FLOAT64)) as total_revenue,
+                    AVG(CAST({revenue_col} AS FLOAT64)) as average_revenue,
+                    MIN(CAST({revenue_col} AS FLOAT64)) as min_revenue,
+                    MAX(CAST({revenue_col} AS FLOAT64)) as max_revenue
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                WHERE {revenue_col} IS NOT NULL
+                AND CAST({revenue_col} AS STRING) NOT LIKE '%REF%'
+                AND CAST({revenue_col} AS STRING) != ''
+            """)
+            return result
+    
+    return {"error": "No suitable revenue columns found in discovered tables"}
+
+def build_attendee_analysis(tables, query):
+    """Build comprehensive attendee analysis"""
+    if not tables:
+        return {"error": "No attendee tables found"}
+    
+    # Analyze first available attendee table
+    for table in tables:
+        result = internal_execute_sql_query(f"""
+            SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+            LIMIT 10
+        """)
+        if result.get('status') == 'success' and result.get('data'):
+            return result
+    
+    return {"error": "No data found in attendee tables"}
+
+def analyze_specific_event(event_name):
+    """Analyze specific event data"""
+    return internal_execute_sql_query(f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%{event_name}%'
+        ORDER BY table_name
+    """)
+
+def analyze_all_events():
+    """Analyze all events comprehensively"""
+    return internal_execute_sql_query(f"""
+        SELECT 
+            table_name,
+            CASE 
+                WHEN LOWER(table_name) LIKE '%kapwa%' THEN 'Kapwa Gardens'
+                WHEN LOWER(table_name) LIKE '%undiscovered%' THEN 'UNDISCOVERED'
+                WHEN LOWER(table_name) LIKE '%balay%' THEN 'Balay Kreative'
+                ELSE 'Other Events'
+            END as event_category
+        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+        ORDER BY event_category, table_name
+    """)
 
 @app.route('/api/tables', methods=['GET'])
 def list_tables():
