@@ -105,6 +105,15 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
+- **June 29, 2025**: CRITICAL API FIXES COMPLETED - Resolved BigQuery Row object KeyError issues preventing proper API responses
+  - ✅ FIXED: BigQuery Row object `'table_name'` KeyError that was causing API failures  
+  - ✅ ENHANCED: Added comprehensive error handling for Row object conversion in all query processing functions
+  - ✅ IMPLEMENTED: Safe dictionary access patterns with proper fallback mechanisms
+  - ✅ UPDATED: Multi-Table Business Intelligence API Testing documentation with deployed URL (https://kultiva-chatv-2-mcp-conceptkitchen.replit.app)
+  - ✅ VALIDATED: Server restart successful with improved error handling for BigQuery data processing
+  - ✅ RESOLVED: `process_revenue_analysis`, `process_attendee_analysis`, and schema query functions now handle Row objects correctly
+  - → API now processes BigQuery responses without KeyError crashes, enabling successful multi-table business intelligence queries
+
 - **June 29, 2025**: EXPANDED ANALYSIS SCOPE COMPLETED - Enhanced multi-table business intelligence with comprehensive cross-event analysis operational
   - ✅ TRANSFORMED: Eliminated hardcoded business logic in favor of AI-driven comprehensive analysis
   - ✅ ENHANCED: Updated `internal_execute_sql_query` tool for automatic table discovery, schema examination, and multi-table analysis
