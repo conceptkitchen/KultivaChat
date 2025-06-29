@@ -1492,7 +1492,15 @@ def process_revenue_analysis(query):
                 ORDER BY ordinal_position
             """)
             if schema_result.get('status') == 'success':
-                columns = [row['column_name'] for row in schema_result.get('data', [])]
+                # Fix BigQuery Row object conversion
+                columns = []
+                for row in schema_result.get('data', []):
+                    if isinstance(row, dict):
+                        columns.append(row['column_name'])
+                    else:
+                        # Convert BigQuery Row object to dict
+                        row_dict = dict(row)
+                        columns.append(row_dict['column_name'])
                 if any(col for col in columns if 'total' in col.lower() or 'sales' in col.lower() or 'amount' in col.lower()):
                     schema_queries.append({'table': table, 'columns': columns})
         
