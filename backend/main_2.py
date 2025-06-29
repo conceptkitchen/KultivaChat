@@ -1237,17 +1237,20 @@ def execute_complex_business_query(query_description: str) -> dict:
                 if revenue_columns:
                     select_cols = ', '.join(revenue_columns[:5])  # Limit to 5 columns
                     
-                    # MULTI-TABLE ANALYSIS: Use multiple sequential queries for comprehensive data
+                    # TRUE MULTI-TABLE ANALYSIS: Query ALL relevant tables for comprehensive data
                     if len(target_tables) > 1 and not specific_table_requested:
-                        app.logger.info(f"Multi-table revenue analysis across {len(target_tables)} tables")
-                        # Start with the primary table for a larger dataset
-                        sql_query = f"""
-                            SELECT {select_cols}, _timestamp, '{target_table}' as source_table
-                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
-                            WHERE {revenue_columns[0]} IS NOT NULL 
-                            AND {revenue_columns[0]} != ''
-                            LIMIT 50
-                        """
+                        app.logger.info(f"TRUE multi-table revenue analysis across {len(target_tables)} tables")
+                        # Build UNION query across ALL relevant tables with proper parentheses
+                        union_parts = []
+                        for table in target_tables[:5]:  # Limit to 5 tables for performance
+                            union_parts.append(f"""(
+                                SELECT {select_cols}, _timestamp, '{table}' as source_table
+                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                                WHERE {revenue_columns[0]} IS NOT NULL 
+                                AND {revenue_columns[0]} != ''
+                                LIMIT 20
+                            )""")
+                        sql_query = " UNION ALL ".join(union_parts)
                     else:
                         sql_query = f"""
                             SELECT {select_cols}, _timestamp
