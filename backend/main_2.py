@@ -1072,8 +1072,30 @@ def execute_complex_business_query(query_description: str) -> dict:
         
         app.logger.info(f"Dynamic table categorization: {[(k, len(v)) for k, v in table_categories.items()]}")
         
-        # DYNAMIC TABLE DISCOVERY: Let AI understand table count questions naturally
-        # No hardcoded patterns - the AI should interpret workspace questions intelligently
+        # WORKSPACE METADATA ANALYSIS: Enhanced handling for workspace overview questions
+        # Check if this is a workspace structure/overview question based on table categorization data
+        if not any(table_categories.get(cat, []) for cat in ['closeout_sales', 'squarespace', 'typeform'] if len(table_categories.get(cat, [])) > 0):
+            # If we have table categories but no specific data request, this might be a workspace overview question
+            pass
+        
+        # Check for workspace overview intent by analyzing query context
+        workspace_indicators = len([word for word in query_lower.split() if word in ['workspace', 'tables', 'count', 'overview', 'many', 'total', 'breakdown']])
+        if workspace_indicators >= 2:  # Multiple workspace-related terms suggest overview question
+            total_tables = len(table_names)
+            category_summary = []
+            for category, tables in table_categories.items():
+                category_summary.append(f"{len(tables)} {category.replace('_', ' ')} tables")
+            
+            summary = f"WORKSPACE OVERVIEW: {total_tables} total tables in your BigQuery workspace | Breakdown: {', '.join(category_summary)} | Dynamic categorization adapts automatically as you add new data sources"
+            
+            return {
+                "status": "success",
+                "data": table_names,
+                "business_intelligence": summary,
+                "data_source": "INFORMATION_SCHEMA table discovery",
+                "records_analyzed": total_tables,
+                "query_context": query_description
+            }
         
         # SMART DATA SOURCE MATCHING
         # 1. FIRST PRIORITY: Data source type matching
