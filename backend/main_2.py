@@ -78,7 +78,7 @@ KBC_STORAGE_TOKEN = os.getenv('KBC_STORAGE_TOKEN')
 
 # Add configuration variables for project and workspace IDs
 GOOGLE_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID', 'kbc-use4-839-261b')
-KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_ID', 'WORKSPACE_21894820')
+KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_SCHEMA', 'WORKSPACE_21894820')
 GEMINI_MODEL = "gemini-2.0-flash-exp"
 
 # Log configuration status for debugging
