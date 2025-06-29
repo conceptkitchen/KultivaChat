@@ -81,6 +81,11 @@ GOOGLE_PROJECT_ID = os.environ.get('GOOGLE_PROJECT_ID', 'kbc-use4-839-261b')
 KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_SCHEMA', 'WORKSPACE_21894820')
 GEMINI_MODEL = "gemini-2.0-flash-exp"
 
+# Dashboard Configuration Variables
+GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD', '/home/runner/workspace/backend/GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD.json')
+KBC_WORKSPACE_SCHEMA_DASHBOARD = os.environ.get('KBC_WORKSPACE_SCHEMA_DASHBOARD', 'WORKSPACE_DASHBOARD')
+DASHBOARD_PROJECT_ID = GOOGLE_PROJECT_ID  # Same project, different workspace
+
 # Log configuration status for debugging
 app.logger.info("=== Configuration Check ===")
 app.logger.info(f"GOOGLE_APPLICATION_CREDENTIALS: {'SET' if GOOGLE_APPLICATION_CREDENTIALS_PATH else 'MISSING'}")
@@ -377,6 +382,21 @@ except TimeoutError:
 except Exception as e:
     app.logger.error(f"Error initializing Google BigQuery Client: {e}",
                      exc_info=True)
+
+# Initialize Dashboard BigQuery Client for financial data visualization
+dashboard_bigquery_client = None
+try:
+    if GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD and os.path.exists(GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD):
+        app.logger.info(f"Initializing Dashboard BigQuery Client using: {GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD}")
+        with timeout_context(30):
+            dashboard_bigquery_client = bigquery.Client.from_service_account_json(
+                GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD)
+        app.logger.info(f"Successfully initialized Dashboard BigQuery Client. Project: {dashboard_bigquery_client.project}")
+    else:
+        app.logger.info("Dashboard credentials not found - will use CSV fallbacks for dashboard data")
+except Exception as e:
+    app.logger.error(f"Error initializing Dashboard BigQuery Client: {e}")
+    app.logger.info("Will use CSV fallbacks for dashboard data")
 
 
 # --- Helper Functions ---
