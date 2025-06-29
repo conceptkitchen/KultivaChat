@@ -1269,17 +1269,16 @@ def execute_complex_business_query(query_description: str) -> dict:
                 if contact_columns:
                     select_cols = ', '.join(contact_columns[:5])
                     
-                    # MULTI-TABLE CONTACT ANALYSIS
+                    # Use single table to avoid SQL complexity for now
                     if len(target_tables) > 1 and not specific_table_requested:
-                        union_queries = []
-                        for table in target_tables[:3]:
-                            union_queries.append(f"""SELECT {select_cols}, '{table}' as source_table
-                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
-                                WHERE {contact_columns[0]} IS NOT NULL 
-                                AND {contact_columns[0]} != ''
-                                LIMIT 12""")
-                        sql_query = " UNION ALL ".join(union_queries)
-                        app.logger.info(f"Multi-table contact analysis across {len(target_tables)} tables")
+                        app.logger.info(f"Multi-table analysis: using primary table {target_table} from {len(target_tables)} available tables")
+                        sql_query = f"""
+                            SELECT {select_cols}
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                            WHERE {contact_columns[0]} IS NOT NULL 
+                            AND {contact_columns[0]} != ''
+                            LIMIT 25
+                        """
                     else:
                         sql_query = f"""
                             SELECT {select_cols}
