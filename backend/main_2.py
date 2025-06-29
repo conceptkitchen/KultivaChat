@@ -1078,6 +1078,9 @@ def execute_complex_business_query(query_description: str) -> dict:
             # If we have table categories but no specific data request, this might be a workspace overview question
             pass
         
+        # All queries should go through natural language processing
+        wants_data_extraction = True  # Always assume user wants data/intelligence
+        
         # Check for workspace overview intent by analyzing query context
         workspace_keywords = ['workspace', 'tables', 'count', 'overview', 'many', 'total', 'breakdown', 'current', 'show', 'how']
         workspace_indicators = len([word for word in query_lower.split() if word in workspace_keywords])
@@ -1104,7 +1107,7 @@ def execute_complex_business_query(query_description: str) -> dict:
                 "query_context": query_description
             }
         
-        # DETECT DATA EXTRACTION INTENT vs WORKSPACE OVERVIEW
+        # If this is clearly a data extraction request, skip workspace overview logic
         data_extraction_keywords = [
             'show me data', 'show data', 'display data', 'get data', 'extract data',
             'show me information', 'show information', 'data from', 'information from',
@@ -1114,7 +1117,6 @@ def execute_complex_business_query(query_description: str) -> dict:
         
         wants_data_extraction = any(keyword in query_lower for keyword in data_extraction_keywords)
         
-        # If this is clearly a data extraction request, skip workspace overview logic
         if wants_data_extraction:
             app.logger.info(f"Data extraction request detected: {query_description}")
         
@@ -1448,112 +1450,10 @@ def natural_language_query():
         
         # Route the query directly to appropriate processing function
         
-        # For complex business queries (prioritize this over simple table display)
-        if any(keyword in query_lower for keyword in ['revenue', 'analysis', 'attendees', 'vendors', 'how much', 'how many', 'which', 'who', 'what', 'top', 'most', 'zip code', 'email', 'phone', 'cell', 'identify', 'gave', 'live', 'participated', 'applied', 'money', 'made']):
-            result = execute_complex_business_query(query)
-            return jsonify(result)
-        
-        elif any(keyword in query_lower for keyword in ['table', 'tables', 'list']):
-            # Table discovery request
-            tables_result = internal_execute_sql_query(f"""
-                SELECT table_name 
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-                ORDER BY table_name
-            """)
-            return jsonify(tables_result)
-        
-        elif any(keyword in query_lower for keyword in ['show me', 'data']):
-            # Data extraction requests - route to complex business query function
-            result = execute_complex_business_query(query)
-            return jsonify(result)
-                # ENHANCED INTELLIGENT DATA SOURCE CATEGORIZATION
-                def categorize_table_by_patterns(table_name: str) -> str:
-                    """Dynamically categorize tables by your three main data sources"""
-                    name_lower = table_name.lower()
-                    
-                    # 1. Typeform Balay Kreative responses (check first for specificity)
-                    if any(pattern in name_lower for pattern in ['answers_unioned', 'balay-kreative', 'typeform']):
-                        return 'typeform'
-                    
-                    # 2. Squarespace vendor and attendee forms
-                    elif any(pattern in name_lower for pattern in ['squarespace', 'vendor-export', 'attendees-export', 'undiscovered---attendees-export', 'undiscovered-vendor-export']):
-                        return 'squarespace'
-                    
-                    # 3. Close-out sales sheets (broadest category)
-                    elif any(pattern in name_lower for pattern in ['close-out', 'closeout', 'sales', 'vendor-close', 'market-recap', 'lovers-mart', 'halo-halo', 'kapwa-gardens']):
-                        return 'closeout_sales'
-                    
-                    # Other tables
-                    else:
-                        return 'other'
-                
-                # Categorize all available tables
-                categorized_tables = {
-                    'closeout_sales': [],
-                    'squarespace': [], 
-                    'typeform': [],
-                    'other': []
-                }
-                
-                for table in table_names:
-                    category = categorize_table_by_patterns(table)
-                    categorized_tables[category].append(table)
-                
-                app.logger.info(f"Table categorization: {[(k, len(v)) for k, v in categorized_tables.items()]}")
-                
-                # SMART TABLE SELECTION based on query intent
-                selected_table = None
-                
-                # Match data source type first
-                if 'typeform' in query_lower or 'balay' in query_lower:
-                    if categorized_tables['typeform']:
-                        selected_table = categorized_tables['typeform'][0]
-                        app.logger.info(f"Selected typeform table: {selected_table}")
-                elif 'squarespace' in query_lower or 'export' in query_lower:
-                    if categorized_tables['squarespace']:
-                        selected_table = categorized_tables['squarespace'][0]
-                        app.logger.info(f"Selected squarespace table: {selected_table}")
-                elif 'closeout' in query_lower or 'sales' in query_lower:
-                    if categorized_tables['closeout_sales']:
-                        selected_table = categorized_tables['closeout_sales'][0]
-                        app.logger.info(f"Selected closeout sales table: {selected_table}")
-                
-                # If no specific data source, match by event/vendor keywords
-                if not selected_table:
-                    event_keywords = ['kapwa', 'gardens', 'balay', 'kreative', 'undiscovered', 'yum', 'yams']
-                    best_match = None
-                    best_score = 0
-                    
-                    for table_name in table_names:
-                        table_lower = table_name.lower()
-                        score = sum(1 for keyword in event_keywords if keyword in query_lower and keyword in table_lower)
-                        if score > best_score:
-                            best_score = score
-                            best_match = table_name
-                    
-                    selected_table = best_match
-                
-                # Fallback to most relevant table by category preference
-                if not selected_table:
-                    for category in ['closeout_sales', 'squarespace', 'typeform', 'other']:
-                        if categorized_tables[category]:
-                            selected_table = categorized_tables[category][0]
-                            break
-                
-                if selected_table:
-                    app.logger.info(f"Final table selection: {selected_table}")
-                    result = internal_execute_sql_query(f"""
-                        SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{selected_table}` 
-                        LIMIT 10
-                    """)
-                    return jsonify(result)
-        
-        # Default response for queries we can't handle yet
-        return jsonify({
-            "status": "success",
-            "response": f"I understand you're asking: '{query}'. This is a natural language query endpoint. For best results, try queries like 'show me tables', 'show me kapwa gardens data', or specific business questions about revenue and attendees.",
-            "data": None
-        })
+        # ALL QUERIES GO THROUGH NATURAL LANGUAGE PROCESSING
+        # No keyword matching - let AI handle everything naturally
+        result = execute_complex_business_query(query)
+        return jsonify(result)
         
     except Exception as e:
         app.logger.error(f"Error in natural language query: {str(e)}")
