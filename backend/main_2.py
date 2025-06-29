@@ -733,10 +733,13 @@ def internal_execute_sql_query(query: str) -> dict:
                             execution_time = time.time() - start_time
                             app.logger.info(f"Expanded multi-table query for {table}: executed in {execution_time:.2f}s, returned {len(table_results)} rows.")
                             
-                            if table_results and table_results[0]['total_revenue'] and table_results[0]['total_revenue'] > 0:
-                                all_revenue_data.extend(table_results)
-                                total_comprehensive_revenue += table_results[0]['total_revenue']
-                                total_comprehensive_transactions += table_results[0]['record_count']
+                            if table_results and len(table_results) > 0:
+                                # Convert BigQuery Row objects to dictionaries
+                                row_dict = dict(table_results[0])
+                                if row_dict.get('total_revenue') and row_dict['total_revenue'] > 0:
+                                    all_revenue_data.append(row_dict)
+                                    total_comprehensive_revenue += row_dict['total_revenue']
+                                    total_comprehensive_transactions += row_dict['record_count']
                         except Exception as table_error:
                             app.logger.warning(f"Skipping table {table} due to error: {table_error}")
                             continue
