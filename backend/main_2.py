@@ -1048,7 +1048,7 @@ def generate_business_intelligence_summary(query_description: str, data_rows: li
         return f"Analysis error: Unable to process {len(data_rows)} records from {table_name} - {str(e)}"
 
 
-def execute_complex_business_query(query_description: str) -> dict:
+def execute_complex_business_query_DEPRECATED(query_description: str) -> dict:
     """Executes complex business intelligence queries using actual table schemas.
     
     This function examines the actual tables and builds appropriate queries based on
@@ -1639,14 +1639,15 @@ def build_multi_table_revenue_query(schema_queries):
                 SELECT 
                     '{table}' as table_source,
                     COUNT(*) as record_count,
-                    SUM(CAST({revenue_col} AS FLOAT64)) as total_revenue,
-                    AVG(CAST({revenue_col} AS FLOAT64)) as average_revenue,
-                    MIN(CAST({revenue_col} AS FLOAT64)) as min_revenue,
-                    MAX(CAST({revenue_col} AS FLOAT64)) as max_revenue
+                    SUM(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                    AVG(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as average_revenue,
+                    MIN(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as min_revenue,
+                    MAX(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as max_revenue
                 FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
                 WHERE {revenue_col} IS NOT NULL
                 AND CAST({revenue_col} AS STRING) NOT LIKE '%REF%'
                 AND CAST({revenue_col} AS STRING) != ''
+                AND REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') != ''
             """)
             return result
     
