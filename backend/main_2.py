@@ -612,8 +612,9 @@ def internal_execute_sql_query(query: str) -> dict:
             # Execute table discovery
             start_time = time.time()
             
-            with bigquery_client.query(table_discovery_query) as query_job:
-                results = list(query_job)
+            query_job = bigquery_client.query(table_discovery_query)
+            results = query_job.result(timeout=60)
+            results = list(results)
                 
             execution_time = time.time() - start_time
             app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(results)} rows.")
@@ -636,8 +637,9 @@ def internal_execute_sql_query(query: str) -> dict:
                 """
                 
                 start_time = time.time()
-                with bigquery_client.query(schema_query) as schema_job:
-                    schema_results = list(schema_job)
+                schema_job = bigquery_client.query(schema_query)
+                schema_results = schema_job.result(timeout=60)
+                schema_results = list(schema_results)
                 execution_time = time.time() - start_time
                 app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(schema_results)} rows.")
                 
@@ -701,8 +703,9 @@ def internal_execute_sql_query(query: str) -> dict:
                         
                         try:
                             start_time = time.time()
-                            with bigquery_client.query(table_query) as table_job:
-                                table_results = list(table_job)
+                            table_job = bigquery_client.query(table_query)
+                            table_results = table_job.result(timeout=60)
+                            table_results = list(table_results)
                             execution_time = time.time() - start_time
                             app.logger.info(f"Expanded multi-table query for {table}: executed in {execution_time:.2f}s, returned {len(table_results)} rows.")
                             
@@ -810,8 +813,8 @@ def internal_execute_sql_query(query: str) -> dict:
         if not (is_business_query and is_comprehensive):
             start_time = time.time()
             
-            with bigquery_client.query(final_query) as query_job:
-                results = list(query_job)
+            query_job = bigquery_client.query(final_query)
+            results = list(query_job.result())
                 
             execution_time = time.time() - start_time
             app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(results)} rows.")
