@@ -1471,15 +1471,28 @@ def process_revenue_analysis(query):
     if table_discovery.get('status') != 'success':
         return jsonify({"error": "Failed to discover sales tables", "details": table_discovery})
     
-    # Fix BigQuery Row object conversion
+    # Fix BigQuery Row object conversion with proper error handling
     tables = []
     for row in table_discovery.get('data', []):
-        if isinstance(row, dict):
-            tables.append(row['table_name'])
-        else:
-            # Convert BigQuery Row object to dict
-            row_dict = dict(row)
-            tables.append(row_dict['table_name'])
+        try:
+            if isinstance(row, dict):
+                if 'table_name' in row:
+                    tables.append(row['table_name'])
+            else:
+                # Convert BigQuery Row object to dict safely
+                if hasattr(row, 'table_name'):
+                    tables.append(row.table_name)
+                elif hasattr(row, '_fields') and 'table_name' in row._fields:
+                    row_dict = dict(row)
+                    tables.append(row_dict['table_name'])
+                else:
+                    # Try first field if it's a table name
+                    row_dict = dict(row)
+                    if row_dict:
+                        tables.append(list(row_dict.values())[0])
+        except (KeyError, AttributeError, IndexError) as e:
+            app.logger.warning(f"Row conversion error: {e}, Row: {row}")
+            continue
     
     # Step 2: Build comprehensive revenue query across all tables
     if tables:
@@ -1492,15 +1505,28 @@ def process_revenue_analysis(query):
                 ORDER BY ordinal_position
             """)
             if schema_result.get('status') == 'success':
-                # Fix BigQuery Row object conversion
+                # Fix BigQuery Row object conversion with proper error handling
                 columns = []
                 for row in schema_result.get('data', []):
-                    if isinstance(row, dict):
-                        columns.append(row['column_name'])
-                    else:
-                        # Convert BigQuery Row object to dict
-                        row_dict = dict(row)
-                        columns.append(row_dict['column_name'])
+                    try:
+                        if isinstance(row, dict):
+                            if 'column_name' in row:
+                                columns.append(row['column_name'])
+                        else:
+                            # Convert BigQuery Row object to dict safely
+                            if hasattr(row, 'column_name'):
+                                columns.append(row.column_name)
+                            elif hasattr(row, '_fields') and 'column_name' in row._fields:
+                                row_dict = dict(row)
+                                columns.append(row_dict['column_name'])
+                            else:
+                                # Try first field if it's a column name
+                                row_dict = dict(row)
+                                if row_dict:
+                                    columns.append(list(row_dict.values())[0])
+                    except (KeyError, AttributeError, IndexError) as e:
+                        app.logger.warning(f"Row conversion error in schema analysis: {e}, Row: {row}")
+                        continue
                 if any(col for col in columns if 'total' in col.lower() or 'sales' in col.lower() or 'amount' in col.lower()):
                     schema_queries.append({'table': table, 'columns': columns})
         
@@ -1522,15 +1548,28 @@ def process_attendee_analysis(query):
     """)
     
     if table_discovery.get('status') == 'success':
-        # Fix BigQuery Row object conversion
+        # Fix BigQuery Row object conversion with proper error handling
         tables = []
         for row in table_discovery.get('data', []):
-            if isinstance(row, dict):
-                tables.append(row['table_name'])
-            else:
-                # Convert BigQuery Row object to dict
-                row_dict = dict(row)
-                tables.append(row_dict['table_name'])
+            try:
+                if isinstance(row, dict):
+                    if 'table_name' in row:
+                        tables.append(row['table_name'])
+                else:
+                    # Convert BigQuery Row object to dict safely
+                    if hasattr(row, 'table_name'):
+                        tables.append(row.table_name)
+                    elif hasattr(row, '_fields') and 'table_name' in row._fields:
+                        row_dict = dict(row)
+                        tables.append(row_dict['table_name'])
+                    else:
+                        # Try first field if it's a table name
+                        row_dict = dict(row)
+                        if row_dict:
+                            tables.append(list(row_dict.values())[0])
+            except (KeyError, AttributeError, IndexError) as e:
+                app.logger.warning(f"Row conversion error in attendee analysis: {e}, Row: {row}")
+                continue
         return build_attendee_analysis(tables, query)
     
     return jsonify({"error": "Failed to discover attendee tables"})
