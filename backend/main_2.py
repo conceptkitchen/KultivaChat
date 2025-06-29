@@ -1040,8 +1040,9 @@ def execute_complex_business_query(query_description: str) -> dict:
         # 3. THIRD PRIORITY: Query intent-based matching using all categories
         if not relevant_tables:
             if any(word in query_lower for word in ['vendor', 'sales', 'money', 'revenue']):
-                # Prefer closeout sales for financial queries
+                # COMPREHENSIVE: Use ALL closeout sales tables for financial queries
                 relevant_tables = table_categories.get('closeout_sales', [])
+                app.logger.info(f"Closeout sales query detected, found {len(relevant_tables)} closeout tables")
                 if not relevant_tables:
                     relevant_tables = table_categories.get('other', [])
             elif any(word in query_lower for word in ['contact', 'email', 'phone', 'application']):
@@ -1049,6 +1050,7 @@ def execute_complex_business_query(query_description: str) -> dict:
                 relevant_tables = (table_categories.get('typeform', []) + 
                                  table_categories.get('squarespace', []) + 
                                  table_categories.get('closeout_sales', []))
+                app.logger.info(f"Contact query detected, found {len(relevant_tables)} total tables across all sources")
         
         # 4. FINAL FALLBACK: Use most recent or largest tables from any category
         if not relevant_tables:
@@ -1062,15 +1064,45 @@ def execute_complex_business_query(query_description: str) -> dict:
         if not relevant_tables:
             return {"status": "error", "error_message": "No relevant tables found for the query"}
         
-        # ENHANCED: Use multiple relevant tables for comprehensive analysis
-        # Prioritize by data freshness and relevance, but analyze multiple sources
-        if len(relevant_tables) > 1:
-            app.logger.info(f"Multiple relevant tables found ({len(relevant_tables)}), will analyze top 3 for comprehensive results")
+        # SMART TABLE SELECTION: Detect if user wants specific table or comprehensive analysis
+        specific_table_requested = False
+        
+        # Check for specific table indicators in natural language
+        specific_indicators = [
+            'from this table', 'in this table', 'this specific table',
+            'only from', 'just from', 'specifically from',
+            'table called', 'named table', 'the table'
+        ]
+        
+        # Check for specific event/vendor names that might indicate single source
+        for table in relevant_tables[:5]:  # Check top 5 tables
+            table_lower = table.lower()
+            # Extract key identifiers from table names
+            if any(identifier in query_lower for identifier in [
+                'lovers-mart', 'halo-halo', 'kapwa-gardens', 'undiscovered',
+                'balay-kreative', 'typeform', 'squarespace'
+            ]) and any(identifier in table_lower for identifier in [
+                'lovers-mart', 'halo-halo', 'kapwa-gardens', 'undiscovered', 
+                'balay-kreative', 'typeform', 'squarespace'
+            ]):
+                specific_table_requested = True
+                target_tables = [table]  # Use only the matching specific table
+                app.logger.info(f"Specific table detected from natural language: {table}")
+                break
+        
+        # Check for explicit specific table language
+        if any(indicator in query_lower for indicator in specific_indicators):
+            specific_table_requested = True
+        
+        # Default: Comprehensive analysis across multiple tables
+        if not specific_table_requested and len(relevant_tables) > 1:
+            app.logger.info(f"Comprehensive analysis mode: analyzing top 3 of {len(relevant_tables)} relevant tables")
             target_tables = relevant_tables[:3]  # Analyze top 3 most relevant tables
         else:
-            target_tables = relevant_tables
-            
+            target_tables = relevant_tables if not specific_table_requested else relevant_tables[:1]
+        
         target_table = target_tables[0]  # Start with primary table for column analysis
+        app.logger.info(f"Selected {len(target_tables)} tables for analysis, specific_table_requested: {specific_table_requested}")
         
         # First, check what columns are actually available in the table
         columns_result = internal_execute_sql_query(f"""
@@ -1098,7 +1130,7 @@ def execute_complex_business_query(query_description: str) -> dict:
                     select_cols = ', '.join(revenue_columns[:5])  # Limit to 5 columns
                     
                     # MULTI-TABLE ANALYSIS: Create UNION query for comprehensive data
-                    if len(target_tables) > 1:
+                    if len(target_tables) > 1 and not specific_table_requested:
                         union_queries = []
                         for table in target_tables[:3]:  # Analyze top 3 tables
                             union_queries.append(f"""
@@ -1121,22 +1153,37 @@ def execute_complex_business_query(query_description: str) -> dict:
                 else:
                     sql_query = f"""SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"""
                     
-            elif any(word in query_lower for word in ['email', 'contact', 'phone']):
+            elif any(word in query_lower for word in ['email', 'contact', 'phone', 'attendee', 'vendor']):
                 # Look for contact-related columns
                 contact_columns = []
                 for col in available_columns:
-                    if any(term in col.lower() for term in ['email', 'phone', 'contact', 'name']):
+                    if any(term in col.lower() for term in ['email', 'phone', 'contact', 'name', 'vendor']):
                         contact_columns.append(col)
                 
                 if contact_columns:
                     select_cols = ', '.join(contact_columns[:5])
-                    sql_query = f"""
-                        SELECT {select_cols}
-                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
-                        WHERE {contact_columns[0]} IS NOT NULL 
-                        AND {contact_columns[0]} != ''
-                        LIMIT 20
-                    """
+                    
+                    # MULTI-TABLE CONTACT ANALYSIS
+                    if len(target_tables) > 1 and not specific_table_requested:
+                        union_queries = []
+                        for table in target_tables[:3]:
+                            union_queries.append(f"""
+                                SELECT {select_cols}, '{table}' as source_table
+                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                                WHERE {contact_columns[0]} IS NOT NULL 
+                                AND {contact_columns[0]} != ''
+                                LIMIT 12
+                            """)
+                        sql_query = " UNION ALL ".join(union_queries)
+                        app.logger.info(f"Multi-table contact analysis across {len(target_tables)} tables")
+                    else:
+                        sql_query = f"""
+                            SELECT {select_cols}
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
+                            WHERE {contact_columns[0]} IS NOT NULL 
+                            AND {contact_columns[0]} != ''
+                            LIMIT 20
+                        """
                 else:
                     sql_query = f"""SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"""
             else:
