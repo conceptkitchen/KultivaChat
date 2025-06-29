@@ -574,8 +574,7 @@ def internal_execute_sql_query(query: str) -> dict:
             'across all', 'from all', 'compare', 'total from', 'breakdown'
         ]
         
-        # Temporarily disable business query detection for raw data access
-        is_business_query = False if 'raw_access' in query_lower else any(indicator in query_lower for indicator in business_indicators)
+        is_business_query = any(indicator in query_lower for indicator in business_indicators)
         
         # DETECT COMPREHENSIVE ANALYSIS REQUESTS (check original query)
         comprehensive_keywords = [
