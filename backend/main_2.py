@@ -1471,7 +1471,15 @@ def process_revenue_analysis(query):
     if table_discovery.get('status') != 'success':
         return jsonify({"error": "Failed to discover sales tables", "details": table_discovery})
     
-    tables = [row['table_name'] for row in table_discovery.get('data', [])]
+    # Fix BigQuery Row object conversion
+    tables = []
+    for row in table_discovery.get('data', []):
+        if isinstance(row, dict):
+            tables.append(row['table_name'])
+        else:
+            # Convert BigQuery Row object to dict
+            row_dict = dict(row)
+            tables.append(row_dict['table_name'])
     
     # Step 2: Build comprehensive revenue query across all tables
     if tables:
@@ -1506,7 +1514,15 @@ def process_attendee_analysis(query):
     """)
     
     if table_discovery.get('status') == 'success':
-        tables = [row['table_name'] for row in table_discovery.get('data', [])]
+        # Fix BigQuery Row object conversion
+        tables = []
+        for row in table_discovery.get('data', []):
+            if isinstance(row, dict):
+                tables.append(row['table_name'])
+            else:
+                # Convert BigQuery Row object to dict
+                row_dict = dict(row)
+                tables.append(row_dict['table_name'])
         return build_attendee_analysis(tables, query)
     
     return jsonify({"error": "Failed to discover attendee tables"})
