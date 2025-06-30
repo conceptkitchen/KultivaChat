@@ -3101,7 +3101,7 @@ def query_squarespace_dashboard_bigquery(sql_query):
 def dashboard_financial_summary():
     """Get financial summary for dashboard visualization"""
     try:
-        # Try BigQuery first, fall back to CSV
+        # Try BigQuery first, fall back to CSV processing
         if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES:
             sql_query = f"""
             SELECT 
@@ -3116,8 +3116,19 @@ def dashboard_financial_summary():
                 COUNT(*) as vendor_count
             FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES}.undiscovered_financial_data`
             """
-            results = query_dashboard_bigquery(sql_query)
+            try:
+                query_job = dashboard_bigquery_client.query(sql_query)
+                bigquery_results = query_job.result()
+                results = [dict(row) for row in bigquery_results]
+            except Exception as e:
+                app.logger.error(f"Dashboard BigQuery error: {e}")
+                # Force CSV fallback by setting results to None
+                results = None
         else:
+            results = None
+        
+        # CSV fallback with proper data processing
+        if results is None:
             # CSV fallback calculation with improved revenue detection
             kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
             undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
