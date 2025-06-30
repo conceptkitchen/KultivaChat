@@ -1557,11 +1557,117 @@ def natural_language_query():
             result = internal_execute_sql_query(original_query)
             return jsonify(result)
         
-        # Enhanced comprehensive multi-table analysis routing
+        # PRIORITY: Handle event comparison queries first (Query 2)
+        if any(phrase in query for phrase in ['which event', 'made the most money', 'highest revenue', 'most money']) and any(year in query for year in ['2020', '2021', '2022', '2023', '2024']):
+            app.logger.info("Processing event revenue comparison query (HIGH PRIORITY)")
+            
+            # Extract year range from query
+            years = [year for year in ['2020', '2021', '2022', '2023', '2024'] if year in query]
+            start_year = min(int(y) for y in years)
+            end_year = max(int(y) for y in years)
+            
+            try:
+                # Get all close-out sales tables
+                tables_query = f"""
+                SELECT table_name
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+                WHERE table_name LIKE '%Close-Out-Sales%'
+                """
+                
+                tables_result = bigquery_client.query(tables_query)
+                event_revenues = []
+                
+                for table_row in tables_result:
+                    table_name = table_row.table_name
+                    
+                    # Extract event info from table name
+                    import re
+                    date_match = re.search(r'(\d{4})-(\d{2})-(\d{2})', table_name)
+                    if date_match:
+                        year = int(date_match.group(1))
+                        if start_year <= year <= end_year:
+                            event_match = re.search(r'Close-Out-Sales---([^-]+)', table_name)
+                            event_name = event_match.group(1) if event_match else 'Unknown'
+                            
+                            # Query individual table for revenue
+                            revenue_query = f"""
+                            SELECT 
+                                COUNT(*) as vendor_count,
+                                SUM(CAST(COALESCE(
+                                    NULLIF(
+                                        REGEXP_REPLACE(
+                                            REGEXP_REPLACE(COALESCE(Cash__Credit_Total, '0'), r'[^0-9.]', ''), 
+                                            r'^$', '0'
+                                        ), 
+                                        ''
+                                    ), 
+                                    '0'
+                                ) AS FLOAT64)) as total_revenue
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table_name}`
+                            WHERE Vendor_Name IS NOT NULL AND Vendor_Name != ''
+                            """
+                            
+                            try:
+                                revenue_result = bigquery_client.query(revenue_query)
+                                for row in revenue_result:
+                                    if row.total_revenue and row.total_revenue > 0:
+                                        event_revenues.append({
+                                            'event_name': event_name,
+                                            'event_year': year,
+                                            'total_revenue': float(row.total_revenue),
+                                            'vendor_count': int(row.vendor_count)
+                                        })
+                            except Exception as e:
+                                app.logger.warning(f"Failed to query table {table_name}: {e}")
+                                continue
+                
+                # Sort by revenue
+                event_revenues.sort(key=lambda x: x['total_revenue'], reverse=True)
+                
+                if event_revenues:
+                    # Generate business intelligence
+                    top_event = event_revenues[0]
+                    business_intelligence = f"EVENT REVENUE ANALYSIS ({start_year}-{end_year})\n\n"
+                    business_intelligence += f"HIGHEST REVENUE EVENT:\n"
+                    business_intelligence += f"• {top_event['event_name']} ({top_event['event_year']})\n"
+                    business_intelligence += f"• Total Revenue: ${top_event['total_revenue']:,.2f}\n"
+                    business_intelligence += f"• Vendor Count: {top_event['vendor_count']}\n\n"
+                    
+                    business_intelligence += f"TOP 5 EVENTS BY REVENUE:\n"
+                    for i, event in enumerate(event_revenues[:5]):
+                        business_intelligence += f"{i+1}. {event['event_name']} ({event['event_year']}): ${event['total_revenue']:,.2f}\n"
+                    
+                    total_all = sum(e['total_revenue'] for e in event_revenues)
+                    business_intelligence += f"\nTOTAL ACROSS ALL EVENTS: ${total_all:,.2f}"
+                    
+                    result = {
+                        'status': 'success',
+                        'data': event_revenues,
+                        'business_intelligence': business_intelligence,
+                        'query_type': 'event_comparison',
+                        'ai_interpretation': f"Revenue comparison of events from {start_year} to {end_year}"
+                    }
+                    
+                    return jsonify(result)
+                else:
+                    return jsonify({
+                        'status': 'error',
+                        'error': f'No event revenue data found for {start_year}-{end_year}',
+                        'query_type': 'event_comparison'
+                    })
+                    
+            except Exception as e:
+                app.logger.error(f"Event comparison query failed: {e}")
+                return jsonify({
+                    'status': 'error',
+                    'error': f'Event comparison failed: {str(e)}',
+                    'query_type': 'event_comparison'
+                })
+        
+        # Enhanced comprehensive multi-table analysis routing (excluding event comparisons)
         comprehensive_keywords = [
-            'across all', 'all events', 'compare events', 'which event', 'best event',
-            'most money', 'highest revenue', 'compare', 'breakdown', 'all tables',
-            'made the most', 'top event', 'highest earning', 'compare revenue'
+            'across all', 'all events', 'compare', 'breakdown', 'all tables',
+            'comprehensive', 'complete', 'all', 'everything', 'full analysis', 'detailed', 'thorough'
         ]
         
         is_comprehensive = any(keyword in query for keyword in comprehensive_keywords)
@@ -1636,8 +1742,8 @@ def natural_language_query():
                 
                 return jsonify(result)
             
-            # Handle event comparison queries (Query 2)
-            elif any(phrase in query for phrase in ['which event', 'made the most money', 'highest revenue', 'most money']) and any(year in query for year in ['2020', '2021', '2022', '2023']):
+            # Handle event comparison queries (Query 2) - PRIORITY PROCESSING
+            elif any(phrase in query for phrase in ['which event', 'made the most money', 'highest revenue', 'most money']) and any(year in query for year in ['2020', '2021', '2022', '2023', '2024']):
                 app.logger.info("Processing event revenue comparison query")
                 
                 # Generate SQL to aggregate revenue by event across all tables
