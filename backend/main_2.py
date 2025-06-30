@@ -645,9 +645,9 @@ def internal_execute_sql_query(query: str) -> dict:
         
         # Check if this is a natural language query needing intelligent processing
         business_indicators = [
-            'show me', 'how much', 'who are', 'which event', 'what vendor', 'revenue', 'sales',
+            'show me', 'how much', 'how many', 'who are', 'which event', 'what vendor', 'revenue', 'sales',
             'attendee', 'contact', 'email', 'phone', 'made money', 'top vendor', 'best event',
-            'across all', 'from all', 'compare', 'total from', 'breakdown'
+            'across all', 'from all', 'compare', 'total from', 'breakdown', 'count', 'participated'
         ]
         
         is_business_query = any(indicator in query_lower for indicator in business_indicators)
@@ -945,13 +945,99 @@ def internal_execute_sql_query(query: str) -> dict:
                 AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != ''
                 """
                 else:
-                    # Fallback to simple data display
-                    target_table = relevant_tables[0]
-                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
+                    # For counting/aggregation queries, use Gemini AI to generate proper SQL
+                    if any(word in query_lower for word in ['how many', 'count', 'total', 'number of']):
+                        app.logger.info(f"Converting counting query to SQL with Gemini AI: {query[:100]}...")
+                        try:
+                            client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
+                            
+                            ai_prompt = f"""Convert this business question to SQL for BigQuery:
+
+Question: {query}
+
+Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
+Relevant tables found: {', '.join(relevant_tables[:5])}
+
+Generate SQL that counts unique vendors across these Kapwa Gardens tables. Use UNION ALL to combine data from multiple tables if needed.
+
+Return only the SQL query, no explanation."""
+
+                            response = client.models.generate_content(
+                                model='gemini-2.0-flash-exp',
+                                contents=[ai_prompt]
+                            )
+                            
+                            if response and hasattr(response, 'text'):
+                                ai_generated_sql = response.text.strip()
+                                # Clean up the response
+                                if '```sql' in ai_generated_sql:
+                                    ai_generated_sql = ai_generated_sql.split('```sql')[1].split('```')[0].strip()
+                                elif '```' in ai_generated_sql:
+                                    ai_generated_sql = ai_generated_sql.split('```')[1].strip()
+                                
+                                app.logger.info(f"Gemini AI generated counting SQL: {ai_generated_sql[:200]}...")
+                                final_query = ai_generated_sql
+                            else:
+                                # Fallback to simple count from first table
+                                target_table = relevant_tables[0]
+                                final_query = f"SELECT COUNT(DISTINCT COALESCE(Vendor_Name, vendor_name, VENDOR_NAME)) as vendor_count FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` WHERE COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) IS NOT NULL AND COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) != ''"
+                                
+                        except Exception as e:
+                            app.logger.error(f"Error using Gemini AI for counting query: {e}")
+                            # Fallback to simple count
+                            target_table = relevant_tables[0]
+                            final_query = f"SELECT COUNT(DISTINCT COALESCE(Vendor_Name, vendor_name, VENDOR_NAME)) as vendor_count FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` WHERE COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) IS NOT NULL AND COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) != ''"
+                    else:
+                        # Fallback to simple data display
+                        target_table = relevant_tables[0]
+                        final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
         
         else:
-            # Direct SQL query - execute as provided
-            final_query = query
+            # This is a natural language query that needs Gemini AI processing
+            app.logger.info(f"Natural language query needs AI processing: {query[:100]}...")
+            
+            # Use Gemini AI to convert natural language to SQL
+            try:
+                client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
+                
+                # Create a simple prompt for SQL conversion
+                ai_prompt = f"""Convert this natural language query to SQL for BigQuery:
+                
+Query: {query}
+
+Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
+Available tables include vendor sales data, attendee data, and event information.
+
+For counting queries like "How many vendors participated in Kapwa Gardens events?", generate SQL that:
+1. First discovers relevant tables with table discovery
+2. Then counts unique vendors across those tables
+3. Uses proper BigQuery syntax
+
+Return only the SQL query, no explanation."""
+
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=[ai_prompt]
+                )
+                
+                if response and hasattr(response, 'text'):
+                    ai_generated_sql = response.text.strip()
+                    # Clean up the response to extract just the SQL
+                    if '```sql' in ai_generated_sql:
+                        ai_generated_sql = ai_generated_sql.split('```sql')[1].split('```')[0].strip()
+                    elif '```' in ai_generated_sql:
+                        ai_generated_sql = ai_generated_sql.split('```')[1].strip()
+                    
+                    app.logger.info(f"Gemini AI generated SQL: {ai_generated_sql[:200]}...")
+                    final_query = ai_generated_sql
+                else:
+                    # Fallback: try to construct a basic query
+                    final_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%vendor%' OR LOWER(table_name) LIKE '%sales%' ORDER BY table_name"
+                    
+            except Exception as e:
+                app.logger.error(f"Error using Gemini AI for SQL conversion: {e}")
+                # Fallback: construct a basic query
+                final_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%vendor%' OR LOWER(table_name) LIKE '%sales%' ORDER BY table_name"
         
         # STEP 4: EXECUTE FINAL QUERY (for non-comprehensive analysis)
         if not (is_business_query and is_comprehensive):
