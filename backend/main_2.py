@@ -1449,6 +1449,14 @@ def natural_language_query():
         app.logger.info(f"Enhanced business intelligence query: {query}")
         app.logger.info(f"Original query: {original_query}")
         
+        # Check if this is a direct SQL query first (before keyword routing)
+        if (original_query.strip().upper().startswith(('SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'EXPLAIN')) or
+            'INFORMATION_SCHEMA' in original_query.upper() or
+            '`' in original_query):
+            app.logger.info(f"DIRECT SQL QUERY detected: {original_query[:100]}...")
+            result = internal_execute_sql_query(original_query)
+            return jsonify(result)
+        
         # Enhanced comprehensive multi-table analysis routing
         comprehensive_keywords = [
             'across all', 'all events', 'compare events', 'which event', 'best event',
@@ -1474,7 +1482,8 @@ def natural_language_query():
             return process_event_analysis(query)
         else:
             # Default comprehensive analysis
-            return process_comprehensive_query(query)
+            result = internal_execute_sql_query(data['query'])
+            return jsonify(result)
         
     except Exception as e:
         app.logger.error(f"Error in natural language query: {str(e)}")
