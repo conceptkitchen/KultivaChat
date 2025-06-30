@@ -1106,6 +1106,93 @@ def get_zip_codes_for_city(
     }
 
 
+def convert_natural_language_to_sql(natural_query: str) -> str:
+    """Convert natural language business questions to SQL queries"""
+    query_lower = natural_query.lower()
+    
+    # Revenue threshold queries
+    if 'made over' in query_lower and '$' in query_lower:
+        # Extract amount
+        import re
+        amount_match = re.search(r'\$(\d+)', query_lower)
+        if amount_match:
+            amount = amount_match.group(1)
+            
+            if 'kapwa gardens' in query_lower:
+                return f"""
+                SELECT 
+                    CASE 
+                        WHEN Vendor_Name IS NOT NULL THEN Vendor_Name
+                        WHEN vendor_name IS NOT NULL THEN vendor_name
+                        WHEN VENDOR_NAME IS NOT NULL THEN VENDOR_NAME
+                        ELSE 'Unknown Vendor'
+                    END as vendor_name,
+                    CASE 
+                        WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
+                        WHEN total_sales IS NOT NULL THEN CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)
+                        WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
+                        ELSE 0
+                    END as total_revenue
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
+                WHERE table_name LIKE '%Kapwa%'
+                AND (Total_Sales IS NOT NULL OR total_sales IS NOT NULL OR Cash__Credit_Total IS NOT NULL)
+                HAVING total_revenue > {amount}
+                ORDER BY total_revenue DESC
+                LIMIT 20
+                """
+    
+    # Multi-event participation
+    if 'multiple' in query_lower and 'events' in query_lower:
+        if 'kapwa gardens' in query_lower:
+            return f"""
+            SELECT 
+                vendor_name,
+                COUNT(DISTINCT table_name) as event_count,
+                SUM(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as total_revenue
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
+            WHERE LOWER(table_name) LIKE '%kapwa%'
+            AND vendor_name IS NOT NULL
+            GROUP BY vendor_name
+            HAVING event_count > 1
+            ORDER BY event_count DESC, total_revenue DESC
+            """
+    
+    # Revenue trend analysis
+    if 'revenue' in query_lower and ('time' in query_lower or 'changed' in query_lower):
+        if 'kapwa gardens' in query_lower:
+            return f"""
+            SELECT 
+                EXTRACT(YEAR FROM creation_time) as year,
+                EXTRACT(MONTH FROM creation_time) as month,
+                COUNT(*) as transaction_count,
+                SUM(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as monthly_revenue
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
+            WHERE LOWER(table_name) LIKE '%kapwa%'
+            AND total_sales IS NOT NULL
+            GROUP BY year, month
+            ORDER BY year, month
+            """
+    
+    # Comprehensive business intelligence
+    if 'comprehensive' in query_lower and 'business intelligence' in query_lower:
+        if 'kapwa gardens' in query_lower:
+            return f"""
+            SELECT 
+                'vendor_summary' as analysis_type,
+                COUNT(DISTINCT vendor_name) as unique_vendors,
+                COUNT(*) as total_transactions,
+                SUM(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                AVG(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as avg_revenue,
+                MAX(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as max_revenue
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
+            WHERE LOWER(table_name) LIKE '%kapwa%'
+            AND total_sales IS NOT NULL
+            """
+    
+    # Default: return None to indicate unsupported query
+    return None
+
+
 def generate_business_intelligence_summary(query_description: str, data_rows: list, table_name: str) -> str:
     """Generate truly actionable business intelligence with specific insights from actual data"""
     import re
@@ -1475,10 +1562,26 @@ def natural_language_query():
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
         else:
-            # Route natural language queries to comprehensive analysis (with fixed table discovery)
+            # Process natural language queries with pattern-based SQL generation
             app.logger.info(f"PROCESSING NATURAL LANGUAGE QUERY: {query}")
-            result = internal_execute_sql_query(data['query'])
-            return jsonify(result)
+            
+            # Convert natural language to SQL using pattern matching
+            sql_query = convert_natural_language_to_sql(original_query)
+            
+            if sql_query:
+                app.logger.info(f"Generated SQL from natural language: {sql_query[:200]}...")
+                result = internal_execute_sql_query(sql_query)
+                
+                if result.get('status') == 'success':
+                    result['ai_interpretation'] = f"Analysis of: {original_query}"
+                    result['query_type'] = "natural_language"
+                
+                return jsonify(result)
+            else:
+                return jsonify({
+                    "status": "error",
+                    "error_message": f"Unable to process natural language query: {original_query}"
+                })
         
     except Exception as e:
         app.logger.error(f"Error in natural language query: {str(e)}")
