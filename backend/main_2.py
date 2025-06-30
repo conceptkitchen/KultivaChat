@@ -1559,41 +1559,7 @@ def process_comprehensive_query(query):
         FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
     """)
 
-def build_multi_table_revenue_query(schema_queries):
-    """Build comprehensive revenue analysis across multiple tables"""
-    if not schema_queries:
-        return {"error": "No revenue tables with appropriate columns found"}
-    
-    # Execute revenue analysis on first available table with revenue columns
-    for schema in schema_queries:
-        table = schema['table']
-        columns = schema['columns']
-        
-        # Find revenue column
-        revenue_col = None
-        for col in columns:
-            if any(keyword in col.lower() for keyword in ['total', 'sales', 'amount', 'revenue']):
-                revenue_col = col
-                break
-        
-        if revenue_col:
-            result = internal_execute_sql_query(f"""
-                SELECT 
-                    '{table}' as table_source,
-                    COUNT(*) as record_count,
-                    SUM(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
-                    AVG(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as average_revenue,
-                    MIN(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as min_revenue,
-                    MAX(CAST(REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as max_revenue
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
-                WHERE {revenue_col} IS NOT NULL
-                AND CAST({revenue_col} AS STRING) NOT LIKE '%REF%'
-                AND CAST({revenue_col} AS STRING) != ''
-                AND REGEXP_REPLACE(CAST({revenue_col} AS STRING), r'[^0-9.]', '') != ''
-            """)
-            return result
-    
-    return {"error": "No suitable revenue columns found in discovered tables"}
+# Removed build_multi_table_revenue_query function - all revenue analysis now uses comprehensive analysis
 
 def build_attendee_analysis(tables, query):
     """Build comprehensive attendee analysis"""
