@@ -754,6 +754,72 @@ def internal_execute_sql_query(query: str) -> dict:
         # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
         # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
         
+        # VENDOR SALES QUERY DETECTION: Check for top vendor ranking requests
+        import re
+        top_vendor_match = re.search(r'top\s+(\d+)\s+vendors?', query_lower)
+        vendor_sales_indicators = ['top vendors', 'highest sales', 'vendor sales ranking', 'best vendors', 'vendors in sales']
+        undiscovered_indicators = ['undiscovered', 'undiscovered events']
+        
+        is_vendor_sales_query = (top_vendor_match is not None and 
+                                any(indicator in query_lower for indicator in vendor_sales_indicators) and
+                                any(event_indicator in query_lower for event_indicator in undiscovered_indicators))
+        
+        # IMMEDIATE VENDOR SALES ROUTING: Direct query for top X vendors
+        if is_vendor_sales_query:
+            limit_number = int(top_vendor_match.group(1)) if top_vendor_match else 5
+            app.logger.info(f"VENDOR SALES QUERY DETECTED IN SQL TOOL: Routing directly to UNDISCOVERED sales data for top {limit_number} vendors")
+            
+            vendor_sales_query = f"""
+            SELECT 
+                Vendor_Name,
+                Total_Sales
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors`
+            WHERE Total_Sales IS NOT NULL 
+            AND Vendor_Name IS NOT NULL 
+            AND Vendor_Name != ''
+            AND Total_Sales != ''
+            ORDER BY CAST(REPLACE(REPLACE(REPLACE(Total_Sales, '$', ''), ',', ''), ' ', '') AS FLOAT64) DESC
+            LIMIT {limit_number}
+            """
+            
+            try:
+                start_time = time.time()
+                query_job = bigquery_client.query(vendor_sales_query)
+                sales_results = query_job.result(timeout=60)
+                sales_results = list(sales_results)
+                execution_time = time.time() - start_time
+                
+                # Format results for display
+                formatted_results = []
+                for row in sales_results:
+                    try:
+                        vendor_name = getattr(row, 'Vendor_Name', str(row[0]) if len(row) > 0 else 'Unknown')
+                        total_sales = getattr(row, 'Total_Sales', str(row[1]) if len(row) > 1 else '$0.00')
+                        
+                        formatted_results.append({
+                            "vendor_name": vendor_name,
+                            "total_sales": total_sales.strip()
+                        })
+                    except Exception as e:
+                        app.logger.warning(f"Error formatting sales result row: {e}")
+                        continue
+                
+                app.logger.info(f"VENDOR SALES QUERY SUCCESS IN SQL TOOL: Retrieved top {len(formatted_results)} vendors in {execution_time:.2f}s")
+                
+                return {
+                    "status": "success", 
+                    "data": formatted_results,
+                    "query_executed": vendor_sales_query,
+                    "execution_time": execution_time,
+                    "query_type": "vendor_sales_ranking",
+                    "table_source": "2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors",
+                    "routing_method": "sql_tool_direct_routing"
+                }
+                
+            except Exception as e:
+                app.logger.error(f"Direct vendor sales query failed in SQL tool: {e}")
+                # Continue to fallback processing
+        
         # PHONE QUERY DETECTION: Check for phone number requests specifically
         phone_indicators = ['phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'billing_phone']
         is_phone_query = any(indicator in query_lower for indicator in phone_indicators)
@@ -2427,6 +2493,7 @@ def natural_language_query():
         # Use natural language processing with AI tools for intelligent SQL query generation
         
         # PHONE QUERY DETECTION: Route directly to Squarespace vendor table for phone requests
+        query_lower = original_query.lower()
         phone_indicators = ['phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'billing_phone']
         
         if any(indicator in query_lower for indicator in phone_indicators):
