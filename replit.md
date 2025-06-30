@@ -124,6 +124,14 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
   - ✅ DOCUMENTED: Query routing logic distinguishes between organizational data types (vendor sales vs attendee registrations)
   - → Natural language API now provides intelligent context-aware routing with comprehensive vendor analysis and precise attendee data access
 
+- **June 30, 2025**: DASHBOARD ENVIRONMENT VARIABLES UPDATED - Changed dashboard credentials naming convention to include CLOSE_OUT_SALES suffix
+  - ✅ UPDATED: `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD` → `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES`
+  - ✅ UPDATED: `KBC_WORKSPACE_SCHEMA_DASHBOARD` → `KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES`
+  - ✅ MODIFIED: All dashboard BigQuery client initialization code to use new variable names
+  - ✅ UPDATED: Dashboard API documentation to reflect new environment variable requirements
+  - ✅ MAINTAINED: Dashboard functionality with CSV fallback system remains intact
+  - → Dashboard API now uses clearer naming convention that specifies close-out sales data source
+
 - **June 30, 2025**: COMPLETE VENDOR ANALYSIS WITH NO LIMITS - Removed artificial LIMIT 50 restriction to show all authentic vendors
   - ✅ REMOVED: Artificial LIMIT 50 from Kapwa Gardens vendor queries - now shows ALL qualifying vendors
   - ✅ ENHANCED: Query now returns complete dataset - 109 vendors over $500 across all 24 Kapwa Gardens events
