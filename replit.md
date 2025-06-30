@@ -4,6 +4,18 @@
 
 Kultivate AI MCP Server is a standalone Model Context Protocol backend service providing AI-powered business intelligence through clean REST API endpoints. The server integrates Google Gemini 2.0 Flash, Keboola Cloud, and BigQuery to deliver sophisticated data analysis capabilities for external frontend applications.
 
+### Intelligent Data Processing Architecture
+
+The system uses an intelligent tool-based architecture that transforms natural language business questions into accurate data-driven insights:
+
+1. **Query Processing** - Takes natural language business questions ("Which event from 2021-2024 made the most money?")
+2. **SQL Extraction Tool** - Converts queries to proper SQL and executes against BigQuery workspace data
+3. **Smart Table Selection** - Uses enhanced filtering to identify relevant tables from 37+ available data sources
+4. **Authentic Data Extraction** - Pulls real revenue, vendor, and event data from multiple BigQuery tables
+5. **Intelligent Analysis** - AI examines actual dollar amounts and makes business logic decisions based on authentic financial data
+
+The intelligence comes from processing authentic BigQuery data (not mock data), comparing actual dollar amounts from SQL results, understanding multi-vendor sheet structures, and making business logic decisions based on real financial data. The SQL extraction tool serves as the core that retrieves authentic data, while the AI layer provides intelligent analysis and ranking to deliver accurate business insights.
+
 ## System Architecture
 
 ### MCP Server Architecture
