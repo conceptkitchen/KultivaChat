@@ -189,25 +189,22 @@ When users ask about:
     5.  **FORBIDDEN RESPONSES:** Do NOT say "Which table would you like?" or "I need more information" or "Could you clarify?" - just pick a table and execute.
     6.  **NEVER claim a table doesn't exist** if you can find ANY reasonable pattern match in the conversation history.
 
-- **Complex Business Intelligence Questions** (e.g., "How much money was made by vendors at Yum Yams event from 2020-2023?", "Which vendors who identify as X made more than $500 sales?", "How many attendees live in SF and Daly City?", "Who applied to Balay Kreative Grant and attended events more than 2x?", "Which vendors participated in Kapwa Gardens AND UNDSCVRD events and made at least $500?"):
-    1.  **USE execute_complex_business_query FIRST** - This specialized tool handles sophisticated business intelligence queries with:
-        * Multi-table analysis across all 64 workspace tables
-        * Date range filtering (2020-2023, specific years)
-        * Geographic analysis (zip codes, cities like SF, Daly City)
-        * Revenue thresholds ($500+, income levels)
-        * Multi-event participation tracking (Kapwa Gardens AND UNDSCVRD)
-        * Demographic filtering (identity categories)
-        * Contact information extraction (emails, phone numbers)
-        * Cross-event attendance analysis
-        * Grant application correlation with event participation
-    2.  **The tool automatically handles:**
-        * Table discovery across vendor, attendee, donor, and event data
-        * Complex JOIN operations between related tables
-        * Date range parsing and filtering
-        * Geographic zip code mapping for SF, Daly City, etc.
-        * Revenue calculations and financial analysis
-        * Multi-condition filtering (event participation + revenue thresholds)
-    3.  **If execute_complex_business_query doesn't fully address the query**, then fall back to manual SQL construction using internal_execute_sql_query with the detailed schema analysis approach.
+- **ALL BUSINESS INTELLIGENCE QUESTIONS MUST USE ACCURATE TABLE FILTERING**:
+    1.  **CRITICAL**: When user mentions specific events/dates (e.g., "UNDISCOVERED SF August 19, 2023", "Yum Yams May 13, 2023"), you MUST target the exact matching table, NOT a random table
+    2.  **EVENT/DATE MATCHING REQUIRED**: 
+        * "UNDISCOVERED SF August 19, 2023" → ONLY use table "2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors"
+        * "Lovers Mart February 11, 2023" → ONLY use table "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal"
+        * "Yum Yams May 13, 2023" → ONLY use table containing "2023-05-13" AND "Yum-Yams"
+    3.  **NEVER return wrong event data** - if user asks for UNDISCOVERED August 2023, never return Lovers-Mart February data
+    4.  **PROCESS**: 
+        * First: Discover all tables with INFORMATION_SCHEMA
+        * Second: Apply smart filtering to match query to correct table
+        * Third: Execute SQL on the SPECIFIC matched table only
+        * Fourth: Return data with table source clearly identified
+    5.  **TABLE FILTERING LOGIC**: Score tables by:
+        * Event name match: +10 points (UNDISCOVERED matches "undiscovered" in table)
+        * Date match: +20 points (August 19, 2023 matches "2023-08-19" in table)
+        * Use highest scoring table only
 
 - "Show me tables" or "what tables do I have" (referring to the transformed data):
     1.  Prioritize listing tables from the BigQuery workspace.
@@ -717,6 +714,10 @@ def internal_execute_sql_query(query: str) -> dict:
                     app.logger.warning(f"Could not extract table name from row: {row}, error: {e}")
                     continue
             
+            # APPLY SMART TABLE FILTERING: Use enhanced routing logic to order tables by relevance
+            relevant_tables = smart_table_filter(original_query, relevant_tables)
+            app.logger.info(f"SMART FILTERING APPLIED: Reordered {len(relevant_tables)} tables by query relevance")
+            
             # STEP 2: SCHEMA ANALYSIS FOR TOP TABLES
             # Analyze schemas of top tables to understand column structures
             schema_analysis_limit = 10 if is_comprehensive else 5
@@ -1179,6 +1180,105 @@ def get_current_time() -> dict:
     app.logger.info("Tool Call: get_current_time")
     current_time_str = time.strftime("%Y-%m-%d %H:%M:%S %Z")
     return {"status": "success", "current_time": current_time_str}
+
+
+def smart_table_filter(query: str, available_tables: list) -> list:
+    """
+    Enhanced table filtering using event name and date matching logic.
+    Returns tables ordered by relevance score (highest first).
+    """
+    query_lower = query.lower()
+    
+    # Event name mapping for precise table selection
+    event_filters = {
+        'undiscovered': ['undiscovered'],
+        'kapwa gardens': ['kapwa'],
+        'lovers mart': ['lovers-mart'],
+        'yum yams': ['yum-yams'],
+        'dye hard': ['dye-hard'],
+        'be free': ['be-free'],
+        'halo halo': ['halo-halo'],
+        'many styles': ['many-styles'],
+        'balay kreative': ['balay-kreative'],
+        'ancestor altars': ['ancestor-altars'],
+        'baked': ['baked'],
+        'lavender cinema': ['lavender-cinema'],
+        'akassa': ['akassa'],
+        'sulat': ['sulat']
+    }
+    
+    # Date filtering for specific dates mentioned
+    date_patterns = [
+        r'august 19,? 2023', r'2023-08-19',
+        r'september 16,? 2023', r'2023-09-16', 
+        r'october 21,? 2023', r'2023-10-21',
+        r'february 11,? 2023', r'2023-02-11',
+        r'may 13,? 2023', r'2023-05-13',
+        r'june 10,? 2023', r'2023-06-10',
+        r'march 18,? 2023', r'2023-03-18',
+        r'december 9,? 2023', r'2023-12-09',
+        r'july 28,? 2023', r'2023-07-28',
+        r'october 19,? 2024', r'2024-10-19',
+        r'april 20,? 2024', r'2024-04-20'
+    ]
+    
+    # Score each table based on query relevance
+    scored_tables = []
+    
+    for table in available_tables:
+        table_lower = table.lower()
+        match_score = 0
+        
+        # Score based on event name matches
+        for event_name, event_keywords in event_filters.items():
+            if event_name in query_lower:
+                for keyword in event_keywords:
+                    if keyword in table_lower:
+                        match_score += 10
+        
+        # Score based on date matches
+        import re
+        for date_pattern in date_patterns:
+            if re.search(date_pattern, query_lower):
+                # Extract expected date components
+                if 'august 19' in query_lower or '2023-08-19' in query_lower:
+                    if '2023-08-19' in table_lower:
+                        match_score += 20
+                elif 'september 16' in query_lower or '2023-09-16' in query_lower:
+                    if '2023-09-16' in table_lower:
+                        match_score += 20
+                elif 'february 11' in query_lower or '2023-02-11' in query_lower:
+                    if '2023-02-11' in table_lower:
+                        match_score += 20
+                elif 'october 19' in query_lower or '2024-10-19' in query_lower:
+                    if '2024-10-19' in table_lower:
+                        match_score += 20
+                elif 'may 13' in query_lower or '2023-05-13' in query_lower:
+                    if '2023-05-13' in table_lower:
+                        match_score += 20
+                elif 'june 10' in query_lower or '2023-06-10' in query_lower:
+                    if '2023-06-10' in table_lower:
+                        match_score += 20
+        
+        # Year-based scoring for general date ranges
+        if '2023' in query_lower and '2023' in table_lower:
+            match_score += 5
+        elif '2024' in query_lower and '2024' in table_lower:
+            match_score += 5
+        
+        # General table relevance (base score for all tables)
+        if any(term in table_lower for term in ['close-out-sales', 'vendor', 'sales']):
+            match_score += 1
+            
+        scored_tables.append((table, match_score))
+    
+    # Sort by score (highest first) and return table names
+    scored_tables.sort(key=lambda x: x[1], reverse=True)
+    
+    if scored_tables and scored_tables[0][1] > 0:
+        app.logger.info(f"SMART TABLE FILTER: Top match '{scored_tables[0][0]}' with score {scored_tables[0][1]} for query: {query[:100]}")
+    
+    return [table for table, score in scored_tables]
 
 
 def get_keboola_table_detail(bucket_id: str, table_name: str) -> dict:
