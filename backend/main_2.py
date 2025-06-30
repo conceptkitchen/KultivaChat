@@ -1444,8 +1444,10 @@ def natural_language_query():
         if not data or 'query' not in data:
             return jsonify({"error": "Missing 'query' parameter"}), 400
         
+        original_query = data['query']
         query = data['query'].lower()
         app.logger.info(f"Enhanced business intelligence query: {query}")
+        app.logger.info(f"Original query: {original_query}")
         
         # Enhanced comprehensive multi-table analysis routing
         comprehensive_keywords = [
@@ -1462,6 +1464,7 @@ def natural_language_query():
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
         elif any(keyword in query for keyword in ['revenue', 'money', 'sales', 'vendor', 'total', 'income', 'financial']):
+            app.logger.info(f"ROUTING TO REVENUE ANALYSIS: {query}")
             return process_revenue_analysis(query)
         elif any(keyword in query for keyword in ['attendee', 'contact', 'email', 'phone', 'participant']):
             return process_attendee_analysis(query)
@@ -1478,107 +1481,18 @@ def natural_language_query():
         return jsonify({"error": str(e)}), 500
 
 def process_revenue_analysis(query):
-    """Process revenue and financial analysis queries"""
-    # Step 1: Discover all sales-related tables with broader patterns
-    table_discovery = internal_execute_sql_query(f"""
-        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-        WHERE LOWER(table_name) LIKE '%close%out%sales%' 
-        OR LOWER(table_name) LIKE '%vendor%'
-        OR LOWER(table_name) LIKE '%sales%'
-        OR LOWER(table_name) LIKE '%kapwa%'
-        OR LOWER(table_name) LIKE '%undiscovered%'
-        OR LOWER(table_name) LIKE '%close%out%'
-        ORDER BY table_name
-    """)
+    """Process revenue and financial analysis queries - FIXED VERSION"""
+    app.logger.info(f"PROCESS_REVENUE_ANALYSIS called with query: {query}")
     
-    if table_discovery.get('status') != 'success':
-        app.logger.error(f"Table discovery failed: {table_discovery}")
-        return jsonify({"error": "Failed to discover sales tables", "details": table_discovery})
-    
-    # Fix BigQuery Row object conversion with proper error handling
-    tables = []
-    raw_data = table_discovery.get('data', [])
-    app.logger.info(f"Raw table discovery data: {len(raw_data)} rows, first row type: {type(raw_data[0]) if raw_data else 'None'}")
-    
-    for i, row in enumerate(raw_data):
-        try:
-            if isinstance(row, dict):
-                if 'table_name' in row:
-                    tables.append(row['table_name'])
-                else:
-                    # If it's a dict but no table_name key, try first value
-                    if row:
-                        tables.append(list(row.values())[0])
-            elif isinstance(row, (list, tuple)):
-                # If it's a list/tuple, take first element
-                if row:
-                    tables.append(row[0])
-            else:
-                # Convert BigQuery Row object to dict safely
-                if hasattr(row, 'table_name'):
-                    tables.append(row.table_name)
-                elif hasattr(row, '_fields'):
-                    # Convert to dict and get table_name
-                    row_dict = dict(row)
-                    if 'table_name' in row_dict:
-                        tables.append(row_dict['table_name'])
-                    else:
-                        # Take first value if no table_name key
-                        if row_dict:
-                            tables.append(list(row_dict.values())[0])
-                else:
-                    # Last resort - convert to string
-                    table_name = str(row).strip()
-                    if table_name and table_name != 'None':
-                        tables.append(table_name)
-        except (KeyError, AttributeError, IndexError) as e:
-            app.logger.warning(f"Row conversion error at index {i}: {e}, Row: {row}, Type: {type(row)}")
-            continue
-    
-    # Add debugging to see what tables were found
-    app.logger.info(f"Revenue analysis found {len(tables)} tables: {tables[:3] if tables else 'None'}")
-    
-    # Step 2: Build comprehensive revenue query across all tables
-    if tables:
-        # Examine schema of first few tables to understand structure
-        schema_queries = []
-        for table in tables[:5]:  # Check first 5 tables
-            schema_result = internal_execute_sql_query(f"""
-                SELECT column_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS` 
-                WHERE table_name = '{table}' 
-                ORDER BY ordinal_position
-            """)
-            if schema_result.get('status') == 'success':
-                # Fix BigQuery Row object conversion with proper error handling
-                columns = []
-                for row in schema_result.get('data', []):
-                    try:
-                        if isinstance(row, dict):
-                            if 'column_name' in row:
-                                columns.append(row['column_name'])
-                        else:
-                            # Convert BigQuery Row object to dict safely
-                            if hasattr(row, 'column_name'):
-                                columns.append(row.column_name)
-                            elif hasattr(row, '_fields') and 'column_name' in row._fields:
-                                row_dict = dict(row)
-                                columns.append(row_dict['column_name'])
-                            else:
-                                # Try first field if it's a column name
-                                row_dict = dict(row)
-                                if row_dict:
-                                    columns.append(list(row_dict.values())[0])
-                    except (KeyError, AttributeError, IndexError) as e:
-                        app.logger.warning(f"Row conversion error in schema analysis: {e}, Row: {row}")
-                        continue
-                if any(col for col in columns if 'total' in col.lower() or 'sales' in col.lower() or 'amount' in col.lower()):
-                    schema_queries.append({'table': table, 'columns': columns})
-        
-        # Build multi-table revenue analysis
-        revenue_analysis = build_multi_table_revenue_query(schema_queries)
-        return jsonify(revenue_analysis)
-    
-    return jsonify({"error": "No sales tables found for revenue analysis"})
+    # Use the enhanced internal tool directly which we know works for comprehensive analysis
+    try:
+        # Since we know the tables exist, use the comprehensive analysis tool directly
+        result = internal_execute_sql_query(query)
+        app.logger.info(f"Revenue analysis using internal_execute_sql_query completed: {result.get('status')}")
+        return jsonify(result)
+    except Exception as e:
+        app.logger.error(f"Error in revenue analysis: {e}")
+        return jsonify({"error": f"Revenue analysis failed: {str(e)}"})
 
 def process_attendee_analysis(query):
     """Process attendee and contact information queries"""
