@@ -1162,6 +1162,42 @@ def internal_execute_sql_query(query: str) -> dict:
         app.logger.info(f"Contact query detected: {is_contact_query}")
         app.logger.info(f"Comprehensive detection - Keywords: {matched_keywords}, Patterns: {matched_patterns}, Result: {is_comprehensive}")
         
+        # TABLE DISCOVERY CHECK: Handle requests for table lists before business intelligence routing
+        table_list_keywords = ['show me my tables', 'show my tables', 'data tables', 'list tables', 'what tables', 'my tables', 'show tables', 'table names', 'show me tables']
+        is_table_discovery = any(keyword in original_query.lower() for keyword in table_list_keywords)
+        
+        if is_table_discovery:
+            app.logger.info(f"TABLE DISCOVERY REQUEST: User asking for table list")
+            table_list_query = f"""
+            SELECT table_name, creation_time, table_type
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+            WHERE table_type = 'BASE_TABLE'
+            ORDER BY table_name
+            """
+            
+            start_time = time.time()
+            query_job = bigquery_client.query(table_list_query)
+            results = query_job.result(timeout=60)
+            results = list(results)
+            execution_time = time.time() - start_time
+            
+            # Convert results to list of dictionaries
+            table_data = []
+            for row in results:
+                if hasattr(row, '_fields'):
+                    table_data.append({field: getattr(row, field) for field in row._fields})
+                else:
+                    table_data.append(dict(row))
+            
+            return {
+                "status": "success",
+                "data": table_data,
+                "query_executed": table_list_query.strip(),
+                "query_type": "table_discovery",
+                "total_tables": len(table_data),
+                "execution_time": execution_time
+            }
+
         if is_business_query:
             app.logger.info(f"Enhanced business intelligence query: {original_query}")
             app.logger.info(f"Contact query: {is_contact_query}, Comprehensive analysis: {is_comprehensive} - Original query: {original_query[:100]}")
