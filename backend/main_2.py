@@ -229,8 +229,15 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
    - "balay kreative demographics" → "Balay-Kreative" tables with demographic fields
    - "kg vendor emails" → "Kapwa-Gardens" tables with email columns
    - "yum yams contacts" → "Yum-Yams" tables with contact fields
+
+6. **GEOGRAPHIC QUERIES**: For location-based attendee questions:
+   - "How many attendees live in San Francisco and Daly City?" → Use Billing_City column with WHERE clause filtering
+   - "attendees from SF" → Filter WHERE UPPER(Billing_City) IN ('SAN FRANCISCO', 'SF')  
+   - "daly city attendees" → Filter WHERE UPPER(Billing_City) LIKE '%DALY CITY%'
+   - Always apply geographic filters to attendee tables using city/location columns
+   - Combine counts from multiple attendee tables for total geographic results
    
-5. **BE DECISIVE**: When tables are found, immediately extract the requested data type without asking for clarification.
+7. **BE DECISIVE**: When tables are found, immediately extract the requested data type without asking for clarification.
 
 **CRITICAL: NEVER HALLUCINATE TABLE NAMES**
 - ALWAYS discover actual table names first using INFORMATION_SCHEMA.TABLES

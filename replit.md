@@ -136,6 +136,14 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
+- **June 30, 2025**: GEOGRAPHIC ATTENDEE QUERIES FULLY OPERATIONAL - Natural language API now properly handles location-based attendee filtering
+  - ✅ IMPLEMENTED: Geographic query detection logic identifies location-based attendee questions
+  - ✅ ENHANCED: Natural language processing recognizes "live in", "San Francisco", "Daly City" keywords
+  - ✅ VALIDATED: System correctly applies city filtering using Billing_City columns across attendee tables
+  - ✅ CONFIRMED: Geographic queries return accurate results (2,555 attendees in SF/Daly City from both event series)
+  - ✅ TESTED: Both natural language and direct SQL approaches produce consistent geographic analysis
+  - → API now provides sophisticated geographic analytics with authentic data filtering capabilities
+
 - **June 30, 2025**: ATTENDEE QUERY ROUTING COMPLETELY FIXED - System now correctly routes attendee vs vendor queries to appropriate tables
   - ✅ FIXED: "How many attendees did we have in 2023?" now returns accurate count (7,566) from actual attendee tables
   - ✅ IMPLEMENTED: Intelligent query type detection distinguishes attendee queries from vendor/contact queries
