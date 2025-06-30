@@ -1144,21 +1144,7 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
     """Convert natural language business questions to SQL queries"""
     query_lower = natural_query.lower()
     
-    # Attendee data queries
-    if 'attendee' in query_lower and ('data' in query_lower or 'show' in query_lower):
-        if 'balay' in query_lower:
-            return f"""
-            SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-squarespace_forms`
-            LIMIT 20
-            """
-        elif 'undiscovered' in query_lower:
-            return f"""
-            SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
-            LIMIT 20
-            """
-        elif 'kapwa gardens' in query_lower or 'kapwa' in query_lower:
-            # No Kapwa Gardens attendee tables exist - return None to trigger fallback handling
-            return None
+    # Remove hardcoded attendee logic - let AI handle it intelligently
     
     # Revenue threshold queries
     if 'made over' in query_lower and '$' in query_lower:
@@ -1537,6 +1523,7 @@ def natural_language_query():
         
         original_query = data['query']
         query = data['query'].lower()
+        query_lower = query  # Add explicit query_lower variable
         app.logger.info(f"Enhanced business intelligence query: {query}")
         app.logger.info(f"Original query: {original_query}")
         
@@ -1563,8 +1550,14 @@ def natural_language_query():
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
         else:
-            # Process natural language queries with pattern-based SQL generation
+            # Process natural language queries with AI system for intelligent understanding
             app.logger.info(f"PROCESSING NATURAL LANGUAGE QUERY: {query}")
+            
+            # For attendee queries, use AI system for intelligent table matching
+            if 'attendee' in query_lower or any(org in query_lower for org in ['balay', 'undiscovered', 'kreative']):
+                app.logger.info(f"ATTENDEE QUERY DETECTED - Using AI system for intelligent processing: {original_query}")
+                result = internal_execute_sql_query(original_query)
+                return jsonify(result)
             
             # Convert natural language to SQL using pattern matching
             sql_query = convert_natural_language_to_sql(original_query)
