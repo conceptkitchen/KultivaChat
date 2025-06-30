@@ -1,0 +1,1 @@
+{"data":[{"Total_Sales":" $ 3,150.00 ","Vendor_Name":"Street Stix"}],"execution_time":0.9764902591705322,"query_executed":"SELECT Vendor_Name, Total_Sales FROM `kbc-use4-839-261b.WORKSPACE_23990909.Close-Out-Sales---Be-Free-Festival---2023-06-10---Kapwa-Gardens-All-Vendor-Close-Out-Sales` WHERE Vendor_Name = \"Street Stix\" LIMIT 1","status":"success"}

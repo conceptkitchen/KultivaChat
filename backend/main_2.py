@@ -1602,27 +1602,14 @@ def natural_language_query():
                             union_queries.append(f"""
                             SELECT 
                                 '{table}' as source_table,
-                                CASE 
-                                    WHEN Vendor_Name IS NOT NULL AND Vendor_Name != '' THEN Vendor_Name
-                                    WHEN vendor_name IS NOT NULL AND vendor_name != '' THEN vendor_name
-                                    WHEN VENDOR_NAME IS NOT NULL AND VENDOR_NAME != '' THEN VENDOR_NAME
-                                    ELSE 'Unknown Vendor'
-                                END as vendor_name,
-                                CASE 
-                                    WHEN Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%' THEN 
-                                        SAFE_CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                                    WHEN total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%' THEN 
-                                        SAFE_CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                                    WHEN Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%' THEN 
-                                        SAFE_CAST(REGEXP_REPLACE(CAST(Cash__Credit_Total AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                                    ELSE 0
-                                END as total_revenue
+                                COALESCE(Vendor_Name, vendor_name, VENDOR_NAME, 'Unknown Vendor') as vendor_name,
+                                SAFE_CAST(REGEXP_REPLACE(COALESCE(Total_Sales, total_sales, Cash__Credit_Total, '0'), r'[^0-9.]', '') AS FLOAT64) as total_revenue
                             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
-                            WHERE (
-                                (Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%') OR
-                                (total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%') OR
-                                (Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%')
-                            )
+                            WHERE COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) IS NOT NULL
+                            AND COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) != ''
+                            AND COALESCE(Total_Sales, total_sales, Cash__Credit_Total) IS NOT NULL
+                            AND COALESCE(Total_Sales, total_sales, Cash__Credit_Total) != ''
+                            AND COALESCE(Total_Sales, total_sales, Cash__Credit_Total) NOT LIKE '%REF%'
                             """)
                         
                         multi_table_query = f"""
