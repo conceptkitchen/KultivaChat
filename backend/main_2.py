@@ -84,7 +84,12 @@ GEMINI_MODEL = "gemini-2.0-flash-exp"
 # Dashboard Configuration Variables
 GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES', '/home/runner/workspace/backend/GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES.json')
 KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES = os.environ.get('KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES', 'WORKSPACE_DASHBOARD_CLOSE_OUT_SALES')
-DASHBOARD_PROJECT_ID = GOOGLE_PROJECT_ID  # Same project, different workspace
+
+# Squarespace Forms Dashboard Configuration
+GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS', '/home/runner/workspace/backend/GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS.json')
+KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS = os.environ.get('KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS', 'WORKSPACE_DASHBOARD_SQUARESPACE_FORMS')
+
+DASHBOARD_PROJECT_ID = GOOGLE_PROJECT_ID  # Same project, different workspaces
 
 # Log configuration status for debugging
 app.logger.info("=== Configuration Check ===")
@@ -383,20 +388,37 @@ except Exception as e:
     app.logger.error(f"Error initializing Google BigQuery Client: {e}",
                      exc_info=True)
 
-# Initialize Dashboard BigQuery Client for financial data visualization
+# Initialize Dashboard BigQuery Clients for financial data visualization
 dashboard_bigquery_client = None
+dashboard_squarespace_bigquery_client = None
+
+# Close-out sales dashboard client
 try:
     if GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES and os.path.exists(GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES):
-        app.logger.info(f"Initializing Dashboard BigQuery Client using: {GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES}")
+        app.logger.info(f"Initializing Dashboard BigQuery Client (Close-out Sales) using: {GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES}")
         with timeout_context(30):
             dashboard_bigquery_client = bigquery.Client.from_service_account_json(
                 GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES)
-        app.logger.info(f"Successfully initialized Dashboard BigQuery Client. Project: {dashboard_bigquery_client.project}")
+        app.logger.info(f"Successfully initialized Dashboard BigQuery Client (Close-out Sales). Project: {dashboard_bigquery_client.project}")
     else:
-        app.logger.info("Dashboard credentials not found - will use CSV fallbacks for dashboard data")
+        app.logger.info("Close-out sales dashboard credentials not found - will use CSV fallbacks")
 except Exception as e:
-    app.logger.error(f"Error initializing Dashboard BigQuery Client: {e}")
-    app.logger.info("Will use CSV fallbacks for dashboard data")
+    app.logger.error(f"Error initializing Dashboard BigQuery Client (Close-out Sales): {e}")
+    app.logger.info("Will use CSV fallbacks for close-out sales dashboard data")
+
+# Squarespace forms dashboard client
+try:
+    if GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS and os.path.exists(GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS):
+        app.logger.info(f"Initializing Dashboard BigQuery Client (Squarespace Forms) using: {GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS}")
+        with timeout_context(30):
+            dashboard_squarespace_bigquery_client = bigquery.Client.from_service_account_json(
+                GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS)
+        app.logger.info(f"Successfully initialized Dashboard BigQuery Client (Squarespace Forms). Project: {dashboard_squarespace_bigquery_client.project}")
+    else:
+        app.logger.info("Squarespace forms dashboard credentials not found - will use CSV fallbacks")
+except Exception as e:
+    app.logger.error(f"Error initializing Dashboard BigQuery Client (Squarespace Forms): {e}")
+    app.logger.info("Will use CSV fallbacks for Squarespace forms dashboard data")
 
 
 # --- Helper Functions ---
@@ -1852,6 +1874,17 @@ def query_dashboard_bigquery(sql_query):
     undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
     return kapwa_data + undiscovered_data
 
+def query_squarespace_dashboard_bigquery(sql_query):
+    """Execute query on Squarespace forms dashboard BigQuery workspace"""
+    if dashboard_squarespace_bigquery_client:
+        try:
+            query_job = dashboard_squarespace_bigquery_client.query(sql_query)
+            results = query_job.result()
+            return [dict(row) for row in results]
+        except Exception as e:
+            app.logger.error(f"Squarespace Dashboard BigQuery error: {e}")
+    return None
+
 @app.route('/api/dashboard/financial-summary', methods=['GET'])
 def dashboard_financial_summary():
     """Get financial summary for dashboard visualization"""
@@ -2010,6 +2043,141 @@ def dashboard_revenue_breakdown():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/dashboard/attendee-analytics', methods=['GET'])
+def dashboard_attendee_analytics():
+    """Get attendee analytics from Squarespace forms data"""
+    try:
+        # Try Squarespace BigQuery first
+        if dashboard_squarespace_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS:
+            sql_query = f"""
+            SELECT 
+                REGEXP_EXTRACT(table_name, r'([^-]+)') as event_name,
+                COUNT(*) as attendee_count,
+                COUNT(DISTINCT COALESCE(Email, email, EMAIL)) as unique_emails,
+                COUNTIF(COALESCE(Phone, phone, PHONE) IS NOT NULL AND COALESCE(Phone, phone, PHONE) != '') as contacts_with_phone
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS}.INFORMATION_SCHEMA.TABLES` t
+            JOIN `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS}.{'{'}t.table_name{'}'}` 
+            WHERE COALESCE(Email, email, EMAIL) IS NOT NULL AND COALESCE(Email, email, EMAIL) != ''
+            GROUP BY event_name
+            ORDER BY attendee_count DESC
+            """
+            results = query_squarespace_dashboard_bigquery(sql_query)
+            
+            if results:
+                return jsonify({
+                    "status": "success",
+                    "data": results,
+                    "data_source": "BigQuery (Squarespace Forms)",
+                    "total_attendees": sum(item.get('attendee_count', 0) for item in results)
+                })
+        
+        # Fallback response when no Squarespace data available
+        return jsonify({
+            "status": "success",
+            "data": [],
+            "message": "Squarespace forms data not available - configure KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS",
+            "data_source": "No data source configured"
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Dashboard attendee analytics error: {e}")
+        return jsonify({"error": "Failed to generate attendee analytics"}), 500
+
+@app.route('/api/dashboard/combined-insights', methods=['GET'])
+def dashboard_combined_insights():
+    """Get combined insights from both sales and attendee data"""
+    try:
+        insights = {
+            "sales_data": {
+                "total_revenue": 0,
+                "vendor_count": 0,
+                "events_with_sales": 0
+            },
+            "attendee_data": {
+                "total_attendees": 0,
+                "events_with_attendees": 0,
+                "contact_completion_rate": 0
+            },
+            "combined_metrics": {
+                "revenue_per_attendee": 0,
+                "vendor_to_attendee_ratio": 0,
+                "average_vendor_revenue": 0
+            }
+        }
+        
+        # Get sales data from CSV
+        sales_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv') + load_csv_fallback_data('undiscovered_dashboard_data.csv')
+        if sales_data:
+            revenues = [safe_float_conversion(record.get('total_revenue', '0')) for record in sales_data]
+            total_revenue = sum(revenues)
+            vendor_names = set(record.get('vendor_name', '') for record in sales_data if record.get('vendor_name'))
+            event_names = set(record.get('event_name', '') for record in sales_data if record.get('event_name'))
+            
+            insights["sales_data"]["total_revenue"] = total_revenue
+            insights["sales_data"]["vendor_count"] = len(vendor_names)
+            insights["sales_data"]["events_with_sales"] = len(event_names)
+            insights["combined_metrics"]["average_vendor_revenue"] = round(total_revenue / len(vendor_names), 2) if vendor_names else 0
+        
+        # Get attendee data from Squarespace if available
+        if dashboard_squarespace_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS:
+            try:
+                # Get table list first
+                table_query = f"""
+                SELECT table_name 
+                FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS}.INFORMATION_SCHEMA.TABLES`
+                WHERE table_type = 'BASE_TABLE'
+                LIMIT 5
+                """
+                table_results = query_squarespace_dashboard_bigquery(table_query)
+                
+                if table_results:
+                    total_attendees = 0
+                    events_with_attendees = len(table_results)
+                    contacts_with_phone = 0
+                    
+                    # Query each table for attendee counts
+                    for table_info in table_results:
+                        table_name = table_info.get('table_name')
+                        if table_name:
+                            attendee_query = f"""
+                            SELECT 
+                                COUNT(*) as count,
+                                COUNTIF(COALESCE(Phone, phone, PHONE) IS NOT NULL AND COALESCE(Phone, phone, PHONE) != '') as with_phone
+                            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS}.{table_name}`
+                            WHERE COALESCE(Email, email, EMAIL) IS NOT NULL AND COALESCE(Email, email, EMAIL) != ''
+                            """
+                            attendee_results = query_squarespace_dashboard_bigquery(attendee_query)
+                            
+                            if attendee_results and attendee_results[0]:
+                                total_attendees += attendee_results[0].get('count', 0)
+                                contacts_with_phone += attendee_results[0].get('with_phone', 0)
+                    
+                    insights["attendee_data"]["total_attendees"] = total_attendees
+                    insights["attendee_data"]["events_with_attendees"] = events_with_attendees
+                    insights["attendee_data"]["contact_completion_rate"] = round((contacts_with_phone / total_attendees * 100), 2) if total_attendees > 0 else 0
+                    
+                    # Calculate combined metrics
+                    if total_attendees > 0:
+                        insights["combined_metrics"]["revenue_per_attendee"] = round(insights["sales_data"]["total_revenue"] / total_attendees, 2)
+                    if total_attendees > 0 and insights["sales_data"]["vendor_count"] > 0:
+                        insights["combined_metrics"]["vendor_to_attendee_ratio"] = round(insights["sales_data"]["vendor_count"] / total_attendees, 3)
+                        
+            except Exception as e:
+                app.logger.warning(f"Could not get Squarespace attendee data: {e}")
+        
+        return jsonify({
+            "status": "success",
+            "data": insights,
+            "data_sources": {
+                "sales": "CSV (Close-out sales)",
+                "attendees": "BigQuery (Squarespace forms)" if dashboard_squarespace_bigquery_client else "Not available"
+            }
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Dashboard combined insights error: {e}")
+        return jsonify({"error": "Failed to generate combined insights"}), 500
 
 
 if __name__ == '__main__':

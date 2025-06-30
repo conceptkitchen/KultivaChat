@@ -194,9 +194,15 @@ curl -X GET https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/dashboard/
 
 ## Environment Variables
 
-Required for dashboard workspace connection:
+Required for dashboard workspace connections:
+
+**Close-out Sales Data:**
 - `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES`: Path to service account JSON
 - `KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES`: Dashboard workspace schema name
+
+**Squarespace Forms Data:**
+- `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS`: Path to service account JSON
+- `KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS`: Squarespace forms workspace schema name
 
 ## Support
 
