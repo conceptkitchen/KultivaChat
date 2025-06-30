@@ -142,10 +142,12 @@ The system processed real vendor registration data from UNDISCOVERED events, int
   - ✅ ENHANCED: Flexible parameter extraction supporting multiple query variations ("top 7", "best 10", "first 5", "show 15")
   - ✅ OPTIMIZED: Geographic entity recognition with context-aware mapping ("bay area" → ['San Francisco', 'SF', 'Daly City'])
   - ✅ VALIDATED: Geographic attendee queries now properly route to location filtering (2,158 attendees from SF/Daly City)
+  - ✅ FIXED: Email extraction queries now properly classified as `geographic_contact_extraction` returning actual email addresses instead of counts
+  - ✅ VERIFIED: "What are the emails of attendees in Daly City?" returns 100 authentic email addresses with names and event series
   - ✅ ARCHITECTURE: AI-first approach where semantic understanding drives tool routing decisions instead of hardcoded indicators
   - ✅ TESTED: Query "Show me people who attended events in the bay area" correctly classified as geographic_attendee with location_filtering
   - ✅ PERFORMANCE: Maintains sub-1s execution with enhanced semantic analysis and intelligent routing
-  - → SQL tool now uses AI natural language understanding to determine optimal routing strategy for each unique query
+  - → SQL tool now uses AI natural language understanding to determine optimal routing strategy including contact extraction vs aggregation
 
 - **June 30, 2025**: PHONE QUERY ROUTING COMPLETELY FIXED WITH VENDOR NAMES - API now correctly returns actual phone numbers WITH proper vendor names
   - ✅ IMPLEMENTED: Direct phone query routing at API endpoint level bypasses comprehensive analysis path
