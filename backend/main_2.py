@@ -656,7 +656,9 @@ def internal_execute_sql_query(query: str) -> dict:
         comprehensive_keywords = [
             'across all', 'all events', 'compare events', 'which event', 'best event',
             'most money', 'highest revenue', 'compare', 'breakdown', 'all tables',
-            'made the most', 'top event', 'highest earning', 'compare revenue'
+            'made the most', 'top event', 'highest earning', 'compare revenue',
+            'made over', 'over $', 'above $', 'more than $', 'vendors who made',
+            'who made over', 'threshold', 'minimum revenue', 'vendors who'
         ]
         
         is_comprehensive = any(keyword in original_query.lower() for keyword in comprehensive_keywords)
