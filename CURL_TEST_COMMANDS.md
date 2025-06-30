@@ -6,7 +6,7 @@
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How much money was made by vendors at UNDISCOVERED events?"}' \
+  -d '{"query": "How much money was made by vendors at UNDISCOVERED SF events on August 19, 2023?"}' \
   --max-time 30
 ```
 
@@ -22,7 +22,7 @@ curl -s -X POST http://localhost:8081/api/query \
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Who are the top 5 vendors from UNDISCOVERED events?"}' \
+  -d '{"query": "Who are the top 5 vendors from UNDISCOVERED events from August 2023 to October 2024?"}' \
   --max-time 30
 ```
 
@@ -34,19 +34,19 @@ curl -s -X POST http://localhost:8081/api/query \
   --max-time 30
 ```
 
-### 5. High Revenue Vendors
+### 5. High Revenue Vendors by Demographics
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Which vendors made more than $500 from 2023 to 2024?"}' \
+  -d '{"query": "Which vendors who identify as Filipino made more than $750 from 2023 to 2024?"}' \
   --max-time 45
 ```
 
-### 6. Vendor Email Addresses
+### 6. Vendor Email Addresses by Product Type
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the email addresses of vendors that sell products?"}' \
+  -d '{"query": "What are the email addresses of vendors that sell jewelry?"}' \
   --max-time 30
 ```
 
@@ -104,7 +104,7 @@ curl -s -X POST http://localhost:8081/api/query \
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How many attendees gave more than $1 from 2023 to 2024?"}' \
+  -d '{"query": "How many attendees gave more than $25 from 2021 to 2024?"}' \
   --max-time 30
 ```
 
@@ -112,7 +112,7 @@ curl -s -X POST http://localhost:8081/api/query \
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Who has attended events at Balay Kreative and UNDISCOVERED in 2023?"}' \
+  -d '{"query": "Who has attended events at Balay Kreative and UNDISCOVERED in 2020?"}' \
   --max-time 30
 ```
 
@@ -168,7 +168,7 @@ curl -s -X POST http://localhost:8081/api/query \
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Which vendors participated in Kapwa Gardens events and UNDISCOVERED events from 2023-2024 and identify as Middle Eastern?"}' \
+  -d '{"query": "Which vendors participated in Kapwa Gardens events and UNDISCOVERED events from 2020-2023 and identify as Middle Eastern?"}' \
   --max-time 45
 ```
 
@@ -176,7 +176,7 @@ curl -s -X POST http://localhost:8081/api/query \
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Which of our Balay Kreative applicants identify as Filipino?"}' \
+  -d '{"query": "Which of our Balay Kreative applicants identify as LGBTQ+?"}' \
   --max-time 30
 ```
 
