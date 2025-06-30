@@ -164,6 +164,22 @@ curl -s -X POST http://localhost:8081/api/query \
   --max-time 30
 ```
 
+### 21. Cross-Event Middle Eastern Vendors
+```bash
+curl -s -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Which vendors participated in Kapwa Gardens events and UNDISCOVERED events from 2023-2024 and identify as Middle Eastern?"}' \
+  --max-time 45
+```
+
+### 22. Grant Applicant Demographics
+```bash
+curl -s -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Which of our Balay Kreative applicants identify as Filipino?"}' \
+  --max-time 30
+```
+
 ## Quick Test Commands
 
 ### Basic Functionality Test
