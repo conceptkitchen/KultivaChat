@@ -2084,6 +2084,28 @@ def dashboard_attendee_analytics():
         app.logger.error(f"Dashboard attendee analytics error: {e}")
         return jsonify({"error": "Failed to generate attendee analytics"}), 500
 
+def safe_float_conversion(value):
+    """Safely convert a value to float, handling various formats"""
+    if value is None:
+        return 0.0
+    
+    # If already a number
+    if isinstance(value, (int, float)):
+        return float(value)
+    
+    # If string, clean and convert
+    if isinstance(value, str):
+        # Remove common currency symbols and whitespace
+        cleaned = value.strip().replace('$', '').replace(',', '').replace(' ', '')
+        if cleaned == '' or cleaned == 'N/A' or cleaned == '#REF!':
+            return 0.0
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
+    
+    return 0.0
+
 @app.route('/api/dashboard/combined-insights', methods=['GET'])
 def dashboard_combined_insights():
     """Get combined insights from both sales and attendee data"""
@@ -2109,7 +2131,8 @@ def dashboard_combined_insights():
         # Get sales data from CSV
         sales_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv') + load_csv_fallback_data('undiscovered_dashboard_data.csv')
         if sales_data:
-            revenues = [safe_float_conversion(record.get('total_revenue', '0')) for record in sales_data]
+            # Use correct column names from CSV: total_sales, cash_credit_total
+            revenues = [safe_float_conversion(record.get('total_sales', record.get('cash_credit_total', '0'))) for record in sales_data]
             total_revenue = sum(revenues)
             vendor_names = set(record.get('vendor_name', '') for record in sales_data if record.get('vendor_name'))
             event_names = set(record.get('event_name', '') for record in sales_data if record.get('event_name'))
