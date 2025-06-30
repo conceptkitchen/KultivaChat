@@ -2424,8 +2424,67 @@ def natural_language_query():
         # CRITICAL: Apply smart routing for natural language queries
         app.logger.info("Processing with Gemini AI and enhanced smart routing")
         
-        # PHONE QUERY DETECTION: Route directly to Squarespace vendor table for phone requests
+        # VENDOR SALES QUERY DETECTION: Route directly to sales data for top vendor queries
         query_lower = original_query.lower()
+        vendor_sales_indicators = ['top vendors', 'top 5 vendors', 'vendors in sales', 'highest sales', 'most sales', 'vendor sales ranking']
+        undiscovered_indicators = ['undiscovered', 'undiscovered events']
+        
+        if any(sales_indicator in query_lower for sales_indicator in vendor_sales_indicators) and any(event_indicator in query_lower for event_indicator in undiscovered_indicators):
+            app.logger.info("VENDOR SALES QUERY DETECTED AT API LEVEL: Routing directly to UNDISCOVERED sales data with optimized query")
+            
+            vendor_sales_query = f"""
+            SELECT 
+                Vendor_Name,
+                Total_Sales
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors`
+            WHERE Total_Sales IS NOT NULL 
+            AND Vendor_Name IS NOT NULL 
+            AND Vendor_Name != ''
+            AND Total_Sales != ''
+            ORDER BY CAST(REPLACE(REPLACE(REPLACE(Total_Sales, '$', ''), ',', ''), ' ', '') AS FLOAT64) DESC
+            LIMIT 5
+            """
+            
+            try:
+                import time
+                start_time = time.time()
+                query_job = bigquery_client.query(vendor_sales_query)
+                sales_results = query_job.result()
+                sales_results = list(sales_results)
+                execution_time = time.time() - start_time
+                
+                # Format results for display
+                formatted_results = []
+                for row in sales_results:
+                    try:
+                        vendor_name = getattr(row, 'Vendor_Name', str(row[0]) if len(row) > 0 else 'Unknown')
+                        total_sales = getattr(row, 'Total_Sales', str(row[1]) if len(row) > 1 else '$0.00')
+                        
+                        formatted_results.append({
+                            "vendor_name": vendor_name,
+                            "total_sales": total_sales.strip()
+                        })
+                    except Exception as e:
+                        app.logger.warning(f"Error formatting sales result row: {e}")
+                        continue
+                
+                app.logger.info(f"VENDOR SALES QUERY SUCCESS: Retrieved top {len(formatted_results)} vendors in {execution_time:.2f}s")
+                
+                return jsonify({
+                    "status": "success",
+                    "data": formatted_results,
+                    "query_executed": vendor_sales_query,
+                    "execution_time": execution_time,
+                    "query_type": "vendor_sales_ranking",
+                    "table_source": "2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors",
+                    "routing_method": "direct_sales_routing"
+                })
+                
+            except Exception as e:
+                app.logger.error(f"Error executing vendor sales query: {e}")
+                # Fall back to regular processing
+        
+        # PHONE QUERY DETECTION: Route directly to Squarespace vendor table for phone requests
         phone_indicators = ['phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'billing_phone']
         
         if any(indicator in query_lower for indicator in phone_indicators):
