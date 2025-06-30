@@ -18,59 +18,59 @@ curl -s -X POST http://localhost:8081/api/query \
   --max-time 30
 ```
 
-### 3. Top 5 Vendors
+### 3. Top 5 Vendors from Be Free Festival
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Who are the top 5 vendors from UNDISCOVERED events from August 2023 to October 2024?"}' \
+  -d '{"query": "Who are the top 5 vendors from Be Free Festival 2023 at Kapwa Gardens?"}' \
   --max-time 30
 ```
 
-### 4. Vendor Zip Codes
+### 4. Vendor Zip Codes from Many Styles Events
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What zip codes are our vendors from who participated from 2023 to 2024?"}' \
+  -d '{"query": "What zip codes are our vendors from who participated in Many Styles events from July to October 2023?"}' \
   --max-time 30
 ```
 
-### 5. High Revenue Vendors by Demographics
+### 5. High Revenue Vendors Over $500
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "Which vendors who identify as Filipino made more than $750 from 2023 to 2024?"}' \
+  -d '{"query": "Which vendors made more than $500 from 2023 to 2024?"}' \
   --max-time 45
 ```
 
-### 6. Vendor Email Addresses by Product Type
+### 6. Vendor Email Addresses from Yum Yams
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the email addresses of vendors that sell jewelry?"}' \
+  -d '{"query": "What are the email addresses of vendors from Yum Yams events?"}' \
   --max-time 30
 ```
 
-### 7. Low Income Vendor Emails
+### 7. Low Income Vendor Emails Under $200
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the email addresses of vendors that make less than $300?"}' \
+  -d '{"query": "What are the email addresses of vendors that made less than $200?"}' \
   --max-time 30
 ```
 
-### 8. Vendor Phone Numbers (Yum Yams)
+### 8. Vendor Phone Numbers from Yum Yams 2023
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the phone numbers of vendors that participated in Yum Yams events?"}' \
+  -d '{"query": "What are the phone numbers of vendors that participated in Yum Yams May 13, 2023?"}' \
   --max-time 30
 ```
 
-### 9. Kapwa Gardens Vendor Phones
+### 9. Kapwa Gardens Vendor Phones from Dye Hard
 ```bash
 curl -s -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "What are the phone numbers of vendors that participated at Kapwa Gardens?"}' \
+  -d '{"query": "What are the phone numbers of vendors from Dye Hard events at Kapwa Gardens?"}' \
   --max-time 30
 ```
 

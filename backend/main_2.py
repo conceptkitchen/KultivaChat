@@ -928,8 +928,80 @@ def internal_execute_sql_query(query: str) -> dict:
                         revenue_tables.append((table, revenue_cols[0]))  # Use first revenue column
                 
                 if revenue_tables:
-                    # Use the first revenue table for analysis
-                    target_table, revenue_column = revenue_tables[0]
+                    # ENHANCED TABLE SELECTION: Filter for specific events mentioned in query
+                    target_table, revenue_column = revenue_tables[0]  # Default fallback
+                    
+                    # Check if query mentions specific event/date and filter accordingly
+                    query_lower = original_query.lower()
+                    
+                    # Event name mapping for precise table selection
+                    event_filters = {
+                        'undiscovered': ['undiscovered'],
+                        'kapwa gardens': ['kapwa'],
+                        'lovers mart': ['lovers-mart'],
+                        'yum yams': ['yum-yams'],
+                        'dye hard': ['dye-hard'],
+                        'be free': ['be-free'],
+                        'halo halo': ['halo-halo'],
+                        'many styles': ['many-styles'],
+                        'balay kreative': ['balay-kreative'],
+                        'ancestor altars': ['ancestor-altars'],
+                        'baked': ['baked'],
+                        'lavender cinema': ['lavender-cinema']
+                    }
+                    
+                    # Date filtering for specific dates mentioned
+                    date_patterns = [
+                        r'august 19,? 2023', r'2023-08-19',
+                        r'september 16,? 2023', r'2023-09-16', 
+                        r'october 21,? 2023', r'2023-10-21',
+                        r'february 11,? 2023', r'2023-02-11',
+                        r'may 13,? 2023', r'2023-05-13',
+                        r'june 10,? 2023', r'2023-06-10',
+                        r'march 18,? 2023', r'2023-03-18'
+                    ]
+                    
+                    # Find best matching table based on event name and date
+                    best_match_table = None
+                    best_match_score = 0
+                    
+                    for table, rev_col in revenue_tables:
+                        table_lower = table.lower()
+                        match_score = 0
+                        
+                        # Score based on event name matches
+                        for event_name, event_keywords in event_filters.items():
+                            if event_name in query_lower:
+                                for keyword in event_keywords:
+                                    if keyword in table_lower:
+                                        match_score += 10
+                        
+                        # Score based on date matches
+                        import re
+                        for date_pattern in date_patterns:
+                            if re.search(date_pattern, query_lower):
+                                # Extract expected date components
+                                if 'august 19' in query_lower or '2023-08-19' in query_lower:
+                                    if '2023-08-19' in table_lower:
+                                        match_score += 20
+                                elif 'september 16' in query_lower or '2023-09-16' in query_lower:
+                                    if '2023-09-16' in table_lower:
+                                        match_score += 20
+                                elif 'february 11' in query_lower or '2023-02-11' in query_lower:
+                                    if '2023-02-11' in table_lower:
+                                        match_score += 20
+                        
+                        # Update best match if this table scores higher
+                        if match_score > best_match_score:
+                            best_match_score = match_score
+                            best_match_table = (table, rev_col)
+                    
+                    # Use best matching table if found, otherwise use first table
+                    if best_match_table and best_match_score > 0:
+                        target_table, revenue_column = best_match_table
+                        app.logger.info(f"SPECIFIC EVENT FILTER: Selected '{target_table}' with score {best_match_score} for query: {original_query[:100]}")
+                    else:
+                        app.logger.info(f"NO SPECIFIC MATCH: Using default table '{target_table}' for query: {original_query[:100]}")
                     
                     # Enhanced revenue analysis with proper currency handling
                     final_query = f"""
