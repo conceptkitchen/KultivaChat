@@ -751,10 +751,73 @@ def internal_execute_sql_query(query: str) -> dict:
             'all events in', 'events during', 'all vendor', 'vendor data from'
         ]
         
-        # STEP 1: INTELLIGENT TABLE DISCOVERY
-        # Determine data source type based on query context FIRST (before comprehensive detection)
-        # IMPORTANT: Remove 'attendee' from contact keywords to avoid misclassification
-        contact_keywords = ['contact', 'email', 'phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'number', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
+        # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
+        # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
+        
+        # PHONE QUERY DETECTION: Check for phone number requests specifically
+        phone_indicators = ['phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'billing_phone']
+        is_phone_query = any(indicator in query_lower for indicator in phone_indicators)
+        
+        # IMMEDIATE PHONE QUERY ROUTING: Route directly to Squarespace vendor table with actual phone data
+        if is_phone_query:
+            app.logger.info(f"PHONE QUERY DETECTED: Routing directly to Squarespace vendor table with actual phone data")
+            
+            # Construct direct query to Squarespace vendor table that has real phone numbers
+            phone_query = f"""
+            SELECT 
+                COALESCE(Vendor_Business_Name, Business_Name, Vendor, 'Unknown') as vendor_name,
+                Email,
+                Billing_Phone as phone_number
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered-Vendor-Export---Squarespace---All-data-orders`
+            WHERE Billing_Phone IS NOT NULL 
+            AND Billing_Phone != ''
+            AND TRIM(Billing_Phone) != ''
+            ORDER BY Email
+            LIMIT 50
+            """
+            
+            try:
+                start_time = time.time()
+                query_job = bigquery_client.query(phone_query)
+                phone_results = query_job.result(timeout=60)
+                phone_results = list(phone_results)
+                execution_time = time.time() - start_time
+                
+                # Format results for display
+                formatted_results = []
+                for row in phone_results:
+                    try:
+                        vendor_name = getattr(row, 'vendor_name', str(row[0]) if len(row) > 0 else 'Unknown')
+                        email = getattr(row, 'Email', str(row[1]) if len(row) > 1 else '')
+                        phone = getattr(row, 'phone_number', str(row[2]) if len(row) > 2 else '')
+                        
+                        formatted_results.append({
+                            "vendor": vendor_name,
+                            "email": email,
+                            "phone": phone
+                        })
+                    except Exception as e:
+                        app.logger.warning(f"Error formatting phone result row: {e}")
+                        continue
+                
+                app.logger.info(f"PHONE QUERY SUCCESS: Retrieved {len(formatted_results)} actual phone numbers in {execution_time:.2f}s")
+                
+                return {
+                    "status": "success",
+                    "data": formatted_results,
+                    "query_executed": phone_query,
+                    "execution_time": execution_time,
+                    "query_type": "phone_extraction",
+                    "table_source": "Undiscovered-Vendor-Export---Squarespace---All-data-orders",
+                    "routing_method": "direct_phone_routing"
+                }
+                
+            except Exception as e:
+                app.logger.error(f"Direct phone query failed: {e}")
+                # Continue to fallback processing
+        
+        # DETERMINE DATA SOURCE TYPE based on query context (after phone routing)
+        contact_keywords = ['contact', 'email', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
         is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
         
         # COMPREHENSIVE ANALYSIS: Only if NOT a contact query
@@ -2360,6 +2423,67 @@ def natural_language_query():
         
         # CRITICAL: Apply smart routing for natural language queries
         app.logger.info("Processing with Gemini AI and enhanced smart routing")
+        
+        # PHONE QUERY DETECTION: Route directly to Squarespace vendor table for phone requests
+        query_lower = original_query.lower()
+        phone_indicators = ['phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'billing_phone']
+        
+        if any(indicator in query_lower for indicator in phone_indicators):
+            app.logger.info("PHONE QUERY DETECTED AT API LEVEL: Routing directly to Squarespace vendor table with actual phone data")
+            
+            phone_query = f"""
+            SELECT 
+                COALESCE(Vendor_data_Your_Business_Name, Vendor, 'Unknown') as vendor_name,
+                Email,
+                Billing_Phone as phone_number
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered-Vendor-Export---Squarespace---All-data-orders`
+            WHERE Billing_Phone IS NOT NULL 
+            AND Billing_Phone != ''
+            AND TRIM(Billing_Phone) != ''
+            ORDER BY Email
+            LIMIT 50
+            """
+            
+            try:
+                import time
+                start_time = time.time()
+                query_job = bigquery_client.query(phone_query)
+                phone_results = query_job.result(timeout=60)
+                phone_results = list(phone_results)
+                execution_time = time.time() - start_time
+                
+                # Format results for display
+                formatted_results = []
+                for row in phone_results:
+                    try:
+                        vendor_name = getattr(row, 'vendor_name', str(row[0]) if len(row) > 0 else 'Unknown')
+                        email = getattr(row, 'Email', str(row[1]) if len(row) > 1 else '')
+                        phone = getattr(row, 'phone_number', str(row[2]) if len(row) > 2 else '')
+                        
+                        formatted_results.append({
+                            "vendor": vendor_name,
+                            "email": email,
+                            "phone": phone
+                        })
+                    except Exception as e:
+                        app.logger.warning(f"Error formatting phone result row: {e}")
+                        continue
+                
+                app.logger.info(f"PHONE QUERY SUCCESS: Retrieved {len(formatted_results)} actual phone numbers in {execution_time:.2f}s")
+                
+                return jsonify({
+                    "status": "success",
+                    "data": formatted_results,
+                    "query_executed": phone_query,
+                    "execution_time": execution_time,
+                    "query_type": "phone_extraction",
+                    "table_source": "Undiscovered-Vendor-Export---Squarespace---All-data-orders",
+                    "routing_method": "direct_phone_routing"
+                })
+                
+            except Exception as e:
+                app.logger.error(f"Direct phone query failed: {e}")
+                # Fall through to standard processing
         
         # Enhanced MCP processing with smart table filtering
         result = internal_execute_sql_query(original_query)
