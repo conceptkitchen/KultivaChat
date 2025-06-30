@@ -1617,7 +1617,6 @@ def natural_language_query():
                         FROM ({' UNION ALL '.join(union_queries)})
                         WHERE total_revenue > {threshold}
                         ORDER BY total_revenue DESC
-                        LIMIT 50
                         """
                         
                         app.logger.info(f"Executing multi-table Kapwa Gardens analysis across {len(table_names)} tables with ${threshold} threshold")
