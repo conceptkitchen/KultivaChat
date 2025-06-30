@@ -848,13 +848,13 @@ def internal_execute_sql_query(query: str) -> dict:
                     if any(keyword in query_lower for keyword in ['contact', 'email', 'phone']):
                         contact_cols = [col for col in columns if any(term in col.lower() for term in ['email', 'phone', 'contact', 'name'])]
                         if contact_cols:
-                            final_query = f"SELECT {', '.join(contact_cols[:5])} FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                            final_query = f"SELECT {', '.join(contact_cols[:5])} FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
                         else:
-                            final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                            final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
                     else:
-                        final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                        final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
                 else:
-                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
             
             else:
                 # BUSINESS INTELLIGENCE ANALYSIS (SINGLE TABLE)
@@ -887,7 +887,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 else:
                     # Fallback to simple data display
                     target_table = relevant_tables[0]
-                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 10"
+                    final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
         
         else:
             # Direct SQL query - execute as provided
