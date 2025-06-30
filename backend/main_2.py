@@ -857,6 +857,11 @@ def internal_execute_sql_query(query: str) -> dict:
                 intent['type'] = 'contact_extraction'
                 intent['focus'] = 'contact_information'
             
+            # Donation/donor queries - clarify data limitations (check before attendee_count)
+            elif any(donation_word in query_lower for donation_word in ['donor', 'donation', 'gave', 'contributed', 'donated']):
+                intent['type'] = 'donation_clarification'
+                intent['focus'] = 'data_limitation_explanation'
+            
             # Revenue/financial queries
             elif any(finance_word in query_lower for finance_word in ['revenue', 'money', 'profit', 'sales', 'made']):
                 intent['type'] = 'revenue_analysis'
@@ -1048,6 +1053,29 @@ def internal_execute_sql_query(query: str) -> dict:
                 app.logger.error(f"City ranking query failed in SQL tool: {e}")
                 # Continue to fallback processing
         
+        # DONATION CLARIFICATION ROUTING: Explain data limitations for donation queries
+        if query_intent.get('type') == 'donation_clarification':
+            app.logger.info(f"DONATION CLARIFICATION QUERY DETECTED: Explaining data availability")
+            
+            return {
+                "status": "data_clarification", 
+                "message": "Your data contains ticket purchases and vendor sales, but not donation amounts. For attendee analysis, I can provide geographic breakdowns, ticket purchase counts, and event participation. For financial analysis, I can show vendor revenue from events.",
+                "available_data_types": [
+                    "Attendee counts by city (ticket purchasers)",
+                    "Vendor revenue from events", 
+                    "Geographic attendee analysis",
+                    "Event participation statistics"
+                ],
+                "suggested_queries": [
+                    "How many attendees in San Francisco?",
+                    "Which vendors made the most revenue?",
+                    "Which cities have the most attendees?",
+                    "Total vendor revenue by event"
+                ],
+                "query_type": "donation_clarification",
+                "routing_method": "sql_tool_data_clarification"
+            }
+        
         # IMMEDIATE ATTENDEE COUNT ROUTING: Direct query for attendee counts
         if query_intent.get('type') == 'attendee_count':
             target_year = query_intent.get('years', ['2023'])[0] if query_intent.get('years') else '2023'
@@ -1058,7 +1086,7 @@ def internal_execute_sql_query(query: str) -> dict:
             SELECT 
                 'Balay-Kreative' as event_series,
                 COUNT(*) as attendee_count
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders`
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
             WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
             
             UNION ALL

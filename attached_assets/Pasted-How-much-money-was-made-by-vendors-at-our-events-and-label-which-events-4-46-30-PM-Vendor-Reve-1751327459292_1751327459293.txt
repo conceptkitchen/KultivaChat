@@ -1,0 +1,111 @@
+How much money was made by vendors at our events, and label which events
+
+
+4:46:30 PM
+## Vendor Revenue Summary Based on our Kultivate AI data platform analysis, here's a comprehensive breakdown of vendor sales across your events: ## Overall Performance **Total Revenue Generated: $395,408** - 289 vendor transactions analyzed - Average vendor revenue: $1,368 per vendor - Revenue range: $1,799 - $135,126 per event ## Event-by-Event Breakdown ### **UNDISCOVERED SF** (Top Performing Event Series) - **August 19, 2023**: $135,126 total revenue - 47 vendors participated - Average per vendor: $2,875 - Top vendor earned: $67,563 - **October 21, 2023**: $103,049 total revenue - 70 vendors participated - Average per vendor: $1,472 - Top vendor earned: $9,599 - **September 16, 2023**: $74,255 total revenue - 60 vendors participated - Average per vendor: $1,238 - Top vendor earned: $7,795 - **October 19, 2024**: $66,510 total revenue - 75 vendors participated - Average per vendor: $887 - Top vendor earned: $5,493 ### **Kapwa Gardens** - **February 11, 2023**: $8,011 total revenue - 19 vendors participated - Average per vendor: $422 - Top vendor earned: $825 - **November 2023**: $1,799 total revenue - 4 vendors participated - Average per vendor: $450 ### **Other Events** - **July 13, 2024** (Sulat): $6,659 total revenue - 14 vendors participated - Average per vendor: $476 ## Key Insights - **UNDISCOVERED SF** is your highest-grossing event series, generating 96% of total revenue - August 2023 UNDISCOVERED SF was your most successful single event - Vendor participation has grown over time (47 → 75 vendors in recent UNDISCOVERED SF events) - Revenue per vendor varies significantly, suggesting opportunities for vendor development ## Recommendations - Focus resources on expanding the UNDISCOVERED SF format - Analyze top-performing vendors for best practices - Consider vendor education programs to improve average sales
+
+Query Results
+8 records found
+
+average revenue
+event date
+event name
+max revenue
+min revenue
+record count
+table source
+tables analyzed
+total revenue
+1368.1948442906573
+2020-2024
+All Events Combined
+135125.83999999997
+1798.6
+289
+COMPREHENSIVE_ANALYSIS_SUMMARY
+7
+395408.30999999994
+2875.0178723404256
+2023-08-19
+UNDISCOVERED SF
+67562.92
+57
+47
+2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors
+-
+135125.83999999997
+1472.1342857142854
+2023-10-21
+UNDISCOVERED SF
+9599.47
+77.5
+70
+2023-10-21-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors
+-
+103049.40000000001
+1237.5751666666672
+2023-09-16
+UNDISCOVERED SF
+7795.2
+127.5
+60
+2023-09-16-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors
+-
+74254.51000000001
+886.7999999999998
+2024-10-19
+UNDISCOVERED SF
+5493
+0
+75
+2024-10-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors
+-
+66510
+421.62315789473683
+2023-02-11
+Kapwa Gardens
+825.09
+65
+19
+2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal
+-
+8010.84
+475.6514285714286
+2024-07-13
+-
+1560.52
+15
+14
+2024-07-13-Sulat_-Close-Out-Sales-START-HERE-Vendor-Close-Out-Sal
+-
+6659.120000000001
+449.65
+Unknown-Date
+Kapwa Gardens
+575.92
+275
+4
+Close-Out-Sales---Ancestor-Altars---2023-11-04---Kapwa-Gardens-Vendor-Close-Out-Sales
+-
+1798.6
+Route: ai_enhanced
+
+4:47:03 PM
+What is the most popular city that our donors live in?
+
+
+4:49:57 PM
+## Analysis: Donor Location Data Unfortunately, I wasn't able to retrieve the donor location information from our Kultivate AI data platform at this time. There appears to be a technical issue accessing the donor demographics data. ## Recommended Next Steps • **Data Availability Check**: Let me verify what donor and attendee location data is currently available in our system • **Alternative Analysis**: I can explore related datasets like event attendee locations or vendor geographic distribution • **System Status**: Our technical team should investigate the data access issue ## What I Can Help With Instead While I resolve the donor location query, I can assist with: • Event attendance patterns by location • Vendor distribution across cities • Revenue analysis by geographic region • Overall event performance metrics Would you like me to explore any of these alternative analyses, or shall I focus on resolving the donor location data access issue first?
+
+Route: ai_enhanced
+
+4:50:07 PM
+How many attendees gave more than $1 from 2021 - 2024?
+
+
+4:50:24 PM
+## Donation Analysis - 2021-2024 I apologize, but I'm currently unable to access the donation data due to a temporary system issue with our Kultivate AI data platform. ## What I Was Looking For: - Total number of attendees who made donations above $1 - Breakdown by year (2021-2024) - Donation patterns and trends over this period ## Next Steps: • **Retry Analysis**: I'll attempt to retrieve this data again shortly • **Alternative Reports**: I can provide other attendee engagement metrics once the system is restored • **Follow-up**: Please let me know if you'd like me to include additional donation metrics like: - Average donation amounts - Peak donation periods - Geographic distribution of donors Would you like me to try accessing different attendee data in the meantime, or shall I retry this specific donation analysis?
+
+Route: ai_enhanced
+
+4:50:40 PM
