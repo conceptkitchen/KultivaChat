@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "average_revenue": 421.62315789473683,
+      "max_revenue": 825.09,
+      "min_revenue": 65.0,
+      "record_count": 19,
+      "table_source": "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal",
+      "total_revenue": 8010.84
+    }
+  ],
+  "query_executed": "\n                SELECT \n                    '2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal' as table_source,\n                    COUNT(*) as record_count,\n ...",
+  "status": "success"
+}
