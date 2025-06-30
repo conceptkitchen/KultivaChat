@@ -583,6 +583,40 @@ def internal_execute_sql_query(query: str) -> dict:
     app.logger.info(f"Tool Call: internal_execute_sql_query with query: {query[:200]}...")
     
     try:
+        # CHECK IF THIS IS ALREADY A PROPERLY FORMATTED SQL QUERY
+        query_stripped = query.strip()
+        if (query_stripped.upper().startswith(('SELECT', 'WITH')) and 
+            ('FROM' in query_stripped.upper()) and 
+            ('`' in query_stripped or 'WORKSPACE' in query_stripped.upper())):
+            
+            app.logger.info(f"Executing pre-formatted SQL query directly: {query_stripped[:100]}...")
+            
+            # Execute the SQL query directly
+            start_time = time.time()
+            query_job = bigquery_client.query(query_stripped)
+            results = query_job.result(timeout=60)
+            results = list(results)
+            execution_time = time.time() - start_time
+            
+            app.logger.info(f"Direct SQL execution completed in {execution_time:.2f}s, returned {len(results)} rows.")
+            
+            # Convert BigQuery Row objects to dictionaries
+            data_rows = []
+            for row in results:
+                if hasattr(row, '_mapping'):
+                    data_rows.append(dict(row._mapping))
+                elif hasattr(row, 'items'):
+                    data_rows.append(dict(row.items()))
+                else:
+                    data_rows.append(dict(row))
+            
+            return {
+                "status": "success",
+                "data": data_rows,
+                "query_executed": query_stripped,
+                "execution_time": execution_time
+            }
+        
         # ENHANCED BUSINESS INTELLIGENCE: Detect if this is a natural language business question
         original_query = query  # Preserve original query for detection
         query_lower = query.lower()
@@ -1119,24 +1153,39 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
             amount = amount_match.group(1)
             
             if 'kapwa gardens' in query_lower:
+                # Use a specific table instead of wildcard query
                 return f"""
                 SELECT 
                     CASE 
-                        WHEN Vendor_Name IS NOT NULL THEN Vendor_Name
-                        WHEN vendor_name IS NOT NULL THEN vendor_name
-                        WHEN VENDOR_NAME IS NOT NULL THEN VENDOR_NAME
+                        WHEN Vendor_Name IS NOT NULL AND Vendor_Name != '' THEN Vendor_Name
+                        WHEN vendor_name IS NOT NULL AND vendor_name != '' THEN vendor_name
+                        WHEN VENDOR_NAME IS NOT NULL AND VENDOR_NAME != '' THEN VENDOR_NAME
                         ELSE 'Unknown Vendor'
                     END as vendor_name,
                     CASE 
-                        WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
-                        WHEN total_sales IS NOT NULL THEN CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)
-                        WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
+                        WHEN Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%' THEN 
+                            SAFE_CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                        WHEN total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%' THEN 
+                            SAFE_CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                        WHEN Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%' THEN 
+                            SAFE_CAST(REGEXP_REPLACE(CAST(Cash__Credit_Total AS STRING), r'[^0-9.]', '') AS FLOAT64)
                         ELSE 0
                     END as total_revenue
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
-                WHERE table_name LIKE '%Kapwa%'
-                AND (Total_Sales IS NOT NULL OR total_sales IS NOT NULL OR Cash__Credit_Total IS NOT NULL)
-                HAVING total_revenue > {amount}
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal`
+                WHERE (
+                    (Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%') OR
+                    (total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%') OR
+                    (Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%')
+                )
+                AND CASE 
+                    WHEN Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%' THEN 
+                        SAFE_CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                    WHEN total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%' THEN 
+                        SAFE_CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                    WHEN Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%' THEN 
+                        SAFE_CAST(REGEXP_REPLACE(CAST(Cash__Credit_Total AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                    ELSE 0
+                END > {amount}
                 ORDER BY total_revenue DESC
                 LIMIT 20
                 """
