@@ -813,11 +813,25 @@ def internal_execute_sql_query(query: str) -> dict:
             table_name
         """
             elif is_contact_query:
-                # CONTACT QUERIES: Prioritize Squarespace tables (have phone data) over close-out sales (no phone data)
-                table_discovery_query = f"""
-        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-        WHERE LOWER(table_name) LIKE '%attendee%' 
-        OR LOWER(table_name) LIKE '%squarespace%'
+                # CONTACT QUERIES: For phone requests, prioritize Squarespace vendor tables with actual phone data
+                if any(term in query_lower for term in ['phone', 'cell', 'phone numbers', 'cell phone']):
+                    table_discovery_query = f"""
+            SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+            WHERE LOWER(table_name) LIKE '%squarespace%' AND LOWER(table_name) LIKE '%vendor%'
+            ORDER BY 
+                CASE 
+                    WHEN LOWER(table_name) LIKE '%squarespace%' AND LOWER(table_name) LIKE '%vendor%' THEN 1
+                    WHEN LOWER(table_name) LIKE '%squarespace%' THEN 2
+                    ELSE 3
+                END,
+                table_name
+            """
+                else:
+                    # OTHER CONTACT QUERIES: Prioritize Squarespace tables (have contact data) over close-out sales
+                    table_discovery_query = f"""
+            SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+            WHERE LOWER(table_name) LIKE '%attendee%' 
+            OR LOWER(table_name) LIKE '%squarespace%'
         OR LOWER(table_name) LIKE '%typeform%'
         OR LOWER(table_name) LIKE '%vendor%'
         OR LOWER(table_name) LIKE '%close-out%'
@@ -1103,11 +1117,35 @@ def internal_execute_sql_query(query: str) -> dict:
             elif is_contact_query and not is_comprehensive:
                 app.logger.info(f"CONTACT/DEMOGRAPHIC EXTRACTION: Processing specific contact query")
                 
-                # For contact queries, we want actual contact details, not aggregations
-                # Use the top relevant table and extract actual contact information
-                if relevant_tables and schema_info:
-                    top_table = relevant_tables[0]
-                    columns = schema_info.get(top_table, [])
+                # CRITICAL FIX: For phone number queries, prioritize Squarespace vendor tables
+                if any(term in query_lower for term in ['phone', 'cell', 'cell phone', 'phone numbers']):
+                    # Find Squarespace vendor table that has actual phone numbers
+                    squarespace_vendor_tables = [t for t in relevant_tables if 'squarespace' in t.lower() and 'vendor' in t.lower()]
+                    if squarespace_vendor_tables:
+                        app.logger.info(f"PHONE QUERY FIX: Using Squarespace vendor table with actual phone data: {squarespace_vendor_tables[0]}")
+                        top_table = squarespace_vendor_tables[0]
+                        # Get schema for this specific table
+                        try:
+                            schema_query = f"""
+                            SELECT column_name 
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS`
+                            WHERE table_name = '{top_table}'
+                            ORDER BY ordinal_position
+                            """
+                            schema_job = bigquery_client.query(schema_query)
+                            schema_results = list(schema_job.result())
+                            columns = [row.column_name for row in schema_results]
+                            app.logger.info(f"Schema for {top_table}: {columns}")
+                        except Exception as e:
+                            app.logger.error(f"Failed to get schema for {top_table}: {e}")
+                            columns = []
+                    else:
+                        top_table = relevant_tables[0] if relevant_tables else None
+                        columns = schema_info.get(top_table, []) if top_table else []
+                else:
+                    # For non-phone queries, use regular table selection
+                    top_table = relevant_tables[0] if relevant_tables else None
+                    columns = schema_info.get(top_table, []) if top_table else []
                     
                     # Find contact-related columns
                     email_cols = [col for col in columns if 'email' in col.lower()]
