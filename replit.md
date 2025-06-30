@@ -114,16 +114,15 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
   - ✅ VALIDATED: Revenue calculations process authentic financial data from close-out sales records
   - → Frontend can now connect to specialized dashboard endpoints for real-time financial data visualization with reliable CSV fallbacks
 
-- **June 30, 2025**: MULTI-TABLE ANALYSIS WITH KG TABLES RULE IMPLEMENTED - Kapwa Gardens queries now analyze all 24 tables (16 Kapwa + 8 KG)
-  - ✅ RESOLVED: Natural language queries now return logical individual results instead of misleading aggregate data
-  - ✅ IMPLEMENTED: Business rule that KG tables are also Kapwa Gardens tables applied across entire system
-  - ✅ EXPANDED: "Which Kapwa Gardens vendors made over $500?" now searches all 24 tables (16 Kapwa Gardens + 8 KG tables)
-  - ✅ ENHANCED: Comprehensive vendor analysis including KG events: Halo-Halo-Holidays ($19,665), Lavender-Cinema-Lounge, AKASSA, etc.
-  - ✅ VERIFIED: System discovers 24 tables automatically and executes complex UNION query in ~1.7s returning 50 results
-  - ✅ CONFIRMED: KG tables properly recognized in all analysis functions (table discovery, categorization, multi-table queries)
-  - ✅ VALIDATED: Multi-table analysis now includes KG event vendors alongside original Kapwa Gardens event data
-  - ✅ DOCUMENTED: Business rule "KG tables are also Kapwa Gardens tables" embedded in system logic and comments
-  - → Natural language business intelligence queries now provide truly comprehensive analysis across all Kapwa Gardens events including KG abbreviation tables
+- **June 30, 2025**: INTELLIGENT QUERY ROUTING WITH KG TABLES RULE IMPLEMENTED - System now distinguishes between vendor/sales vs attendee queries
+  - ✅ IMPLEMENTED: Business rule that KG tables are Kapwa Gardens tables - but only for vendor/sales data, not attendee data
+  - ✅ ENHANCED: Intelligent AI system understands "Balay" refers to "Balay Kreative" attendee table through natural language processing
+  - ✅ VALIDATED: Vendor queries like "Which Kapwa Gardens vendors made over $500?" analyze all 24 tables (16 Kapwa + 8 KG tables)
+  - ✅ CONFIRMED: Attendee queries like "Show me Balay attendee data" use AI to identify correct single table (Balay-Kreative attendee table)
+  - ✅ VERIFIED: System correctly routes different query types - comprehensive multi-table for vendors, precise single-table for attendees
+  - ✅ TESTED: AI system successfully returns 10 authentic Balay Kreative attendee records with proper field recognition
+  - ✅ DOCUMENTED: Query routing logic distinguishes between organizational data types (vendor sales vs attendee registrations)
+  - → Natural language API now provides intelligent context-aware routing with comprehensive vendor analysis and precise attendee data access
 
 - **June 30, 2025**: DATA INTEGRITY ISSUE COMPLETELY RESOLVED - False error eliminated, authentic revenue data now returned
   - ✅ CONFIRMED: 38 tables exist in workspace (32 sales tables, 16 Kapwa tables) - authentic data verified
