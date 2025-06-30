@@ -1621,9 +1621,11 @@ def smart_table_filter(query: str, available_tables: list) -> list:
     # CRITICAL: Detect query type for proper table prioritization
     attendee_keywords = ['attendee', 'attendees', 'how many attendees', 'count attendees', 'total attendees', 'number of attendees']
     vendor_keywords = ['vendor', 'vendors', 'sales', 'revenue', 'made money', 'earned', 'sold']
+    phone_keywords = ['phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'billing_phone']
     
     is_attendee_query = any(keyword in query_lower for keyword in attendee_keywords)
     is_vendor_query = any(keyword in query_lower for keyword in vendor_keywords)
+    is_phone_query = any(keyword in query_lower for keyword in phone_keywords)
     
     # Event name mapping for precise table selection
     event_filters = {
@@ -1681,6 +1683,15 @@ def smart_table_filter(query: str, available_tables: list) -> list:
                 match_score += 30
             elif 'attendee' in table_lower:
                 match_score -= 10  # Slightly deprioritize attendee tables for vendor queries
+        
+        elif is_phone_query:
+            # PHONE QUERIES: Heavily prioritize Squarespace vendor tables with actual phone data
+            if 'squarespace' in table_lower and 'vendor' in table_lower:
+                match_score += 60  # Highest priority for Squarespace vendor tables (have Billing_Phone)
+            elif 'squarespace' in table_lower:
+                match_score += 40  # High priority for other Squarespace tables
+            elif 'vendor' in table_lower and 'close-out-sales' in table_lower:
+                match_score -= 30  # Deprioritize close-out sales (only have Contact_Name, not phone numbers)
         
         # Score based on event name matches
         for event_name, event_keywords in event_filters.items():
