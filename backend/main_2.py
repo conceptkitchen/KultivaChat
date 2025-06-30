@@ -1479,12 +1479,15 @@ def natural_language_query():
 
 def process_revenue_analysis(query):
     """Process revenue and financial analysis queries"""
-    # Step 1: Discover all sales-related tables
+    # Step 1: Discover all sales-related tables with broader patterns
     table_discovery = internal_execute_sql_query(f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
         WHERE LOWER(table_name) LIKE '%close%out%sales%' 
         OR LOWER(table_name) LIKE '%vendor%'
         OR LOWER(table_name) LIKE '%sales%'
+        OR LOWER(table_name) LIKE '%kapwa%'
+        OR LOWER(table_name) LIKE '%undiscovered%'
+        OR LOWER(table_name) LIKE '%close%out%'
         ORDER BY table_name
     """)
     
