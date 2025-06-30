@@ -2433,14 +2433,24 @@ def natural_language_query():
             
             phone_query = f"""
             SELECT 
-                COALESCE(Vendor_data_Your_Business_Name, Vendor, 'Unknown') as vendor_name,
+                CASE 
+                    WHEN Vendor_data_Your_Business_Name IS NOT NULL AND Vendor_data_Your_Business_Name != '' 
+                    THEN Vendor_data_Your_Business_Name
+                    WHEN Vendor_data_Describe_Your_Product IS NOT NULL AND Vendor_data_Describe_Your_Product != '' 
+                    THEN Vendor_data_Describe_Your_Product
+                    ELSE Billing_Name
+                END as vendor_name,
                 Email,
                 Billing_Phone as phone_number
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered-Vendor-Export---Squarespace---All-data-orders`
             WHERE Billing_Phone IS NOT NULL 
             AND Billing_Phone != ''
             AND TRIM(Billing_Phone) != ''
-            ORDER BY Email
+            ORDER BY CASE 
+                WHEN Vendor_data_Your_Business_Name IS NOT NULL AND Vendor_data_Your_Business_Name != '' THEN 1
+                WHEN Vendor_data_Describe_Your_Product IS NOT NULL AND Vendor_data_Describe_Your_Product != '' THEN 2
+                ELSE 3
+            END, Email
             LIMIT 50
             """
             
