@@ -1152,8 +1152,8 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
         if amount_match:
             amount = amount_match.group(1)
             
-            if 'kapwa gardens' in query_lower:
-                # Return None to trigger comprehensive analysis across all 16 Kapwa Gardens tables
+            if 'kapwa gardens' in query_lower or 'kapwa' in query_lower or 'kg' in query_lower:
+                # Return None to trigger comprehensive analysis across all Kapwa Gardens tables (including KG tables)
                 return None
     
     # Multi-event participation - trigger comprehensive analysis instead of wildcard query
@@ -1562,9 +1562,10 @@ def natural_language_query():
                 return jsonify(result)
             else:
                 # If pattern matching fails, check if it's a Kapwa Gardens multi-table query
-                if 'kapwa gardens' in query and any(keyword in query for keyword in ['over', 'made', 'vendors', '$', 'revenue']):
+                if ('kapwa gardens' in query or 'kapwa' in query or 'kg' in query.lower()) and any(keyword in query for keyword in ['over', 'made', 'vendors', '$', 'revenue']):
                     app.logger.info(f"Kapwa Gardens multi-table analysis detected: {original_query}")
                     
+                    # BUSINESS RULE: KG tables are also Kapwa Gardens tables
                     # Build multi-table UNION query for all Kapwa Gardens tables (including KG abbreviation)
                     kapwa_tables_query = f"""
                     SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
