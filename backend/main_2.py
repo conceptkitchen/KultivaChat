@@ -621,12 +621,15 @@ def internal_execute_sql_query(query: str) -> dict:
         ORDER BY table_name
         """
             else:
-                # Revenue/sales data query (default)
+                # Revenue/sales data query (default) - FIXED to match actual table names
                 table_discovery_query = f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-        WHERE LOWER(table_name) LIKE '%close%out%sales%' 
+        WHERE LOWER(table_name) LIKE '%close-out-sales%' 
         OR LOWER(table_name) LIKE '%vendor%'
         OR LOWER(table_name) LIKE '%sales%'
+        OR LOWER(table_name) LIKE '%kapwa%'
+        OR LOWER(table_name) LIKE '%undiscovered%'
+        OR LOWER(table_name) LIKE '%balay%'
         ORDER BY table_name
         """
         
