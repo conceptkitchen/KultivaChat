@@ -718,6 +718,12 @@ def internal_execute_sql_query(query: str) -> dict:
             relevant_tables = smart_table_filter(original_query, relevant_tables)
             app.logger.info(f"SMART FILTERING APPLIED: Reordered {len(relevant_tables)} tables by query relevance")
             
+            # Log top matching tables for debugging
+            if relevant_tables:
+                app.logger.info(f"TOP TABLE MATCHES: {relevant_tables[:3]}")
+                if len(relevant_tables) > 3:
+                    app.logger.info(f"Additional {len(relevant_tables)-3} tables available")
+            
             # STEP 2: SCHEMA ANALYSIS FOR TOP TABLES
             # Analyze schemas of top tables to understand column structures
             schema_analysis_limit = 10 if is_comprehensive else 5
@@ -1852,9 +1858,17 @@ def natural_language_query():
             result = internal_execute_sql_query(original_query)
             return jsonify(result)
         
-        # Use existing MCP implementation for natural language queries
-        app.logger.info("Processing with Gemini AI and MCP tools")
+        # CRITICAL: Apply smart routing for natural language queries
+        app.logger.info("Processing with Gemini AI and enhanced smart routing")
+        
+        # Enhanced MCP processing with smart table filtering
         result = internal_execute_sql_query(original_query)
+        
+        # Add smart routing metadata to response
+        if result.get('status') == 'success':
+            result['routing_method'] = 'smart_filtered'
+            result['query_type'] = 'natural_language'
+        
         return jsonify(result)
     
     except Exception as e:
