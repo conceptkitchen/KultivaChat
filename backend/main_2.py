@@ -754,8 +754,10 @@ def internal_execute_sql_query(query: str) -> dict:
         # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
         # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
         
-        # VENDOR SALES QUERY DETECTION: Check for top vendor ranking requests
+        # INTELLIGENT ROUTING LOGIC: All routing patterns embedded in SQL extraction tool
         import re
+        
+        # VENDOR SALES QUERY DETECTION: Top vendor ranking requests
         top_vendor_match = re.search(r'top\s+(\d+)\s+vendors?', query_lower)
         vendor_sales_indicators = ['top vendors', 'highest sales', 'vendor sales ranking', 'best vendors', 'vendors in sales']
         undiscovered_indicators = ['undiscovered', 'undiscovered events']
@@ -763,6 +765,74 @@ def internal_execute_sql_query(query: str) -> dict:
         is_vendor_sales_query = (top_vendor_match is not None and 
                                 any(indicator in query_lower for indicator in vendor_sales_indicators) and
                                 any(event_indicator in query_lower for event_indicator in undiscovered_indicators))
+        
+        # REVENUE COMPARISON QUERY DETECTION: Cross-event revenue analysis
+        revenue_comparison_indicators = ['which event made the most money', 'highest revenue event', 'most profitable event', 'event revenue comparison']
+        year_range_pattern = re.search(r'(\d{4})\s*(?:to|through|-)\s*(\d{4})', query_lower)
+        
+        is_revenue_comparison_query = (any(indicator in query_lower for indicator in revenue_comparison_indicators) or
+                                     (year_range_pattern and any(word in query_lower for word in ['revenue', 'money', 'sales', 'profit'])))
+        
+        # ATTENDEE COUNT QUERY DETECTION: Attendee analytics
+        attendee_count_indicators = ['how many attendees', 'attendee count', 'total attendees', 'number of attendees']
+        is_attendee_count_query = any(indicator in query_lower for indicator in attendee_count_indicators)
+        
+        # CONTACT EXTRACTION QUERY DETECTION: Email/phone extraction
+        contact_extraction_indicators = ['email addresses', 'contact information', 'vendor contacts', 'vendor emails']
+        is_contact_extraction_query = any(indicator in query_lower for indicator in contact_extraction_indicators)
+        
+        # IMMEDIATE ATTENDEE COUNT ROUTING: Direct query for attendee counts
+        if is_attendee_count_query:
+            year_match = re.search(r'20\d{2}', query_lower)
+            target_year = year_match.group() if year_match else '2023'
+            app.logger.info(f"ATTENDEE COUNT QUERY DETECTED IN SQL TOOL: Routing to attendee tables for year {target_year}")
+            
+            # Query both major attendee data sources
+            attendee_query = f"""
+            SELECT 
+                'Balay-Kreative' as event_series,
+                COUNT(*) as attendee_count
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders`
+            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
+            
+            UNION ALL
+            
+            SELECT 
+                'UNDISCOVERED' as event_series,
+                COUNT(*) as attendee_count
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
+            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
+            """
+            
+            try:
+                start_time = time.time()
+                query_job = bigquery_client.query(attendee_query)
+                attendee_results = query_job.result(timeout=60)
+                attendee_results = list(attendee_results)
+                execution_time = time.time() - start_time
+                
+                # Calculate total and breakdown
+                total_attendees = sum(row.attendee_count for row in attendee_results)
+                breakdown = [{"event_series": row.event_series, "attendee_count": row.attendee_count} for row in attendee_results]
+                
+                app.logger.info(f"ATTENDEE COUNT SUCCESS IN SQL TOOL: Retrieved {total_attendees} total attendees for {target_year} in {execution_time:.2f}s")
+                
+                return {
+                    "status": "success", 
+                    "data": {
+                        "total_attendees": total_attendees,
+                        "year": target_year,
+                        "breakdown": breakdown
+                    },
+                    "query_executed": attendee_query,
+                    "execution_time": execution_time,
+                    "query_type": "attendee_count",
+                    "routing_method": "sql_tool_attendee_routing"
+                }
+                
+            except Exception as e:
+                app.logger.error(f"Direct attendee count query failed in SQL tool: {e}")
+                # Continue to fallback processing
         
         # IMMEDIATE VENDOR SALES ROUTING: Direct query for top X vendors
         if is_vendor_sales_query:
