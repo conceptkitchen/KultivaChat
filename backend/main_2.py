@@ -169,6 +169,8 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
 
 **7. DONOR INFORMATION QUERIES** (donations, sponsors, contributors, grants):
 - Extract donor details including names, contribution amounts, donation types
+- IMPORTANT: Donor queries should use "typeform_report_balay_kreative_forms" table for donation data
+- For donor location queries, use "Balay-Kreative---attendees---all-orders" table
 - Query format: SELECT donor_name, donation_amount, donation_type, grant_status FROM table
 - Include donor analysis, contribution tracking, sponsorship data
 - Return actual donor records with specific contribution details
@@ -212,7 +214,8 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
    - "financial data" → tables with Total_Sales, Revenue, Payment columns
    - "vendor names" → tables with Vendor_Name, Business_Name columns
    - "event data" → tables with Event_Name, Event_Date columns
-   - "donor information" → tables with Donor_Name, Donation_Amount, Grant columns
+   - "donor information" → "typeform_report_balay_kreative_forms" table (donation data)
+   - "donor locations" → "Balay-Kreative---attendees---all-orders" table (donor cities)
 
 4. **EVENT NAME RECOGNITION AND MATCHING**: Essential for accurate data extraction:
    - "Balay Kreative" or "balay" → "Balay-Kreative" tables
