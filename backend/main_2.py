@@ -2424,12 +2424,21 @@ def natural_language_query():
         # CRITICAL: Apply smart routing for natural language queries
         app.logger.info("Processing with Gemini AI and enhanced smart routing")
         
-        # VENDOR SALES QUERY DETECTION: Route directly to sales data for top vendor queries
+        # VENDOR SALES QUERY DETECTION: Route directly to sales data for specific top vendor queries only
         query_lower = original_query.lower()
-        vendor_sales_indicators = ['top vendors', 'top 5 vendors', 'vendors in sales', 'highest sales', 'most sales', 'vendor sales ranking']
+        top_vendor_indicators = ['top', 'highest sales', 'vendor sales ranking', 'best vendors']
+        all_vendor_indicators = ['all vendors', 'vendors from', 'undiscovered vendors']
         undiscovered_indicators = ['undiscovered', 'undiscovered events']
         
-        if any(sales_indicator in query_lower for sales_indicator in vendor_sales_indicators) and any(event_indicator in query_lower for event_indicator in undiscovered_indicators):
+        # Extract number for top X vendors queries (top 5, top 7, top 12, top 15, etc.)
+        import re
+        top_number_match = re.search(r'top\s+(\d+)\s+vendors?', query_lower)
+        limit_number = 5  # Default
+        if top_number_match:
+            limit_number = int(top_number_match.group(1))
+        
+        # Only use direct routing for specific TOP vendor queries, let comprehensive handle "all vendors"
+        if any(top_indicator in query_lower for top_indicator in top_vendor_indicators) and any(event_indicator in query_lower for event_indicator in undiscovered_indicators) and not any(all_indicator in query_lower for all_indicator in all_vendor_indicators):
             app.logger.info("VENDOR SALES QUERY DETECTED AT API LEVEL: Routing directly to UNDISCOVERED sales data with optimized query")
             
             vendor_sales_query = f"""
