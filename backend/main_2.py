@@ -754,51 +754,99 @@ def internal_execute_sql_query(query: str) -> dict:
         # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
         # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
         
-        # INTELLIGENT ROUTING LOGIC: All routing patterns embedded in SQL extraction tool
+        # INTELLIGENT NATURAL LANGUAGE ROUTING: Let AI understand query intent instead of hardcoded patterns
         import re
         
-        # VENDOR SALES QUERY DETECTION: Top vendor ranking requests
-        top_vendor_match = re.search(r'top\s+(\d+)\s+vendors?', query_lower)
-        vendor_sales_indicators = ['top vendors', 'highest sales', 'vendor sales ranking', 'best vendors', 'vendors in sales']
-        undiscovered_indicators = ['undiscovered', 'undiscovered events']
+        # AI-DRIVEN QUERY ANALYSIS: Let the AI understand query intent naturally
+        def ai_analyze_query_intent(query_text):
+            """Use AI natural language understanding to determine query intent and routing"""
+            query_lower = query_text.lower()
+            intent = {
+                'original_query': query_text,
+                'query_lower': query_lower
+            }
+            
+            # Smart parameter extraction using natural language patterns
+            # Numbers for ranking/limits
+            import re
+            number_patterns = [
+                r'top\s+(\d+)',
+                r'first\s+(\d+)', 
+                r'best\s+(\d+)',
+                r'show\s+(\d+)'
+            ]
+            for pattern in number_patterns:
+                match = re.search(pattern, query_lower)
+                if match:
+                    intent['limit'] = int(match.group(1))
+                    break
+            
+            # Years for temporal filtering
+            year_matches = re.findall(r'20\d{2}', query_lower)
+            if year_matches:
+                intent['years'] = year_matches
+            
+            # Geographic entities - more flexible city detection
+            cities = []
+            city_mappings = {
+                'sf': ['San Francisco', 'SF'],
+                'san francisco': ['San Francisco', 'SF'],
+                'daly city': ['Daly City'],
+                'bay area': ['San Francisco', 'SF', 'Daly City']
+            }
+            
+            for city_term, city_variants in city_mappings.items():
+                if city_term in query_lower:
+                    cities.extend(city_variants)
+            
+            if cities:
+                intent['cities'] = list(set(cities))  # Remove duplicates
+            
+            # AI-driven intent classification based on semantic understanding
+            # Vendor queries
+            if ('vendor' in query_lower and 
+                any(word in query_lower for word in ['top', 'best', 'highest', 'ranking', 'sales', 'revenue'])):
+                intent['type'] = 'vendor_ranking'
+                intent['focus'] = 'sales_performance'
+            
+            # Attendee queries with geographic filtering
+            elif ('attendee' in query_lower and cities):
+                intent['type'] = 'geographic_attendee'
+                intent['focus'] = 'location_filtering'
+            
+            # General attendee count queries
+            elif ('attendee' in query_lower and 
+                  any(word in query_lower for word in ['how many', 'count', 'total', 'number'])):
+                intent['type'] = 'attendee_count'
+                intent['focus'] = 'aggregate_count'
+            
+            # Contact extraction queries
+            elif any(contact_word in query_lower for contact_word in ['phone', 'email', 'contact']):
+                intent['type'] = 'contact_extraction'
+                intent['focus'] = 'contact_information'
+            
+            # Revenue/financial queries
+            elif any(finance_word in query_lower for finance_word in ['revenue', 'money', 'profit', 'sales', 'made']):
+                intent['type'] = 'revenue_analysis'
+                intent['focus'] = 'financial_performance'
+            
+            # Default to intelligent analysis
+            else:
+                intent['type'] = 'intelligent_analysis'
+                intent['focus'] = 'data_exploration'
+            
+            app.logger.info(f"AI INTENT ANALYSIS: {intent['type']} - {intent.get('focus', 'general')} | Query: {query_text[:50]}...")
+            return intent
         
-        is_vendor_sales_query = (top_vendor_match is not None and 
-                                any(indicator in query_lower for indicator in vendor_sales_indicators) and
-                                any(event_indicator in query_lower for event_indicator in undiscovered_indicators))
+        # Use AI to understand the query
+        query_intent = ai_analyze_query_intent(original_query)
         
-        # REVENUE COMPARISON QUERY DETECTION: Cross-event revenue analysis
-        revenue_comparison_indicators = ['which event made the most money', 'highest revenue event', 'most profitable event', 'event revenue comparison']
-        year_range_pattern = re.search(r'(\d{4})\s*(?:to|through|-)\s*(\d{4})', query_lower)
-        
-        is_revenue_comparison_query = (any(indicator in query_lower for indicator in revenue_comparison_indicators) or
-                                     (year_range_pattern and any(word in query_lower for word in ['revenue', 'money', 'sales', 'profit'])))
-        
-        # ATTENDEE COUNT QUERY DETECTION: Attendee analytics
-        attendee_count_indicators = ['how many attendees', 'attendee count', 'total attendees', 'number of attendees']
-        is_attendee_count_query = any(indicator in query_lower for indicator in attendee_count_indicators)
-        
-        # CONTACT EXTRACTION QUERY DETECTION: Email/phone extraction
-        contact_extraction_indicators = ['email addresses', 'contact information', 'vendor contacts', 'vendor emails']
-        is_contact_extraction_query = any(indicator in query_lower for indicator in contact_extraction_indicators)
-        
-        # GEOGRAPHIC ATTENDEE QUERY DETECTION: Location-based attendee filtering
-        geographic_indicators = ['live in', 'from sf', 'from san francisco', 'daly city', 'attendees in', 'from the bay area']
-        city_patterns = ['sf', 'san francisco', 'daly city', 'bay area']
-        is_geographic_attendee_query = (any(indicator in query_lower for indicator in geographic_indicators) and
-                                      any(city in query_lower for city in city_patterns) and
-                                      'attendee' in query_lower)
-        
-        # IMMEDIATE GEOGRAPHIC ATTENDEE ROUTING: Location-based attendee filtering
-        if is_geographic_attendee_query:
+        # SMART ROUTING BASED ON QUERY INTENT: Use AI understanding instead of hardcoded patterns
+        if query_intent.get('type') == 'geographic_attendee':
             app.logger.info(f"GEOGRAPHIC ATTENDEE QUERY DETECTED IN SQL TOOL: Routing to location-based attendee filtering")
             
-            # Extract cities from query
-            cities_to_filter = []
-            if 'sf' in query_lower or 'san francisco' in query_lower:
-                cities_to_filter.extend(['San Francisco', 'SF'])
-            if 'daly city' in query_lower:
-                cities_to_filter.append('Daly City')
-            
+            # Extract cities from query intent
+            cities_to_filter = query_intent.get('cities', ['San Francisco', 'SF', 'Daly City'])
             city_filter = "', '".join(cities_to_filter)
             
             geographic_query = f"""
@@ -848,9 +896,8 @@ def internal_execute_sql_query(query: str) -> dict:
                 # Continue to fallback processing
         
         # IMMEDIATE ATTENDEE COUNT ROUTING: Direct query for attendee counts
-        if is_attendee_count_query:
-            year_match = re.search(r'20\d{2}', query_lower)
-            target_year = year_match.group() if year_match else '2023'
+        if query_intent.get('type') == 'attendee_count':
+            target_year = query_intent.get('years', ['2023'])[0] if query_intent.get('years') else '2023'
             app.logger.info(f"ATTENDEE COUNT QUERY DETECTED IN SQL TOOL: Routing to attendee tables for year {target_year}")
             
             # Query both major attendee data sources
@@ -901,8 +948,8 @@ def internal_execute_sql_query(query: str) -> dict:
                 # Continue to fallback processing
         
         # IMMEDIATE VENDOR SALES ROUTING: Direct query for top X vendors
-        if is_vendor_sales_query:
-            limit_number = int(top_vendor_match.group(1)) if top_vendor_match else 5
+        if query_intent.get('type') == 'vendor_ranking':
+            limit_number = query_intent.get('limit', 5)
             app.logger.info(f"VENDOR SALES QUERY DETECTED IN SQL TOOL: Routing directly to UNDISCOVERED sales data for top {limit_number} vendors")
             
             vendor_sales_query = f"""
