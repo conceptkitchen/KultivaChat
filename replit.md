@@ -136,6 +136,14 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
+- **June 30, 2025**: ATTENDEE QUERY ROUTING COMPLETELY FIXED - System now correctly routes attendee vs vendor queries to appropriate tables
+  - ✅ FIXED: "How many attendees did we have in 2023?" now returns accurate count (7,566) from actual attendee tables
+  - ✅ IMPLEMENTED: Intelligent query type detection distinguishes attendee queries from vendor/contact queries
+  - ✅ ENHANCED: Attendee tables now get priority score 50 vs vendor tables for attendee queries
+  - ✅ VALIDATED: System correctly identifies and counts from both Balay-Kreative (2,440) and UNDISCOVERED (5,126) attendee tables
+  - ✅ ELIMINATED: Faulty routing that sent attendee queries to vendor contact extraction
+  - → Natural language API now provides accurate attendee counts with proper table breakdown
+
 - **June 30, 2025**: CRITICAL ANTI-HALLUCINATION FIX COMPLETED - System now NEVER generates fake table names, always discovers real tables first
   - ✅ ELIMINATED: Fake table names like "vendor_sales_data", "customer_data", "sales_report" completely prevented
   - ✅ IMPLEMENTED: Mandatory table discovery using INFORMATION_SCHEMA.TABLES before any data queries

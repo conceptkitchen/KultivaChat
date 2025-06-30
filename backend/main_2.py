@@ -857,7 +857,15 @@ def internal_execute_sql_query(query: str) -> dict:
                     continue
             
             # APPLY SMART TABLE FILTERING: Use enhanced routing logic to order tables by relevance
-            relevant_tables = smart_table_filter(original_query, relevant_tables)
+            # CRITICAL FIX: For attendee queries, prioritize attendee tables first
+            if is_attendee_focused:
+                attendee_tables = [table for table in relevant_tables if 'attendee' in table.lower()]
+                other_tables = [table for table in relevant_tables if 'attendee' not in table.lower()]
+                relevant_tables = attendee_tables + other_tables
+                app.logger.info(f"ATTENDEE QUERY PRIORITIZATION: Found {len(attendee_tables)} attendee tables, placing them first")
+            else:
+                relevant_tables = smart_table_filter(original_query, relevant_tables)
+            
             app.logger.info(f"SMART FILTERING APPLIED: Reordered {len(relevant_tables)} tables by query relevance")
             
             # Log top matching tables for debugging
@@ -899,15 +907,73 @@ def internal_execute_sql_query(query: str) -> dict:
                         continue
                 schema_info[table] = columns
             
-            # STEP 3: ATTENDEE COUNT QUERIES - Handle before contact extraction
+            # STEP 3: ATTENDEE QUERIES - Handle both count and data display
             if is_attendee_focused and not is_comprehensive:
-                app.logger.info(f"ATTENDEE COUNT QUERY: Processing attendee count query")
+                # Check if this is a count query vs data display query
+                count_keywords = ['how many', 'count', 'total', 'number of']
+                display_keywords = ['show me', 'list', 'data', 'records', 'from']
                 
-                # For attendee count queries, we want actual counts from attendee tables
+                is_count_query = any(keyword in query_lower for keyword in count_keywords)
+                is_display_query = any(keyword in query_lower for keyword in display_keywords)
+                
+                if is_count_query:
+                    app.logger.info(f"ATTENDEE COUNT QUERY: Processing attendee count query")
+                elif is_display_query:
+                    app.logger.info(f"ATTENDEE DISPLAY QUERY: Processing attendee data display")
+                else:
+                    app.logger.info(f"ATTENDEE QUERY: Processing general attendee query")
+                
+                # Process attendee queries based on type (count vs display)
                 if relevant_tables and schema_info:
                     attendee_tables = [table for table in relevant_tables if 'attendee' in table.lower()]
                     
-                    if attendee_tables:
+                    if attendee_tables and is_display_query:
+                        # For display queries, show actual attendee records
+                        target_table = attendee_tables[0]  # Use most relevant attendee table
+                        columns = schema_info.get(target_table, [])
+                        
+                        # Build sample query to show attendee records
+                        sample_query = f"""
+                        SELECT * 
+                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` 
+                        LIMIT 10
+                        """
+                        
+                        try:
+                            start_time = time.time()
+                            query_job = bigquery_client.query(sample_query)
+                            sample_results = query_job.result(timeout=60)
+                            sample_results = list(sample_results)
+                            execution_time = time.time() - start_time
+                            
+                            if sample_results:
+                                # Convert results to dictionaries
+                                data_rows = []
+                                for row in sample_results:
+                                    if hasattr(row, '_fields'):
+                                        row_dict = {field: getattr(row, field) for field in row._fields}
+                                    else:
+                                        row_dict = dict(row)
+                                    data_rows.append(row_dict)
+                                
+                                return {
+                                    "status": "success",
+                                    "data": data_rows,
+                                    "table_source": target_table,
+                                    "records_displayed": len(data_rows),
+                                    "query_executed": sample_query.strip(),
+                                    "query_type": "attendee_display",
+                                    "execution_time": execution_time
+                                }
+                        except Exception as e:
+                            app.logger.error(f"Failed to retrieve attendee data from {target_table}: {e}")
+                            return {
+                                "status": "error",
+                                "error_message": f"Failed to retrieve attendee data: {str(e)}",
+                                "table_attempted": target_table
+                            }
+                    
+                    elif attendee_tables and (is_count_query or not is_display_query):
                         total_attendees = 0
                         table_counts = []
                         
