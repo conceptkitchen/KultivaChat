@@ -4,17 +4,42 @@
 
 Kultivate AI MCP Server is a standalone Model Context Protocol backend service providing AI-powered business intelligence through clean REST API endpoints. The server integrates Google Gemini 2.0 Flash, Keboola Cloud, and BigQuery to deliver sophisticated data analysis capabilities for external frontend applications.
 
-### Intelligent Data Processing Architecture
+### AI-Driven Semantic Routing Architecture
 
-The system uses an intelligent tool-based architecture that transforms natural language business questions into accurate data-driven insights:
+The system uses an advanced AI-driven semantic routing architecture that intelligently analyzes natural language queries and automatically selects the optimal processing path:
 
-1. **Query Processing** - Takes natural language business questions ("Which event from 2021-2024 made the most money?")
-2. **SQL Extraction Tool** - Converts queries to proper SQL and executes against BigQuery workspace data
-3. **Smart Table Selection** - Uses enhanced filtering to identify relevant tables from 37+ available data sources
-4. **Authentic Data Extraction** - Pulls real revenue, vendor, and event data from multiple BigQuery tables
-5. **Intelligent Analysis** - AI examines actual dollar amounts and makes business logic decisions based on authentic financial data
+#### Natural Language → AI Analysis → Smart Routing
 
-The intelligence comes from processing authentic BigQuery data (not mock data), comparing actual dollar amounts from SQL results, understanding multi-vendor sheet structures, and making business logic decisions based on real financial data. The SQL extraction tool serves as the core that retrieves authentic data, while the AI layer provides intelligent analysis and ranking to deliver accurate business insights.
+1. **Natural Language Processing** - Accepts any business question in plain English
+2. **AI Semantic Analysis** - `ai_analyze_query_intent()` function analyzes intent, keywords, and context
+3. **Intelligent Classification** - Automatically categorizes queries into specific intent types:
+   - `geographic_contact_extraction` - Email/phone extraction by location
+   - `vendor_ranking` - Sales performance and top vendor analysis  
+   - `geographic_attendee` - Location-based attendee counting
+   - `revenue_analysis` - Financial performance analysis
+   - `contact_extraction` - General contact information retrieval
+4. **Smart Routing** - SQL tool receives intent classification and chooses appropriate execution path
+5. **Authentic Data Extraction** - Executes optimized BigQuery queries for specific use case
+
+#### Intelligent Query Examples
+
+**Contact Extraction:**
+- "What are the emails of attendees in Daly City?" → Returns 100 actual email addresses with names
+- "Give me phone numbers of UNDISCOVERED vendors" → Extracts authentic contact data
+
+**Performance Analysis:**  
+- "Show me the top 5 vendors by revenue" → Ranks vendors by sales performance
+- "Which event from 2021-2024 made the most money?" → Cross-year revenue comparison
+
+**Geographic Intelligence:**
+- "How many people attended events in the bay area?" → Location-filtered attendee counts
+- "Attendees from San Francisco" → Geographic demographic analysis
+
+**Financial Intelligence:**
+- "Which vendors made over $500?" → Revenue threshold filtering with authentic amounts
+- "Total sales from Kapwa Gardens events" → Event-specific financial aggregation
+
+The system automatically detects keywords (emails, phone, top, revenue), geographic entities (SF, bay area, Daly City), quantifiers (top 5, over $500), and intent context to route queries to the optimal processing method. Users can ask any business question in natural language without needing to understand SQL or technical implementation.
 
 #### Example: Food Vendor Email Extraction
 
