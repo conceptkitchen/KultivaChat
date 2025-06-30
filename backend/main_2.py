@@ -2433,13 +2433,16 @@ def natural_language_query():
         # Extract number for top X vendors queries (top 5, top 7, top 12, top 15, etc.)
         import re
         top_number_match = re.search(r'top\s+(\d+)\s+vendors?', query_lower)
-        limit_number = 5  # Default
+        limit_number = 5  # Default  
         if top_number_match:
             limit_number = int(top_number_match.group(1))
         
-        # Only use direct routing for specific TOP vendor queries, let comprehensive handle "all vendors"
-        if any(top_indicator in query_lower for top_indicator in top_vendor_indicators) and any(event_indicator in query_lower for event_indicator in undiscovered_indicators) and not any(all_indicator in query_lower for all_indicator in all_vendor_indicators):
-            app.logger.info("VENDOR SALES QUERY DETECTED AT API LEVEL: Routing directly to UNDISCOVERED sales data with optimized query")
+        # Check if this is a "top X vendors" query (has specific number)
+        is_top_x_vendors = top_number_match is not None
+        
+        # Only use direct routing for specific TOP X vendor queries, let comprehensive handle "all vendors" without numbers
+        if is_top_x_vendors and any(event_indicator in query_lower for event_indicator in undiscovered_indicators):
+            app.logger.info(f"VENDOR SALES QUERY DETECTED AT API LEVEL: Routing directly to UNDISCOVERED sales data for top {limit_number} vendors")
             
             vendor_sales_query = f"""
             SELECT 
@@ -2451,7 +2454,7 @@ def natural_language_query():
             AND Vendor_Name != ''
             AND Total_Sales != ''
             ORDER BY CAST(REPLACE(REPLACE(REPLACE(Total_Sales, '$', ''), ',', ''), ' ', '') AS FLOAT64) DESC
-            LIMIT 5
+            LIMIT {limit_number}
             """
             
             try:
