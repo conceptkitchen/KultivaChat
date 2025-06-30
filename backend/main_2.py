@@ -534,11 +534,9 @@ def extract_recent_table_name(conversation_history: list):
                 table_name = full_table_path.split('.')[-1] if '.' in full_table_path else full_table_path
                 return table_name
             
-            # Also look for table patterns in text (OUT_*, DIM_*, etc.)
-            table_pattern = r'\b(OUT_[A-Z_]+_\d+_[A-Z_]+|OUT_[A-Z_]+_[A-Z_]+|DIM_[A-Z_]+|FACT_[A-Z_]+)\b'
-            table_matches = re.findall(table_pattern, content)
-            if table_matches:
-                return table_matches[0]
+            # REMOVED: Hardcoded fake table patterns that don't match actual table structure
+            # These patterns caused fake table name generation like "OUT_CUSTOMERS_6_KAPWA_GARDENS"
+            # Real tables have names like "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal"
     
     return None
 
@@ -569,59 +567,10 @@ def auto_execute_table_query(user_message: str, conversation_history: list):
     Returns:
         dict: Query result if auto-execution succeeds, None if not applicable
     """
-    # Keywords that indicate a table data request
-    data_keywords = ['show me', 'data from', 'customers', 'orders', 'products', 'table', 'query']
-    
-    if not any(keyword in user_message.lower() for keyword in data_keywords):
-        return None
-        
-    # Extract table names from conversation history
-    available_tables = []
-    for entry in conversation_history:
-        if entry.get('role') == 'assistant':
-            content = entry.get('content', '')
-            # Look for table patterns like OUT_DIM_CUSTOMERS_6_KAPWA_GARDENS
-            import re
-            table_matches = re.findall(r'OUT_[A-Z_]+_\d+_[A-Z_]+|OUT_[A-Z_]+_[A-Z_]+', content)
-            available_tables.extend(table_matches)
-    
-    if not available_tables:
-        return None
-        
-    # Find best matching table
-    user_lower = user_message.lower()
-    best_table = None
-    
-    # Look for company + data type matches
-    if 'kapwa gardens' in user_lower and 'customer' in user_lower:
-        kapwa_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KAPWA_GARDENS' in t]
-        if kapwa_customer_tables:
-            # Pick highest numbered version
-            best_table = max(kapwa_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
-    
-    elif 'kultivate labs' in user_lower and 'customer' in user_lower:
-        kultivate_customer_tables = [t for t in available_tables if 'CUSTOMERS' in t and 'KULTIVATE_LABS' in t]
-        if kultivate_customer_tables:
-            best_table = max(kultivate_customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
-    
-    # Generic fallback - match any table with relevant keywords
-    if not best_table:
-        if 'customer' in user_lower:
-            customer_tables = [t for t in available_tables if 'CUSTOMERS' in t]
-            if customer_tables:
-                best_table = max(customer_tables, key=lambda x: int(re.search(r'_(\d+)_', x).group(1)) if re.search(r'_(\d+)_', x) else 0)
-    
-    # Execute query if we found a table
-    if best_table:
-        sql_query = f"SELECT * FROM `kbc-use4-839-261b.WORKSPACE_21894820.{best_table}` LIMIT 10;"
-        result = internal_execute_sql_query(sql_query)
-        if result.get('status') == 'success':
-            return {
-                'auto_executed': True,
-                'table_used': best_table,
-                'result': result
-            }
-    
+    # DISABLED - This function used hardcoded fake table patterns that don't match actual table structure
+    # Real tables have names like "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal"
+    # But this function looked for patterns like "OUT_CUSTOMERS_6_KAPWA_GARDENS" which don't exist
+    # All queries now go through proper table discovery using INFORMATION_SCHEMA.TABLES
     return None
 
 def find_best_table_match(user_input: str, available_tables: list) -> str:
@@ -846,11 +795,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 intent['type'] = 'vendor_ranking'
                 intent['focus'] = 'sales_performance'
             
-            # Donation/donor queries - clarify data limitations (PRIORITY: check before attendee_count)
-            elif any(donation_word in query_lower for donation_word in ['donor', 'donation', 'gave', 'contributed', 'donated']):
-                intent['type'] = 'donation_clarification'
-                intent['focus'] = 'data_limitation_explanation'
-            
+
             # General attendee count queries
             elif (any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant']) and 
                   any(word in query_lower for word in ['how many', 'count', 'total', 'number'])):
@@ -1053,29 +998,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 app.logger.error(f"City ranking query failed in SQL tool: {e}")
                 # Continue to fallback processing
         
-        # DONATION CLARIFICATION ROUTING: Explain data limitations for donation queries
-        if query_intent.get('type') == 'donation_clarification':
-            app.logger.info(f"DONATION CLARIFICATION QUERY DETECTED: Explaining data availability")
-            
-            return {
-                "status": "data_clarification", 
-                "message": "Your data contains ticket purchases and vendor sales, but not donation amounts. For attendee analysis, I can provide geographic breakdowns, ticket purchase counts, and event participation. For financial analysis, I can show vendor revenue from events.",
-                "available_data_types": [
-                    "Attendee counts by city (ticket purchasers)",
-                    "Vendor revenue from events", 
-                    "Geographic attendee analysis",
-                    "Event participation statistics"
-                ],
-                "suggested_queries": [
-                    "How many attendees in San Francisco?",
-                    "Which vendors made the most revenue?",
-                    "Which cities have the most attendees?",
-                    "Total vendor revenue by event"
-                ],
-                "query_type": "donation_clarification",
-                "routing_method": "sql_tool_data_clarification"
-            }
-        
+
         # IMMEDIATE ATTENDEE COUNT ROUTING: Direct query for attendee counts
         if query_intent.get('type') == 'attendee_count':
             target_year = query_intent.get('years', ['2023'])[0] if query_intent.get('years') else '2023'
