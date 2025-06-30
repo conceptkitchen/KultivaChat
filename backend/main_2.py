@@ -1592,7 +1592,7 @@ def natural_language_query():
             result = internal_execute_sql_query(original_query)
             return jsonify(result)
         
-        # Use Gemini AI with MCP tools for all natural language queries
+        # Use existing MCP implementation for natural language queries
         app.logger.info("Processing with Gemini AI and MCP tools")
         result = internal_execute_sql_query(original_query)
         return jsonify(result)
