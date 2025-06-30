@@ -1144,6 +1144,22 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
     """Convert natural language business questions to SQL queries"""
     query_lower = natural_query.lower()
     
+    # Attendee data queries
+    if 'attendee' in query_lower and ('data' in query_lower or 'show' in query_lower):
+        if 'balay' in query_lower:
+            return f"""
+            SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-squarespace_forms`
+            LIMIT 20
+            """
+        elif 'undiscovered' in query_lower:
+            return f"""
+            SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
+            LIMIT 20
+            """
+        elif 'kapwa gardens' in query_lower or 'kapwa' in query_lower:
+            # No Kapwa Gardens attendee tables exist - return None to trigger fallback handling
+            return None
+    
     # Revenue threshold queries
     if 'made over' in query_lower and '$' in query_lower:
         # Extract amount
