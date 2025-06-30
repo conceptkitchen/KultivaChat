@@ -108,7 +108,7 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 - **June 29, 2025**: DASHBOARD API ENDPOINTS CREATED - Separate financial visualization API for frontend integration completed
   - ✅ CREATED: Dedicated dashboard API endpoints for financial data visualization (`/api/dashboard/*`)
   - ✅ IMPLEMENTED: Four specialized endpoints (financial-summary, vendor-performance, event-timeline, revenue-breakdown)
-  - ✅ CONFIGURED: Dashboard BigQuery client using `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD` and `KBC_WORKSPACE_SCHEMA_DASHBOARD`
+  - ✅ CONFIGURED: Dashboard BigQuery client using `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES` and `KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES`
   - ✅ ESTABLISHED: CSV fallback system with Kapwa Gardens and UNDISCOVERED close-out sales transformation data
   - ✅ DOCUMENTED: Complete Dashboard API Documentation with integration examples for JavaScript, Python, and cURL
   - ✅ VALIDATED: Revenue calculations process authentic financial data from close-out sales records

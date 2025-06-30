@@ -82,8 +82,8 @@ KBC_WORKSPACE_ID = os.environ.get('KBC_WORKSPACE_SCHEMA', 'WORKSPACE_21894820')
 GEMINI_MODEL = "gemini-2.0-flash-exp"
 
 # Dashboard Configuration Variables
-GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD', '/home/runner/workspace/backend/GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD.json')
-KBC_WORKSPACE_SCHEMA_DASHBOARD = os.environ.get('KBC_WORKSPACE_SCHEMA_DASHBOARD', 'WORKSPACE_DASHBOARD')
+GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES', '/home/runner/workspace/backend/GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES.json')
+KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES = os.environ.get('KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES', 'WORKSPACE_DASHBOARD_CLOSE_OUT_SALES')
 DASHBOARD_PROJECT_ID = GOOGLE_PROJECT_ID  # Same project, different workspace
 
 # Log configuration status for debugging
@@ -386,11 +386,11 @@ except Exception as e:
 # Initialize Dashboard BigQuery Client for financial data visualization
 dashboard_bigquery_client = None
 try:
-    if GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD and os.path.exists(GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD):
-        app.logger.info(f"Initializing Dashboard BigQuery Client using: {GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD}")
+    if GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES and os.path.exists(GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES):
+        app.logger.info(f"Initializing Dashboard BigQuery Client using: {GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES}")
         with timeout_context(30):
             dashboard_bigquery_client = bigquery.Client.from_service_account_json(
-                GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD)
+                GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES)
         app.logger.info(f"Successfully initialized Dashboard BigQuery Client. Project: {dashboard_bigquery_client.project}")
     else:
         app.logger.info("Dashboard credentials not found - will use CSV fallbacks for dashboard data")
@@ -1857,19 +1857,19 @@ def dashboard_financial_summary():
     """Get financial summary for dashboard visualization"""
     try:
         # Try BigQuery first, fall back to CSV
-        if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD:
+        if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES:
             sql_query = f"""
             SELECT 
                 'Kapwa Gardens' as event_type,
                 SUM(CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
                 COUNT(*) as vendor_count
-            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD}.kapwa_gardens_financial_data`
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES}.kapwa_gardens_financial_data`
             UNION ALL
             SELECT 
                 'UNDISCOVERED' as event_type,
                 SUM(CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
                 COUNT(*) as vendor_count
-            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD}.undiscovered_financial_data`
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES}.undiscovered_financial_data`
             """
             results = query_dashboard_bigquery(sql_query)
         else:
@@ -1903,13 +1903,13 @@ def dashboard_vendor_performance():
     """Get top performing vendors for dashboard charts"""
     try:
         # Try BigQuery first, fall back to CSV
-        if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD:
+        if dashboard_bigquery_client and KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES:
             sql_query = f"""
             SELECT 
                 vendor_name,
                 event_name,
                 CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64) as revenue
-            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD}.kapwa_gardens_financial_data`
+            FROM `{DASHBOARD_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES}.kapwa_gardens_financial_data`
             WHERE vendor_name IS NOT NULL AND vendor_name != ''
             ORDER BY revenue DESC
             LIMIT 20
