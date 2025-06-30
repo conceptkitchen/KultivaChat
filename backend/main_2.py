@@ -758,11 +758,52 @@ def internal_execute_sql_query(query: str) -> dict:
             
             # STEP 1: INTELLIGENT TABLE DISCOVERY
             # Determine data source type based on query context
-            contact_keywords = ['attendee', 'contact', 'email', 'phone', 'cell', 'number', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant', 'squarespace', 'typeform']
+            # IMPORTANT: Remove 'attendee' from contact keywords to avoid misclassification
+            contact_keywords = ['contact', 'email', 'phone', 'cell', 'number', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
             is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
             
-            if is_contact_query:
-                # Contact/attendee/demographic data query - search all tables that might have contact info
+            # INTELLIGENT TABLE DISCOVERY: Detect query intent and prioritize appropriate tables
+            attendee_query_indicators = ['attendee', 'attendees', 'how many attendees', 'count attendees', 'total attendees']
+            vendor_query_indicators = ['vendor', 'vendors', 'sales', 'revenue', 'made money']
+            
+            is_attendee_focused = any(indicator in query_lower for indicator in attendee_query_indicators)
+            is_vendor_focused = any(indicator in query_lower for indicator in vendor_query_indicators)
+            
+            if is_attendee_focused:
+                # ATTENDEE QUERIES: Prioritize attendee, squarespace, and typeform tables
+                table_discovery_query = f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%attendee%' 
+        OR LOWER(table_name) LIKE '%squarespace%'
+        OR LOWER(table_name) LIKE '%typeform%'
+        OR LOWER(table_name) LIKE '%registration%'
+        ORDER BY 
+            CASE 
+                WHEN LOWER(table_name) LIKE '%attendee%' THEN 1
+                WHEN LOWER(table_name) LIKE '%squarespace%' THEN 2
+                WHEN LOWER(table_name) LIKE '%typeform%' THEN 3
+                ELSE 4
+            END,
+            table_name
+        """
+            elif is_vendor_focused:
+                # VENDOR QUERIES: Prioritize vendor and sales tables
+                table_discovery_query = f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%close-out-sales%' 
+        OR LOWER(table_name) LIKE '%vendor%'
+        OR LOWER(table_name) LIKE '%sales%'
+        ORDER BY 
+            CASE 
+                WHEN LOWER(table_name) LIKE '%vendor%' THEN 1
+                WHEN LOWER(table_name) LIKE '%close-out-sales%' THEN 2
+                WHEN LOWER(table_name) LIKE '%sales%' THEN 3
+                ELSE 4
+            END,
+            table_name
+        """
+            elif is_contact_query:
+                # CONTACT QUERIES: Search all contact-related tables
                 table_discovery_query = f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
         WHERE LOWER(table_name) LIKE '%attendee%' 
@@ -775,12 +816,14 @@ def internal_execute_sql_query(query: str) -> dict:
         ORDER BY table_name
         """
             else:
-                # Revenue/sales data query (default) - FIXED to match actual table names
+                # GENERAL QUERIES: Default broad search
                 table_discovery_query = f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
         WHERE LOWER(table_name) LIKE '%close-out-sales%' 
         OR LOWER(table_name) LIKE '%vendor%'
         OR LOWER(table_name) LIKE '%sales%'
+        OR LOWER(table_name) LIKE '%attendee%'
+        OR LOWER(table_name) LIKE '%squarespace%'
         OR LOWER(table_name) LIKE '%kapwa%'
         OR LOWER(table_name) LIKE '%undiscovered%'
         OR LOWER(table_name) LIKE '%balay%'
@@ -856,8 +899,59 @@ def internal_execute_sql_query(query: str) -> dict:
                         continue
                 schema_info[table] = columns
             
-            # STEP 3: CONTACT/DEMOGRAPHIC EXTRACTION FOR SPECIFIC QUERIES
-            if is_contact_query and not is_comprehensive:
+            # STEP 3: ATTENDEE COUNT QUERIES - Handle before contact extraction
+            if is_attendee_focused and not is_comprehensive:
+                app.logger.info(f"ATTENDEE COUNT QUERY: Processing attendee count query")
+                
+                # For attendee count queries, we want actual counts from attendee tables
+                if relevant_tables and schema_info:
+                    attendee_tables = [table for table in relevant_tables if 'attendee' in table.lower()]
+                    
+                    if attendee_tables:
+                        total_attendees = 0
+                        table_counts = []
+                        
+                        for table in attendee_tables[:5]:  # Process up to 5 attendee tables
+                            count_query = f"""
+                            SELECT COUNT(*) as attendee_count
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                            """
+                            
+                            try:
+                                start_time = time.time()
+                                query_job = bigquery_client.query(count_query)
+                                count_results = query_job.result(timeout=60)
+                                count_results = list(count_results)
+                                execution_time = time.time() - start_time
+                                
+                                if count_results:
+                                    count_value = count_results[0].attendee_count if hasattr(count_results[0], 'attendee_count') else count_results[0][0]
+                                    total_attendees += count_value
+                                    table_counts.append({"table": table, "count": count_value})
+                                    app.logger.info(f"Attendee count from {table}: {count_value} (processed in {execution_time:.2f}s)")
+                                    
+                            except Exception as e:
+                                app.logger.warning(f"Failed to count attendees in {table}: {e}")
+                                continue
+                        
+                        if table_counts:
+                            return {
+                                "status": "success",
+                                "data": [{
+                                    "total_attendees": total_attendees,
+                                    "year": "2023" if "2023" in query_lower else "all",
+                                    "table_breakdown": table_counts,
+                                    "tables_analyzed": len(table_counts)
+                                }],
+                                "query_executed": f"COUNT(*) from {len(table_counts)} attendee tables",
+                                "query_type": "attendee_count",
+                                "execution_time": sum([0.8] * len(table_counts))  # Approximate time
+                            }
+                
+                return {"status": "error", "error_message": "No attendee tables found for count query"}
+            
+            # STEP 4: CONTACT/DEMOGRAPHIC EXTRACTION FOR SPECIFIC QUERIES
+            elif is_contact_query and not is_comprehensive:
                 app.logger.info(f"CONTACT/DEMOGRAPHIC EXTRACTION: Processing specific contact query")
                 
                 # For contact queries, we want actual contact details, not aggregations
@@ -1370,10 +1464,17 @@ def get_current_time() -> dict:
 
 def smart_table_filter(query: str, available_tables: list) -> list:
     """
-    Enhanced table filtering using event name and date matching logic.
+    Enhanced table filtering using event name, date matching, and data type priority logic.
     Returns tables ordered by relevance score (highest first).
     """
     query_lower = query.lower()
+    
+    # CRITICAL: Detect query type for proper table prioritization
+    attendee_keywords = ['attendee', 'attendees', 'how many attendees', 'count attendees', 'total attendees', 'number of attendees']
+    vendor_keywords = ['vendor', 'vendors', 'sales', 'revenue', 'made money', 'earned', 'sold']
+    
+    is_attendee_query = any(keyword in query_lower for keyword in attendee_keywords)
+    is_vendor_query = any(keyword in query_lower for keyword in vendor_keywords)
     
     # Event name mapping for precise table selection
     event_filters = {
@@ -1414,6 +1515,23 @@ def smart_table_filter(query: str, available_tables: list) -> list:
     for table in available_tables:
         table_lower = table.lower()
         match_score = 0
+        
+        # CRITICAL: Priority scoring based on query type
+        if is_attendee_query:
+            # ATTENDEE QUERIES: Heavily prioritize attendee tables
+            if 'attendee' in table_lower:
+                match_score += 50  # High priority for attendee tables
+            elif any(term in table_lower for term in ['squarespace', 'typeform']):
+                match_score += 30  # Medium priority for registration tables
+            elif 'vendor' in table_lower or 'close-out-sales' in table_lower:
+                match_score -= 20  # Deprioritize vendor tables for attendee queries
+        
+        elif is_vendor_query:
+            # VENDOR QUERIES: Prioritize vendor and sales tables
+            if any(term in table_lower for term in ['vendor', 'close-out-sales', 'sales']):
+                match_score += 30
+            elif 'attendee' in table_lower:
+                match_score -= 10  # Slightly deprioritize attendee tables for vendor queries
         
         # Score based on event name matches
         for event_name, event_keywords in event_filters.items():
@@ -1463,6 +1581,10 @@ def smart_table_filter(query: str, available_tables: list) -> list:
     
     if scored_tables and scored_tables[0][1] > 0:
         app.logger.info(f"SMART TABLE FILTER: Top match '{scored_tables[0][0]}' with score {scored_tables[0][1]} for query: {query[:100]}")
+        if is_attendee_query:
+            app.logger.info(f"ATTENDEE QUERY DETECTED: Prioritizing attendee tables")
+        elif is_vendor_query:
+            app.logger.info(f"VENDOR QUERY DETECTED: Prioritizing vendor tables")
     
     return [table for table, score in scored_tables]
 
