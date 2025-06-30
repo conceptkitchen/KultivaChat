@@ -790,32 +790,35 @@ def internal_execute_sql_query(query: str) -> dict:
             cities = []
             city_mappings = {
                 'sf': ['San Francisco', 'SF'],
-                'san francisco': ['San Francisco', 'SF'],
+                'san francisco': ['San Francisco', 'SF'],  
                 'daly city': ['Daly City'],
-                'bay area': ['San Francisco', 'SF', 'Daly City']
+                'bay area': ['San Francisco', 'SF', 'Daly City'],
+                'attended events in the bay area': ['San Francisco', 'SF', 'Daly City'],
+                'in the bay area': ['San Francisco', 'SF', 'Daly City']
             }
             
             for city_term, city_variants in city_mappings.items():
                 if city_term in query_lower:
                     cities.extend(city_variants)
+                    app.logger.info(f"CITY DETECTED: '{city_term}' -> {city_variants}")
             
             if cities:
                 intent['cities'] = list(set(cities))  # Remove duplicates
             
             # AI-driven intent classification based on semantic understanding
+            # Geographic attendee queries get highest priority
+            if (cities and any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant', 'customer'])):
+                intent['type'] = 'geographic_attendee'
+                intent['focus'] = 'location_filtering'
+            
             # Vendor queries
-            if ('vendor' in query_lower and 
+            elif ('vendor' in query_lower and 
                 any(word in query_lower for word in ['top', 'best', 'highest', 'ranking', 'sales', 'revenue'])):
                 intent['type'] = 'vendor_ranking'
                 intent['focus'] = 'sales_performance'
             
-            # Attendee queries with geographic filtering
-            elif ('attendee' in query_lower and cities):
-                intent['type'] = 'geographic_attendee'
-                intent['focus'] = 'location_filtering'
-            
             # General attendee count queries
-            elif ('attendee' in query_lower and 
+            elif (any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant']) and 
                   any(word in query_lower for word in ['how many', 'count', 'total', 'number'])):
                 intent['type'] = 'attendee_count'
                 intent['focus'] = 'aggregate_count'
@@ -835,7 +838,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 intent['type'] = 'intelligent_analysis'
                 intent['focus'] = 'data_exploration'
             
-            app.logger.info(f"AI INTENT ANALYSIS: {intent['type']} - {intent.get('focus', 'general')} | Query: {query_text[:50]}...")
+            app.logger.info(f"AI INTENT ANALYSIS: {intent['type']} - {intent.get('focus', 'general')} | Cities: {intent.get('cities', 'none')} | Query: {query_text[:50]}...")
             return intent
         
         # Use AI to understand the query
