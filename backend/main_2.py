@@ -751,23 +751,26 @@ def internal_execute_sql_query(query: str) -> dict:
             'all events in', 'events during', 'all vendor', 'vendor data from'
         ]
         
-        is_comprehensive = (any(keyword in original_query.lower() for keyword in comprehensive_keywords) or
-                          any(pattern in original_query.lower() for pattern in multi_table_patterns))
+        # STEP 1: INTELLIGENT TABLE DISCOVERY
+        # Determine data source type based on query context FIRST (before comprehensive detection)
+        # IMPORTANT: Remove 'attendee' from contact keywords to avoid misclassification
+        contact_keywords = ['contact', 'email', 'phone', 'cell', 'phone numbers', 'cell phone', 'cell numbers', 'number', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
+        is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
+        
+        # COMPREHENSIVE ANALYSIS: Only if NOT a contact query
+        is_comprehensive = (not is_contact_query and 
+                          (any(keyword in original_query.lower() for keyword in comprehensive_keywords) or
+                           any(pattern in original_query.lower() for pattern in multi_table_patterns)))
         
         # Debug logging for comprehensive detection
         matched_keywords = [k for k in comprehensive_keywords if k in original_query.lower()]
         matched_patterns = [p for p in multi_table_patterns if p in original_query.lower()]
+        app.logger.info(f"Contact query detected: {is_contact_query}")
         app.logger.info(f"Comprehensive detection - Keywords: {matched_keywords}, Patterns: {matched_patterns}, Result: {is_comprehensive}")
         
         if is_business_query:
             app.logger.info(f"Enhanced business intelligence query: {original_query}")
-            app.logger.info(f"Comprehensive analysis detected: {is_comprehensive} for keywords: {[k for k in comprehensive_keywords if k in original_query.lower()]} - Original query: {original_query[:100]}")
-            
-            # STEP 1: INTELLIGENT TABLE DISCOVERY
-            # Determine data source type based on query context
-            # IMPORTANT: Remove 'attendee' from contact keywords to avoid misclassification
-            contact_keywords = ['contact', 'email', 'phone', 'cell', 'number', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
-            is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
+            app.logger.info(f"Contact query: {is_contact_query}, Comprehensive analysis: {is_comprehensive} - Original query: {original_query[:100]}")
             
             # INTELLIGENT TABLE DISCOVERY: Detect query intent and prioritize appropriate tables
             attendee_query_indicators = ['attendee', 'attendees', 'how many attendees', 'count attendees', 'total attendees']
@@ -810,7 +813,7 @@ def internal_execute_sql_query(query: str) -> dict:
             table_name
         """
             elif is_contact_query:
-                # CONTACT QUERIES: Search all contact-related tables
+                # CONTACT QUERIES: Prioritize Squarespace tables (have phone data) over close-out sales (no phone data)
                 table_discovery_query = f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
         WHERE LOWER(table_name) LIKE '%attendee%' 
@@ -820,7 +823,16 @@ def internal_execute_sql_query(query: str) -> dict:
         OR LOWER(table_name) LIKE '%close-out%'
         OR LOWER(table_name) LIKE '%registration%'
         OR LOWER(table_name) LIKE '%contact%'
-        ORDER BY table_name
+        ORDER BY 
+            CASE 
+                WHEN LOWER(table_name) LIKE '%squarespace%' THEN 1
+                WHEN LOWER(table_name) LIKE '%attendee%' THEN 2
+                WHEN LOWER(table_name) LIKE '%typeform%' THEN 3
+                WHEN LOWER(table_name) LIKE '%vendor%' THEN 4
+                WHEN LOWER(table_name) LIKE '%close-out%' THEN 5
+                ELSE 6
+            END,
+            table_name
         """
             else:
                 # GENERAL QUERIES: Default broad search
@@ -1099,7 +1111,7 @@ def internal_execute_sql_query(query: str) -> dict:
                     
                     # Find contact-related columns
                     email_cols = [col for col in columns if 'email' in col.lower()]
-                    phone_cols = [col for col in columns if any(term in col.lower() for term in ['phone', 'cell', 'mobile', 'contact'])]
+                    phone_cols = [col for col in columns if any(term in col.lower() for term in ['phone', 'cell', 'mobile', 'contact', 'billing_phone'])]
                     name_cols = [col for col in columns if any(term in col.lower() for term in ['name', 'vendor', 'business'])]
                     address_cols = [col for col in columns if any(term in col.lower() for term in ['address', 'street', 'city', 'zip', 'state'])]
                     demographic_cols = [col for col in columns if any(term in col.lower() for term in ['age', 'gender', 'occupation', 'income', 'ethnicity', 'race'])]
