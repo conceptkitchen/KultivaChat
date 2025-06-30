@@ -132,9 +132,12 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
 **CRITICAL RULES:**
 - For revenue questions: Query ALL relevant sales tables, not just one
 - For vendor analysis: Include ALL events they participated in
+- For contact extraction (emails, phone numbers): Extract actual contact details, NOT aggregations
+- For demographic queries: Extract actual demographic fields like age, gender, occupation
+- For location queries: Extract zip codes, cities, addresses from vendor/attendee forms
 - For geographic questions: Use zip code lookup tool for city filtering
 - Always use authentic data from actual table queries
-- Provide specific dollar amounts, vendor names, and record counts from real data
+- Provide specific dollar amounts, vendor names, contact details, and record counts from real data
 
 **CRITICAL TABLE SEARCH LOGIC: When users ask for data in natural language (e.g., "show me undiscovered attendees squarespace data"), you MUST:**
 
@@ -680,13 +683,20 @@ def internal_execute_sql_query(query: str) -> dict:
             
             # STEP 1: INTELLIGENT TABLE DISCOVERY
             # Determine data source type based on query context
-            if any(keyword in query_lower for keyword in ['attendee', 'contact', 'email', 'phone', 'squarespace', 'typeform']):
-                # Contact/attendee data query
+            contact_keywords = ['attendee', 'contact', 'email', 'phone', 'cell', 'number', 'address', 'demographic', 'squarespace', 'typeform']
+            is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
+            
+            if is_contact_query:
+                # Contact/attendee/demographic data query - search all tables that might have contact info
                 table_discovery_query = f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
         WHERE LOWER(table_name) LIKE '%attendee%' 
         OR LOWER(table_name) LIKE '%squarespace%'
         OR LOWER(table_name) LIKE '%typeform%'
+        OR LOWER(table_name) LIKE '%vendor%'
+        OR LOWER(table_name) LIKE '%close-out%'
+        OR LOWER(table_name) LIKE '%registration%'
+        OR LOWER(table_name) LIKE '%contact%'
         ORDER BY table_name
         """
             else:
@@ -771,8 +781,89 @@ def internal_execute_sql_query(query: str) -> dict:
                         continue
                 schema_info[table] = columns
             
-            # STEP 3: COMPREHENSIVE MULTI-TABLE ANALYSIS
-            if is_comprehensive:
+            # STEP 3: CONTACT/DEMOGRAPHIC EXTRACTION FOR SPECIFIC QUERIES
+            if is_contact_query and not is_comprehensive:
+                app.logger.info(f"CONTACT/DEMOGRAPHIC EXTRACTION: Processing specific contact query")
+                
+                # For contact queries, we want actual contact details, not aggregations
+                # Use the top relevant table and extract actual contact information
+                if relevant_tables and schema_info:
+                    top_table = relevant_tables[0]
+                    columns = schema_info.get(top_table, [])
+                    
+                    # Find contact-related columns
+                    email_cols = [col for col in columns if 'email' in col.lower()]
+                    phone_cols = [col for col in columns if any(term in col.lower() for term in ['phone', 'cell', 'mobile', 'contact'])]
+                    name_cols = [col for col in columns if any(term in col.lower() for term in ['name', 'vendor', 'business'])]
+                    address_cols = [col for col in columns if any(term in col.lower() for term in ['address', 'street', 'city', 'zip', 'state'])]
+                    demographic_cols = [col for col in columns if any(term in col.lower() for term in ['age', 'gender', 'occupation', 'income', 'ethnicity', 'race'])]
+                    
+                    # Build SELECT clause with available contact fields
+                    select_fields = []
+                    if name_cols:
+                        select_fields.append(f"{name_cols[0]} as name")
+                    if email_cols:
+                        select_fields.append(f"{email_cols[0]} as email")
+                    if phone_cols:
+                        select_fields.append(f"{phone_cols[0]} as phone")
+                    if address_cols:
+                        for addr_col in address_cols[:3]:  # Limit to 3 address fields
+                            select_fields.append(f"{addr_col} as {addr_col.lower()}")
+                    if demographic_cols:
+                        for demo_col in demographic_cols[:3]:  # Limit to 3 demographic fields  
+                            select_fields.append(f"{demo_col} as {demo_col.lower()}")
+                    
+                    if select_fields:
+                        # Extract actual contact/demographic data
+                        contact_query = f"""
+                        SELECT {', '.join(select_fields)}
+                        FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{top_table}`
+                        WHERE 1=1
+                        """
+                        
+                        # Add specific filters based on query context
+                        if 'food' in query_lower and name_cols:
+                            contact_query += f" AND LOWER({name_cols[0]}) LIKE '%food%' OR LOWER({name_cols[0]}) LIKE '%kitchen%' OR LOWER({name_cols[0]}) LIKE '%restaurant%'"
+                        
+                        # Filter out empty contact info
+                        if email_cols:
+                            contact_query += f" AND {email_cols[0]} IS NOT NULL AND {email_cols[0]} != ''"
+                        if phone_cols:
+                            contact_query += f" AND {phone_cols[0]} IS NOT NULL AND {phone_cols[0]} != ''"
+                            
+                        contact_query += " LIMIT 100"
+                        
+                        start_time = time.time()
+                        query_job = bigquery_client.query(contact_query)
+                        contact_results = query_job.result(timeout=60)
+                        contact_results = list(contact_results)
+                        execution_time = time.time() - start_time
+                        
+                        app.logger.info(f"Contact extraction completed in {execution_time:.2f}s, returned {len(contact_results)} rows.")
+                        
+                        # Convert to dictionaries
+                        contact_data = []
+                        for row in contact_results:
+                            if hasattr(row, '_mapping'):
+                                contact_data.append(dict(row._mapping))
+                            elif hasattr(row, 'items'):
+                                contact_data.append(dict(row.items()))
+                            else:
+                                contact_data.append(dict(row))
+                        
+                        return {
+                            "status": "success",
+                            "data": contact_data,
+                            "query_executed": contact_query,
+                            "query_type": "contact_extraction",
+                            "table_source": top_table,
+                            "execution_time": execution_time
+                        }
+                
+                return {"status": "error", "error_message": "No suitable tables found for contact extraction"}
+            
+            # STEP 4: COMPREHENSIVE MULTI-TABLE ANALYSIS
+            elif is_comprehensive:
                 app.logger.info(f"COMPREHENSIVE ANALYSIS: Processing {len(schema_info)} tables for multi-table insights")
                 
                 # Find all tables with revenue columns for expanded analysis
