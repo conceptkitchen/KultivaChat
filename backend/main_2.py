@@ -872,7 +872,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 'Balay-Kreative' as event_series,
                 Email,
                 Billing_City,
-                Full_Name
+                Billing_Name as name
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
             WHERE Billing_City IN ('{city_filter}') AND Email IS NOT NULL AND Email != ''
             
@@ -882,10 +882,10 @@ def internal_execute_sql_query(query: str) -> dict:
                 'UNDISCOVERED' as event_series,
                 Email,
                 Billing_City,
-                Full_Name
+                Billing_Name as name
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
             WHERE Billing_City IN ('{city_filter}') AND Email IS NOT NULL AND Email != ''
-            ORDER BY event_series, Full_Name
+            ORDER BY event_series, name
             LIMIT 100
             """
             
@@ -901,7 +901,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 for row in contact_results:
                     emails.append({
                         "email": row.Email,
-                        "name": row.Full_Name,
+                        "name": row.name,
                         "city": row.Billing_City,
                         "event_series": row.event_series
                     })
