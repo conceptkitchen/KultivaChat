@@ -1579,11 +1579,20 @@ def natural_language_query():
             if 'lavender cinema lounge' in query and '2023-08-04' in query and any(term in query for term in ['money', 'revenue', 'made', 'vendors']):
                 app.logger.info("Processing Lavender Cinema Lounge 2023-08-04 vendor revenue query")
                 
-                # Generate SQL for the specific table and authentic data
+                # Generate SQL for the specific table and authentic data with proper currency handling
                 sql_query = f"""
                 SELECT 
                     Vendor_Name,
-                    CAST(COALESCE(NULLIF(Cash__Credit_Total, ''), '0') AS FLOAT64) as revenue,
+                    CAST(COALESCE(
+                        NULLIF(
+                            REGEXP_REPLACE(
+                                REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', ''), 
+                                r'^$', '0'
+                            ), 
+                            ''
+                        ), 
+                        '0'
+                    ) AS FLOAT64) as revenue,
                     Contact_Name,
                     Email,
                     Phone
