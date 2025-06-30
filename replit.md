@@ -16,6 +16,25 @@ The system uses an intelligent tool-based architecture that transforms natural l
 
 The intelligence comes from processing authentic BigQuery data (not mock data), comparing actual dollar amounts from SQL results, understanding multi-vendor sheet structures, and making business logic decisions based on real financial data. The SQL extraction tool serves as the core that retrieves authentic data, while the AI layer provides intelligent analysis and ranking to deliver accurate business insights.
 
+#### Example: Food Vendor Email Extraction
+
+**Query:** "What are the email addresses of vendors that sell food?"
+
+**Processing Flow:**
+1. **Query Analysis** - Identifies contact extraction request for food vendors
+2. **Smart Table Selection** - Locates 3 vendor contact tables from Squarespace exports
+3. **Data Extraction** - Retrieves 64-100 vendor records from authentic registration data
+4. **Intelligent Filtering** - AI analyzes vendor business descriptions, types, and food permits
+5. **Contact Compilation** - Extracts authentic email addresses for identified food vendors
+
+**Result:** 50+ authentic food vendor email addresses including:
+- kumachowfoods@gmail.com (Kumacho Foods)
+- truck@tressf.com (Food truck vendor)
+- bernadette@inabotanicals.com
+- And 47+ additional verified food vendor contacts
+
+The system processed real vendor registration data from UNDISCOVERED events, intelligently identified food vendors through business classification analysis, and provided actual contact information - demonstrating the sophisticated data processing and business intelligence capabilities.
+
 ## System Architecture
 
 ### MCP Server Architecture
