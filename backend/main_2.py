@@ -167,13 +167,14 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
 - Include cross-event analysis and participation tracking
 - Provide event-specific insights with authentic data
 
-**7. DONOR INFORMATION QUERIES** (donations, sponsors, contributors, grants):
-- Extract donor details including names, contribution amounts, donation types
-- IMPORTANT: Donor queries should use "typeform_report_balay_kreative_forms" table for donation data
-- For donor location queries, use "Balay-Kreative---attendees---all-orders" table
-- Query format: SELECT donor_name, donation_amount, donation_type, grant_status FROM table
-- Include donor analysis, contribution tracking, sponsorship data
-- Return actual donor records with specific contribution details
+**7. DONOR INFORMATION QUERIES** (donations, sponsors, contributors, supporters):
+- Extract donor details including names, contribution amounts, purchase amounts
+- IMPORTANT: Donors are people who PAY for events (attendees who purchase tickets)
+- DONOR QUERIES use "Balay-Kreative---attendees---all-orders" table (people who paid for tickets)
+- GRANT queries use "typeform_report_balay_kreative_forms" table (people who received funding)
+- Query format: SELECT donor_name, purchase_amount, event_name, billing_city FROM attendees table
+- Include donor analysis, supporter tracking, ticket purchase data
+- Return actual supporter records who financially contributed through ticket purchases
 
 **EVENT-SPECIFIC DATA EXTRACTION:**
 - When users mention specific events, target ONLY that event's tables
@@ -214,8 +215,8 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
    - "financial data" → tables with Total_Sales, Revenue, Payment columns
    - "vendor names" → tables with Vendor_Name, Business_Name columns
    - "event data" → tables with Event_Name, Event_Date columns
-   - "donor information" → "typeform_report_balay_kreative_forms" table (donation data)
-   - "donor locations" → "Balay-Kreative---attendees---all-orders" table (donor cities)
+   - "donor information" → "Balay-Kreative---attendees---all-orders" table (people who paid for tickets)
+   - "grant information" → "typeform_report_balay_kreative_forms" table (people who received funding)
 
 4. **EVENT NAME RECOGNITION AND MATCHING**: Essential for accurate data extraction:
    - "Balay Kreative" or "balay" → "Balay-Kreative" tables
