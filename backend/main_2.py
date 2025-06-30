@@ -1604,69 +1604,6 @@ def natural_language_query():
             "error": f"Query processing failed: {str(e)}",
             "query_type": "natural_language_error"
         }), 500
-                    app.logger.info(f"Kapwa Gardens multi-table vendor/sales analysis detected: {original_query}")
-                    
-                    # BUSINESS RULE: KG tables are also Kapwa Gardens tables - for vendor/sales data only
-                    # Build multi-table UNION query for all Kapwa Gardens tables (including KG abbreviation)
-                    kapwa_tables_query = f"""
-                    SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-                    WHERE LOWER(table_name) LIKE '%kapwa%' 
-                    OR UPPER(table_name) LIKE '%KG%'
-                    OR LOWER(table_name) LIKE '%kg%'
-                    ORDER BY table_name
-                    """
-                    
-                    tables_result = internal_execute_sql_query(kapwa_tables_query)
-                    
-                    if tables_result.get('status') == 'success' and tables_result.get('data'):
-                        table_names = [row['table_name'] for row in tables_result['data']]
-                        
-                        # Extract revenue threshold from query
-                        import re
-                        amount_match = re.search(r'\$(\d+)', original_query)
-                        threshold = int(amount_match.group(1)) if amount_match else 500
-                        
-                        # Build UNION query across all Kapwa Gardens tables
-                        union_queries = []
-                        for table in table_names:
-                            union_queries.append(f"""
-                            SELECT 
-                                '{table}' as source_table,
-                                COALESCE(Vendor_Name, vendor_name, VENDOR_NAME, 'Unknown Vendor') as vendor_name,
-                                SAFE_CAST(REGEXP_REPLACE(COALESCE(Total_Sales, total_sales, Cash__Credit_Total, '0'), r'[^0-9.]', '') AS FLOAT64) as total_revenue
-                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
-                            WHERE COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) IS NOT NULL
-                            AND COALESCE(Vendor_Name, vendor_name, VENDOR_NAME) != ''
-                            AND COALESCE(Total_Sales, total_sales, Cash__Credit_Total) IS NOT NULL
-                            AND COALESCE(Total_Sales, total_sales, Cash__Credit_Total) != ''
-                            AND COALESCE(Total_Sales, total_sales, Cash__Credit_Total) NOT LIKE '%REF%'
-                            """)
-                        
-                        multi_table_query = f"""
-                        SELECT vendor_name, total_revenue, source_table
-                        FROM ({' UNION ALL '.join(union_queries)})
-                        WHERE total_revenue > {threshold}
-                        ORDER BY total_revenue DESC
-                        """
-                        
-                        app.logger.info(f"Executing multi-table Kapwa Gardens analysis across {len(table_names)} tables with ${threshold} threshold")
-                        result = internal_execute_sql_query(multi_table_query)
-                        
-                        if result.get('status') == 'success':
-                            result['ai_interpretation'] = f"Multi-table analysis across all {len(table_names)} Kapwa Gardens tables for vendors over ${threshold}"
-                            result['query_type'] = "multi_table_analysis"
-                            result['tables_analyzed'] = len(table_names)
-                        
-                        return jsonify(result)
-                
-                return jsonify({
-                    "status": "error", 
-                    "error_message": f"Unable to process natural language query: {original_query}"
-                })
-        
-    except Exception as e:
-        app.logger.error(f"Error in natural language query: {str(e)}")
-        return jsonify({"error": str(e)}), 500
 
 # Removed problematic process_revenue_analysis function - all revenue queries now use comprehensive analysis
 
