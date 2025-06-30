@@ -1,0 +1,37 @@
+Welcome to your AI Data Assistant! I can help you analyze your business data including Balay Kreative events, Kapwa Gardens vendor sales, attendee information, and revenue analytics. Ask me questions in natural language and I'll provide insights from your data.
+
+
+4:36:05 PM
+How many attendees in San Francisco?
+
+
+4:36:07 PM
+## San Francisco Attendee Summary **Total Attendees: 1,824** ### Event Breakdown: - **UNDISCOVERED Series**: 1,197 attendees (66% of total) - **Balay-Kreative Series**: 627 attendees (34% of total) ### Key Insights: - UNDISCOVERED events show stronger attendance in the San Francisco market - Combined attendance demonstrates solid market presence across both event series - Data includes both "San Francisco" and "SF" location entries for comprehensive coverage ### Next Steps: - Consider expanding UNDISCOVERED events given their higher attendance - Analyze revenue per attendee to understand profitability by event series - Review demographic data to better understand your San Francisco audience *Data sourced from Kultivate AI analytics platform*
+
+Attendee Breakdown by Event Series
+2 records found
+
+attendee count
+event series
+1197
+UNDISCOVERED
+627
+Balay-Kreative
+Route: ai_enhanced
+
+4:36:21 PM
+how many attendees in san francisco
+
+
+4:36:29 PM
+## San Francisco Attendee Summary **Total Attendees: 1,824** ### Event Breakdown - **UNDISCOVERED Series**: 1,197 attendees (66% of total) - **Balay-Kreative Series**: 627 attendees (34% of total) ### Key Insights - UNDISCOVERED events are driving the majority of San Francisco attendance - Strong overall turnout across both event series in the SF market - San Francisco represents a significant attendee base for your events ### Recommendations - Consider expanding UNDISCOVERED events given their strong performance - Analyze what makes UNDISCOVERED successful in SF to replicate in other markets - Evaluate capacity and venue requirements for future SF events *Data sourced from Kultivate AI analytics platform*
+
+Attendee Breakdown by Event Series
+2 records found
+
+attendee count
+event series
+1197
+UNDISCOVERED
+627
+Balay-Kreative
