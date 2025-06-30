@@ -3118,21 +3118,38 @@ def dashboard_financial_summary():
             """
             results = query_dashboard_bigquery(sql_query)
         else:
-            # CSV fallback calculation
+            # CSV fallback calculation with improved revenue detection
             kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
             undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
             
-            # Calculate Kapwa Gardens totals
-            kapwa_revenue = sum(float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) for row in kapwa_data)
-            kapwa_count = len([row for row in kapwa_data if float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) > 0])
+            # Calculate Kapwa Gardens totals (use cash_credit_total as main revenue source)
+            kapwa_revenue = 0.0
+            kapwa_vendors = 0
+            for row in kapwa_data:
+                if row.get('vendor_name') and row.get('vendor_name').strip():
+                    revenue = 0.0
+                    if row.get('cash_credit_total'):
+                        revenue = float(str(row.get('cash_credit_total', 0) or 0).replace('$', '').replace(',', '') or 0)
+                    elif row.get('total_sales'):
+                        revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+                    
+                    if revenue > 0:
+                        kapwa_revenue += revenue
+                        kapwa_vendors += 1
             
-            # Calculate UNDISCOVERED totals
-            undiscovered_revenue = sum(float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) for row in undiscovered_data)
-            undiscovered_count = len([row for row in undiscovered_data if float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0) > 0])
+            # Calculate UNDISCOVERED totals (use total_sales as primary)
+            undiscovered_revenue = 0.0
+            undiscovered_vendors = 0
+            for row in undiscovered_data:
+                if row.get('vendor_name') and row.get('vendor_name').strip():
+                    revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+                    if revenue > 0:
+                        undiscovered_revenue += revenue
+                        undiscovered_vendors += 1
             
             results = [
-                {"event_type": "Kapwa Gardens", "total_revenue": kapwa_revenue, "vendor_count": kapwa_count},
-                {"event_type": "UNDISCOVERED", "total_revenue": undiscovered_revenue, "vendor_count": undiscovered_count}
+                {"event_type": "Kapwa Gardens", "total_revenue": round(kapwa_revenue, 2), "vendor_count": kapwa_vendors},
+                {"event_type": "UNDISCOVERED", "total_revenue": round(undiscovered_revenue, 2), "vendor_count": undiscovered_vendors}
             ]
         
         return jsonify({
@@ -3161,21 +3178,43 @@ def dashboard_vendor_performance():
             """
             results = query_dashboard_bigquery(sql_query)
         else:
-            # CSV fallback
-            all_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv') + load_csv_fallback_data('undiscovered_dashboard_data.csv')
+            # CSV fallback with improved revenue detection
+            kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
+            undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
             
             vendor_performance = []
-            for row in all_data:
+            
+            # Process Kapwa Gardens data (use cash_credit_total as main revenue source)
+            for row in kapwa_data:
+                if row.get('vendor_name') and row.get('vendor_name').strip():
+                    # For Kapwa Gardens, prioritize cash_credit_total over total_sales
+                    revenue = 0.0
+                    if row.get('cash_credit_total'):
+                        revenue = float(str(row.get('cash_credit_total', 0) or 0).replace('$', '').replace(',', '') or 0)
+                    elif row.get('total_sales'):
+                        revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+                    
+                    if revenue > 0:
+                        vendor_performance.append({
+                            "vendor_name": row.get('vendor_name'),
+                            "event_name": row.get('event_name', 'Unknown'),
+                            "total_sales": str(revenue),  # Keep consistent with expected field name
+                            "revenue": revenue  # For sorting
+                        })
+            
+            # Process UNDISCOVERED data (use total_sales as primary)
+            for row in undiscovered_data:
                 if row.get('vendor_name') and row.get('vendor_name').strip():
                     revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
                     if revenue > 0:
                         vendor_performance.append({
                             "vendor_name": row.get('vendor_name'),
                             "event_name": row.get('event_name', 'Unknown'),
-                            "revenue": revenue
+                            "total_sales": str(revenue),  # Keep consistent with expected field name
+                            "revenue": revenue  # For sorting
                         })
             
-            # Sort by revenue and take top 20
+            # Sort by revenue descending and take top 20
             results = sorted(vendor_performance, key=lambda x: x['revenue'], reverse=True)[:20]
         
         return jsonify({
