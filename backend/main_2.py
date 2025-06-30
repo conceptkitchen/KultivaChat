@@ -1575,196 +1575,35 @@ def execute_sql():
 
 @app.route('/api/query', methods=['POST'])
 def natural_language_query():
-    """Enhanced natural language business intelligence with comprehensive multi-table analysis"""
+    """Enhanced natural language business intelligence using Gemini AI with MCP tools"""
     try:
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({"error": "Missing 'query' parameter"}), 400
         
         original_query = data['query']
-        query = data['query'].lower()
-        query_lower = query  # Add explicit query_lower variable
-        app.logger.info(f"Enhanced business intelligence query: {query}")
-        app.logger.info(f"Original query: {original_query}")
+        app.logger.info(f"Processing natural language query: {original_query}")
         
-        # Check if this is a direct SQL query first (before keyword routing)
+        # Check if this is a direct SQL query first
         if (original_query.strip().upper().startswith(('SELECT', 'WITH', 'CREATE', 'INSERT', 'UPDATE', 'DELETE', 'ALTER', 'DROP')) or
             'INFORMATION_SCHEMA' in original_query.upper() or
             (original_query.count('`') >= 2 and 'FROM' in original_query.upper())):
-            app.logger.info(f"DIRECT SQL QUERY detected: {original_query[:100]}...")
+            app.logger.info(f"Direct SQL query detected: {original_query[:100]}...")
             result = internal_execute_sql_query(original_query)
             return jsonify(result)
         
-# Let Gemini AI handle all queries using tools properly
-        
-        # Enhanced comprehensive multi-table analysis routing (excluding event comparisons)
-        comprehensive_keywords = [
-            'across all', 'all events', 'compare', 'breakdown', 'all tables',
-            'comprehensive', 'complete', 'all', 'everything', 'full analysis', 'detailed', 'thorough'
-        ]
-        
-        is_comprehensive = any(keyword in query for keyword in comprehensive_keywords)
-        
-        if is_comprehensive:
-            app.logger.info(f"COMPREHENSIVE ANALYSIS REQUEST detected with keywords: {[k for k in comprehensive_keywords if k in query]}")
-            # Use enhanced internal tool for comprehensive multi-table analysis
-            result = internal_execute_sql_query(data['query'])
-            return jsonify(result)
-        else:
-            # Process natural language queries using intelligent SQL generation
-            app.logger.info(f"PROCESSING NATURAL LANGUAGE QUERY: {query}")
-            
-            # Direct processing for vendor revenue queries at specific events
-            if 'lavender cinema lounge' in query and '2023-08-04' in query and any(term in query for term in ['money', 'revenue', 'made', 'vendors']):
-                app.logger.info("Processing Lavender Cinema Lounge 2023-08-04 vendor revenue query")
-                
-                # Generate SQL for the specific table and authentic data with proper currency handling
-                sql_query = f"""
-                SELECT 
-                    Vendor_Name,
-                    CAST(COALESCE(
-                        NULLIF(
-                            REGEXP_REPLACE(
-                                REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', ''), 
-                                r'^$', '0'
-                            ), 
-                            ''
-                        ), 
-                        '0'
-                    ) AS FLOAT64) as revenue,
-                    Contact_Name,
-                    Email,
-                    Phone
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Close-Out-Sales---Lavender-Cinema-Lounge---2023-08-04---KG-Vendor-Close-Out-Sales`
-                WHERE Vendor_Name IS NOT NULL 
-                AND Vendor_Name != ''
-                ORDER BY revenue DESC
-                """
-                
-                app.logger.info(f"Generated SQL for Lavender Cinema Lounge analysis: {sql_query[:200]}...")
-                result = internal_execute_sql_query(sql_query)
-                
-                if result.get('status') == 'success' and result.get('data'):
-                    # Calculate total revenue and vendor count
-                    total_revenue = sum(float(row.get('revenue', 0) or 0) for row in result['data'])
-                    vendor_count = len([row for row in result['data'] if float(row.get('revenue', 0) or 0) > 0])
-                    
-                    # Add business intelligence analysis
-                    vendors_with_revenue = [row for row in result['data'] if float(row.get('revenue', 0) or 0) > 0]
-                    
-                    business_intelligence = f"VENDOR REVENUE ANALYSIS - Lavender Cinema Lounge (2023-08-04)\n\n"
-                    business_intelligence += f"• Total Revenue: ${total_revenue:,.2f}\n"
-                    business_intelligence += f"• Active Vendors: {vendor_count}\n"
-                    business_intelligence += f"• Average per Vendor: ${total_revenue/vendor_count:,.2f}\n\n" if vendor_count > 0 else ""
-                    
-                    if vendors_with_revenue:
-                        business_intelligence += "Top Performing Vendors:\n"
-                        for vendor in vendors_with_revenue[:5]:
-                            revenue = float(vendor.get('revenue', 0) or 0)
-                            business_intelligence += f"• {vendor.get('Vendor_Name', 'Unknown')}: ${revenue:,.2f}\n"
-                    
-                    result['business_intelligence'] = business_intelligence
-                    result['ai_interpretation'] = f"Analysis of vendor revenue at Lavender Cinema Lounge on August 4, 2023"
-                    result['query_type'] = "natural_language_processed"
-                    result['event_details'] = {
-                        "event": "Lavender Cinema Lounge",
-                        "date": "2023-08-04",
-                        "total_revenue": total_revenue,
-                        "vendor_count": vendor_count
-                    }
-                
-                return jsonify(result)
-            
-            # Handle event comparison queries (Query 2) - PRIORITY PROCESSING
-            elif any(phrase in query for phrase in ['which event', 'made the most money', 'highest revenue', 'most money']) and any(year in query for year in ['2020', '2021', '2022', '2023', '2024']):
-                app.logger.info("Processing event revenue comparison query")
-                
-                # Generate SQL to aggregate revenue by event across all tables
-                sql_query = f"""
-                WITH event_revenues AS (
-                  SELECT 
-                    REGEXP_EXTRACT(table_name, r'Close-Out-Sales---([^-]+)') as event_name,
-                    table_name,
-                    EXTRACT(YEAR FROM PARSE_DATE('%Y-%m-%d', REGEXP_EXTRACT(table_name, r'(\\d{{4}}-\\d{{2}}-\\d{{2}})'))) as event_year
-                  FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
-                  WHERE table_name LIKE '%Close-Out-Sales%'
-                  AND EXTRACT(YEAR FROM PARSE_DATE('%Y-%m-%d', REGEXP_EXTRACT(table_name, r'(\\d{{4}}-\\d{{2}}-\\d{{2}})'))) BETWEEN 2020 AND 2023
-                ),
-                revenue_data AS (
-                  SELECT 
-                    event_name,
-                    event_year,
-                    COUNT(*) as vendor_count,
-                    SUM(CAST(COALESCE(
-                      NULLIF(
-                        REGEXP_REPLACE(
-                          REGEXP_REPLACE(COALESCE(Cash__Credit_Total, '0'), r'[^0-9.]', ''), 
-                          r'^$', '0'
-                        ), 
-                        ''
-                      ), 
-                      '0'
-                    ) AS FLOAT64)) as total_revenue
-                  FROM event_revenues er
-                  JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{{er.table_name}}` t ON true
-                  WHERE Vendor_Name IS NOT NULL AND Vendor_Name != ''
-                  GROUP BY event_name, event_year
-                )
-                SELECT 
-                  event_name,
-                  event_year,
-                  total_revenue,
-                  vendor_count
-                FROM revenue_data
-                ORDER BY total_revenue DESC
-                LIMIT 20
-                """
-                
-                app.logger.info(f"Generated event comparison SQL: {sql_query[:300]}...")
-                result = internal_execute_sql_query(sql_query)
-                
-                if result.get('status') == 'success' and result.get('data'):
-                    # Add business intelligence analysis
-                    top_event = result['data'][0] if result['data'] else None
-                    total_events = len(result['data'])
-                    
-                    business_intelligence = f"EVENT REVENUE ANALYSIS (2020-2023)\n\n"
-                    
-                    if top_event:
-                        business_intelligence += f"🏆 HIGHEST REVENUE EVENT:\n"
-                        business_intelligence += f"• {top_event.get('event_name', 'Unknown')} ({top_event.get('event_year', 'Unknown')})\n"
-                        business_intelligence += f"• Total Revenue: ${float(top_event.get('total_revenue', 0)):,.2f}\n"
-                        business_intelligence += f"• Vendor Count: {top_event.get('vendor_count', 0)}\n\n"
-                    
-                    business_intelligence += f"TOP 5 EVENTS BY REVENUE:\n"
-                    for i, event in enumerate(result['data'][:5]):
-                        revenue = float(event.get('total_revenue', 0))
-                        business_intelligence += f"{i+1}. {event.get('event_name', 'Unknown')} ({event.get('event_year', '')}): ${revenue:,.2f}\n"
-                    
-                    total_revenue_all = sum(float(row.get('total_revenue', 0)) for row in result['data'])
-                    business_intelligence += f"\nTOTAL ACROSS ALL EVENTS: ${total_revenue_all:,.2f}"
-                    
-                    result['business_intelligence'] = business_intelligence
-                    result['ai_interpretation'] = f"Analysis of highest revenue events from 2020-2023"
-                    result['query_type'] = "event_comparison"
-                
-                return jsonify(result)
-            
-            # Fallback to pattern matching for other queries
-            sql_query = convert_natural_language_to_sql(original_query)
-            
-            if sql_query:
-                app.logger.info(f"Generated SQL from natural language: {sql_query[:200]}...")
-                result = internal_execute_sql_query(sql_query)
-                
-                if result.get('status') == 'success':
-                    result['ai_interpretation'] = f"Analysis of: {original_query}"
-                    result['query_type'] = "natural_language"
-                
-                return jsonify(result)
-            else:
-                # If pattern matching fails, check if it's a Kapwa Gardens multi-table query (vendor/sales only)
-                if ('kapwa gardens' in query or 'kapwa' in query or 'kg' in query.lower()) and any(keyword in query for keyword in ['over', 'made', 'vendors', '$', 'revenue']) and 'attendee' not in query.lower():
+        # Use Gemini AI with MCP tools for all natural language queries
+        app.logger.info("Processing with Gemini AI and MCP tools")
+        result = internal_execute_sql_query(original_query)
+        return jsonify(result)
+    
+    except Exception as e:
+        app.logger.error(f"Natural language query processing error: {e}")
+        return jsonify({
+            "status": "error", 
+            "error": f"Query processing failed: {str(e)}",
+            "query_type": "natural_language_error"
+        }), 500
                     app.logger.info(f"Kapwa Gardens multi-table vendor/sales analysis detected: {original_query}")
                     
                     # BUSINESS RULE: KG tables are also Kapwa Gardens tables - for vendor/sales data only
