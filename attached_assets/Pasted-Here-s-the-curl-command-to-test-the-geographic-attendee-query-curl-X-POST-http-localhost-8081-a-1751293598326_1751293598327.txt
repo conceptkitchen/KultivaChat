@@ -1,0 +1,33 @@
+Here's the curl command to test the geographic attendee query:
+
+curl -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How many attendees live in San Francisco and Daly City?"}' \
+  --max-time 60
+And here are the specific SQL queries I used to get the detailed breakdown:
+
+1. Check Balay-Kreative attendees in SF/Daly City:
+
+curl -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT COUNT(*) as sf_daly_city_attendees FROM `kbc-use4-839-261b.WORKSPACE_23990909.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` WHERE UPPER(Billing_City) IN (\"SAN FRANCISCO\", \"DALY CITY\", \"SF\")"}' \
+  --max-time 30
+2. Check UNDISCOVERED attendees in SF/Daly City:
+
+curl -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT COUNT(*) as sf_daly_city_attendees FROM `kbc-use4-839-261b.WORKSPACE_23990909.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-` WHERE UPPER(Billing_City) IN (\"SAN FRANCISCO\", \"DALY CITY\", \"SF\")"}' \
+  --max-time 30
+3. Get detailed city breakdown for Balay-Kreative:
+
+curl -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT Billing_City, COUNT(*) as attendee_count FROM `kbc-use4-839-261b.WORKSPACE_23990909.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders` WHERE UPPER(Billing_City) IN (\"SAN FRANCISCO\", \"DALY CITY\", \"SF\") GROUP BY Billing_City ORDER BY attendee_count DESC"}' \
+  --max-time 30
+4. Get detailed city breakdown for UNDISCOVERED:
+
+curl -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "SELECT Billing_City, COUNT(*) as attendee_count FROM `kbc-use4-839-261b.WORKSPACE_23990909.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-` WHERE UPPER(Billing_City) IN (\"SAN FRANCISCO\", \"DALY CITY\", \"SF\") GROUP BY Billing_City ORDER BY attendee_count DESC"}' \
+  --max-time 30
+The first natural language query should work but currently defaults to total attendee count. The SQL queries will give you the precise geographic breakdown showing 2,555 total attendees from SF and Daly City.
