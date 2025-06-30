@@ -1565,10 +1565,12 @@ def natural_language_query():
                 if 'kapwa gardens' in query and any(keyword in query for keyword in ['over', 'made', 'vendors', '$', 'revenue']):
                     app.logger.info(f"Kapwa Gardens multi-table analysis detected: {original_query}")
                     
-                    # Build multi-table UNION query for all 16 Kapwa Gardens tables
+                    # Build multi-table UNION query for all Kapwa Gardens tables (including KG abbreviation)
                     kapwa_tables_query = f"""
                     SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-                    WHERE LOWER(table_name) LIKE '%kapwa%'
+                    WHERE LOWER(table_name) LIKE '%kapwa%' 
+                    OR UPPER(table_name) LIKE '%KG%'
+                    OR LOWER(table_name) LIKE '%kg%'
                     ORDER BY table_name
                     """
                     
@@ -1727,11 +1729,20 @@ def build_attendee_analysis(tables, query):
 
 def analyze_specific_event(event_name):
     """Analyze specific event data"""
-    return internal_execute_sql_query(f"""
-        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
-        WHERE LOWER(table_name) LIKE '%{event_name}%'
-        ORDER BY table_name
-    """)
+    if event_name == 'kapwa':
+        # Include both 'kapwa' and 'KG' tables for Kapwa Gardens
+        return internal_execute_sql_query(f"""
+            SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+            WHERE LOWER(table_name) LIKE '%kapwa%' 
+            OR UPPER(table_name) LIKE '%KG%'
+            ORDER BY table_name
+        """)
+    else:
+        return internal_execute_sql_query(f"""
+            SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+            WHERE LOWER(table_name) LIKE '%{event_name}%'
+            ORDER BY table_name
+        """)
 
 def analyze_all_events():
     """Analyze all events comprehensively"""
@@ -1739,7 +1750,7 @@ def analyze_all_events():
         SELECT 
             table_name,
             CASE 
-                WHEN LOWER(table_name) LIKE '%kapwa%' THEN 'Kapwa Gardens'
+                WHEN LOWER(table_name) LIKE '%kapwa%' OR UPPER(table_name) LIKE '%KG%' THEN 'Kapwa Gardens'
                 WHEN LOWER(table_name) LIKE '%undiscovered%' THEN 'UNDISCOVERED'
                 WHEN LOWER(table_name) LIKE '%balay%' THEN 'Balay Kreative'
                 ELSE 'Other Events'
