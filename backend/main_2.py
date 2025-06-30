@@ -1517,6 +1517,9 @@ def process_revenue_analysis(query):
             app.logger.warning(f"Row conversion error: {e}, Row: {row}")
             continue
     
+    # Add debugging to see what tables were found
+    app.logger.info(f"Revenue analysis found {len(tables)} tables: {tables[:3] if tables else 'None'}")
+    
     # Step 2: Build comprehensive revenue query across all tables
     if tables:
         # Examine schema of first few tables to understand structure
