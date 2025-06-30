@@ -829,6 +829,12 @@ def internal_execute_sql_query(query: str) -> dict:
                     intent['type'] = 'contact_extraction'
                     intent['focus'] = 'contact_information'
             
+            # City ranking/comparison queries - detect "which cities", "top cities", etc.
+            elif (any(ranking_word in query_lower for ranking_word in ['which cities', 'top cities', 'most attendees', 'cities have']) and 
+                  any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant'])):
+                intent['type'] = 'city_ranking'
+                intent['focus'] = 'city_comparison'
+            
             # Geographic attendee queries (counts only)
             elif (cities and any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant', 'customer'])):
                 intent['type'] = 'geographic_attendee'
@@ -983,6 +989,63 @@ def internal_execute_sql_query(query: str) -> dict:
                 
             except Exception as e:
                 app.logger.error(f"Direct geographic attendee query failed in SQL tool: {e}")
+                # Continue to fallback processing
+        
+        # CITY RANKING ROUTING: City-level aggregation for ranking queries
+        if query_intent.get('type') == 'city_ranking':
+            app.logger.info(f"CITY RANKING QUERY DETECTED IN SQL TOOL: Routing to city-level aggregation")
+            
+            city_ranking_query = f"""
+            SELECT 
+                Billing_City as city,
+                COUNT(*) as attendee_count
+            FROM (
+                SELECT Billing_City FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
+                WHERE Billing_City IS NOT NULL AND Billing_City != ''
+                UNION ALL
+                SELECT Billing_City FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
+                WHERE Billing_City IS NOT NULL AND Billing_City != ''
+            )
+            GROUP BY Billing_City
+            ORDER BY attendee_count DESC
+            LIMIT 15
+            """
+            
+            try:
+                start_time = time.time()
+                query_job = bigquery_client.query(city_ranking_query)
+                city_results = query_job.result(timeout=60)
+                city_results = list(city_results)
+                execution_time = time.time() - start_time
+                
+                # Process results for ranking display
+                cities_ranked = []
+                total_attendees = 0
+                for i, row in enumerate(city_results, 1):
+                    cities_ranked.append({
+                        "rank": i,
+                        "city": row.city,
+                        "attendee_count": row.attendee_count
+                    })
+                    total_attendees += row.attendee_count
+                
+                app.logger.info(f"CITY RANKING SUCCESS IN SQL TOOL: Retrieved {len(cities_ranked)} cities with {total_attendees} total attendees in {execution_time:.2f}s")
+                
+                return {
+                    "status": "success", 
+                    "data": {
+                        "cities_ranked": cities_ranked,
+                        "total_cities": len(cities_ranked),
+                        "total_attendees_analyzed": total_attendees
+                    },
+                    "query_executed": city_ranking_query,
+                    "execution_time": execution_time,
+                    "query_type": "city_ranking",
+                    "routing_method": "sql_tool_city_ranking"
+                }
+                
+            except Exception as e:
+                app.logger.error(f"City ranking query failed in SQL tool: {e}")
                 # Continue to fallback processing
         
         # IMMEDIATE ATTENDEE COUNT ROUTING: Direct query for attendee counts
