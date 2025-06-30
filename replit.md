@@ -105,7 +105,7 @@ Kultivate AI MCP Server is a standalone Model Context Protocol backend service p
 
 ## Recent Changes
 
-- **June 30, 2025**: NATURAL LANGUAGE QUERY ROUTING COMPLETELY FIXED - All 10 critical business intelligence queries now operational with authentic data
+- **June 30, 2025**: CRITICAL ROUTING BUG COMPLETELY FIXED - Natural language queries now return correct event-specific data instead of wrong table results
   - ✅ RESOLVED: Critical MCP routing bug where natural language queries bypassed Gemini AI conversion causing SQL syntax errors
   - ✅ IMPLEMENTED: Enhanced Gemini AI integration for counting/aggregation queries with "how many", "count", "total" keywords
   - ✅ VALIDATED: All 10 systematic test queries now process correctly through natural language to SQL conversion
