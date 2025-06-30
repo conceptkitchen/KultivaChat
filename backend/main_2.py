@@ -768,7 +768,45 @@ def internal_execute_sql_query(query: str) -> dict:
                     total_comprehensive_transactions = 0
                     
                     for table, revenue_column in revenue_tables[:15]:  # Expanded from 8 to 15 tables for broader analysis
-                        # Enhanced table query with more detailed event extraction
+                        
+                        # SMART COLUMN DETECTION: Get actual column names for this table
+                        try:
+                            schema_query = f"""
+                            SELECT column_name
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.COLUMNS`
+                            WHERE table_name = '{table}'
+                            """
+                            schema_result = bigquery_client.query(schema_query)
+                            actual_columns = [row.column_name for row in schema_result]
+                            
+                            # Find the correct revenue column for this specific table
+                            actual_revenue_col = None
+                            for col in actual_columns:
+                                if any(term in col.lower() for term in ['cash_credit_total', 'total_sales', 'sales', 'revenue', 'total']):
+                                    actual_revenue_col = col
+                                    break
+                            
+                            # Find vendor name column
+                            vendor_col = None
+                            for col in actual_columns:
+                                if 'vendor' in col.lower() and 'name' in col.lower():
+                                    vendor_col = col
+                                    break
+                            if not vendor_col:
+                                for col in actual_columns:
+                                    if 'name' in col.lower():
+                                        vendor_col = col
+                                        break
+                            
+                            if not actual_revenue_col or not vendor_col:
+                                app.logger.warning(f"Table {table}: Missing columns - revenue: {actual_revenue_col}, vendor: {vendor_col}")
+                                continue
+                                
+                        except Exception as schema_error:
+                            app.logger.warning(f"Failed to get schema for {table}: {schema_error}")
+                            continue
+                        
+                        # Enhanced table query with dynamic column detection
                         table_query = f"""
                         SELECT 
                             '{table}' as table_source,
@@ -791,17 +829,17 @@ def internal_execute_sql_query(query: str) -> dict:
                                 ELSE REGEXP_EXTRACT('{table}', r'---(.*?)---')
                             END as event_name,
                             COUNT(*) as record_count,
-                            SUM(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
-                            AVG(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as average_revenue,
-                            MIN(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as min_revenue,
-                            MAX(CAST(REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as max_revenue
+                            SUM(CAST(REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
+                            AVG(CAST(REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as average_revenue,
+                            MIN(CAST(REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as min_revenue,
+                            MAX(CAST(REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') AS FLOAT64)) as max_revenue
                         FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
-                        WHERE {revenue_column} IS NOT NULL
-                        AND CAST({revenue_column} AS STRING) NOT LIKE '%REF%'
-                        AND CAST({revenue_column} AS STRING) != ''
-                        AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != ''
-                        AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != '0'
-                        AND REGEXP_REPLACE(CAST({revenue_column} AS STRING), r'[^0-9.]', '') != '0.0'
+                        WHERE {vendor_col} IS NOT NULL
+                        AND CAST({actual_revenue_col} AS STRING) NOT LIKE '%REF%'
+                        AND CAST({actual_revenue_col} AS STRING) != ''
+                        AND REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') != ''
+                        AND REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') != '0'
+                        AND REGEXP_REPLACE(CAST({actual_revenue_col} AS STRING), r'[^0-9.]', '') != '0.0'
                         """
                         
                         try:
