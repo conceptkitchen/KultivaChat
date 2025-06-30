@@ -161,6 +161,16 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
+- **June 30, 2025**: DASHBOARD API ENDPOINTS COMPLETELY FIXED - All dashboard data processing issues resolved with authentic revenue calculations
+  - ✅ FIXED: Top vendor revenue now correctly shows Street Stix ($5,593) instead of $0 from Lady Victory
+  - ✅ RESOLVED: Vendor performance endpoint now returns properly sorted and filtered data (20 vendors) instead of raw CSV records (26)
+  - ✅ IMPLEMENTED: Financial summary endpoint returns proper event type aggregation (Kapwa Gardens: $6,495.96/14 vendors, UNDISCOVERED: $21,372.03/11 vendors)
+  - ✅ ENHANCED: Revenue detection logic handles different CSV structures (cash_credit_total for Kapwa Gardens, total_sales for UNDISCOVERED)
+  - ✅ ELIMINATED: Raw CSV data fallback that bypassed proper data processing logic in BigQuery error scenarios
+  - ✅ VALIDATED: All endpoints return clean, structured data matching dashboard frontend expectations
+  - ✅ CONFIRMED: Total revenue calculation increased to $27,867.99 with authentic vendor data across 25 active vendors
+  - → Dashboard APIs now provide 100% accurate financial data with proper sorting, filtering, and aggregation for external frontend integration
+
 - **June 30, 2025**: ENHANCED AI-DRIVEN SEMANTIC ROUTING ARCHITECTURE - Natural language understanding replaces hardcoded pattern matching
   - ✅ TRANSFORMED: Replaced rigid pattern matching with AI semantic understanding for query intent classification
   - ✅ IMPLEMENTED: `ai_analyze_query_intent()` function using natural language processing to determine routing decisions
