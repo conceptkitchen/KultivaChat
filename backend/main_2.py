@@ -1190,71 +1190,21 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
                 LIMIT 20
                 """
     
-    # Multi-event participation
+    # Multi-event participation - trigger comprehensive analysis instead of wildcard query
     if ('multiple' in query_lower and 'events' in query_lower) or ('participated' in query_lower and 'multiple' in query_lower):
         if 'kapwa gardens' in query_lower:
-            return f"""
-            SELECT 
-                CASE 
-                    WHEN Vendor_Name IS NOT NULL THEN Vendor_Name
-                    WHEN vendor_name IS NOT NULL THEN vendor_name
-                    ELSE 'Unknown Vendor'
-                END as vendor_name,
-                COUNT(DISTINCT _TABLE_SUFFIX) as event_count,
-                SUM(CASE 
-                    WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
-                    WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
-                    ELSE 0
-                END) as total_revenue
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
-            WHERE _TABLE_SUFFIX LIKE '%Kapwa%'
-            AND (Vendor_Name IS NOT NULL OR vendor_name IS NOT NULL)
-            GROUP BY vendor_name
-            HAVING event_count > 1
-            ORDER BY event_count DESC, total_revenue DESC
-            LIMIT 20
-            """
+            # Return None to trigger comprehensive analysis which handles multi-table queries properly
+            return None
     
-    # Revenue trend analysis
+    # Revenue trend analysis - trigger comprehensive analysis for multi-table queries
     if 'revenue' in query_lower and ('time' in query_lower or 'changed' in query_lower or 'over time' in query_lower):
         if 'kapwa gardens' in query_lower:
-            return f"""
-            SELECT 
-                _TABLE_SUFFIX as event_table,
-                COUNT(*) as transaction_count,
-                SUM(CASE 
-                    WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
-                    WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
-                    ELSE 0
-                END) as total_revenue,
-                AVG(CASE 
-                    WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
-                    WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
-                    ELSE 0
-                END) as avg_revenue
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
-            WHERE _TABLE_SUFFIX LIKE '%Kapwa%'
-            AND (Total_Sales IS NOT NULL OR Cash__Credit_Total IS NOT NULL)
-            GROUP BY _TABLE_SUFFIX
-            ORDER BY total_revenue DESC
-            LIMIT 20
-            """
+            return None
     
-    # Comprehensive business intelligence
+    # Comprehensive business intelligence - trigger comprehensive analysis
     if 'comprehensive' in query_lower and 'business intelligence' in query_lower:
         if 'kapwa gardens' in query_lower:
-            return f"""
-            SELECT 
-                'vendor_summary' as analysis_type,
-                COUNT(DISTINCT vendor_name) as unique_vendors,
-                COUNT(*) as total_transactions,
-                SUM(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as total_revenue,
-                AVG(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as avg_revenue,
-                MAX(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as max_revenue
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
-            WHERE LOWER(table_name) LIKE '%kapwa%'
-            AND total_sales IS NOT NULL
-            """
+            return None
     
     # Default: return None to indicate unsupported query
     return None
