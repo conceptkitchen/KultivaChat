@@ -1472,8 +1472,9 @@ def natural_language_query():
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
         elif any(keyword in query for keyword in ['revenue', 'money', 'sales', 'vendor', 'total', 'income', 'financial']):
-            app.logger.info(f"ROUTING TO REVENUE ANALYSIS: {query}")
-            return process_revenue_analysis(query)
+            app.logger.info(f"ROUTING TO COMPREHENSIVE ANALYSIS FOR REVENUE: {query}")
+            result = internal_execute_sql_query(data['query'])
+            return jsonify(result)
         elif any(keyword in query for keyword in ['attendee', 'contact', 'email', 'phone', 'participant']):
             return process_attendee_analysis(query)
         elif any(keyword in query for keyword in ['table', 'data', 'show me', 'list']):
