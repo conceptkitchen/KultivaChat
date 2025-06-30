@@ -1490,19 +1490,7 @@ def natural_language_query():
         app.logger.error(f"Error in natural language query: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-def process_revenue_analysis(query):
-    """Process revenue and financial analysis queries - FIXED VERSION"""
-    app.logger.info(f"PROCESS_REVENUE_ANALYSIS called with query: {query}")
-    
-    # Use the enhanced internal tool directly which we know works for comprehensive analysis
-    try:
-        # Since we know the tables exist, use the comprehensive analysis tool directly
-        result = internal_execute_sql_query(query)
-        app.logger.info(f"Revenue analysis using internal_execute_sql_query completed: {result.get('status')}")
-        return jsonify(result)
-    except Exception as e:
-        app.logger.error(f"Error in revenue analysis: {e}")
-        return jsonify({"error": f"Revenue analysis failed: {str(e)}"})
+# Removed problematic process_revenue_analysis function - all revenue queries now use comprehensive analysis
 
 def process_attendee_analysis(query):
     """Process attendee and contact information queries"""
