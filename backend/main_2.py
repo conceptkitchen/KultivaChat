@@ -806,8 +806,23 @@ def internal_execute_sql_query(query: str) -> dict:
                 intent['cities'] = list(set(cities))  # Remove duplicates
             
             # AI-driven intent classification based on semantic understanding
-            # Geographic attendee queries get highest priority
-            if (cities and any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant', 'customer'])):
+            # Contact extraction gets highest priority when emails are requested
+            email_detected = any(contact_word in query_lower for contact_word in ['email', 'emails', 'email address'])
+            attendee_detected = any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant', 'customer'])
+            
+            app.logger.info(f"EMAIL DETECTION: email_detected={email_detected}, attendee_detected={attendee_detected}, cities={cities}")
+            
+            if email_detected:
+                if cities and attendee_detected:
+                    intent['type'] = 'geographic_contact_extraction'
+                    intent['focus'] = 'attendee_emails_by_location'
+                    app.logger.info(f"SETTING INTENT TO: geographic_contact_extraction")
+                else:
+                    intent['type'] = 'contact_extraction'
+                    intent['focus'] = 'contact_information'
+            
+            # Geographic attendee queries (counts only)
+            elif (cities and any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant', 'customer'])):
                 intent['type'] = 'geographic_attendee'
                 intent['focus'] = 'location_filtering'
             
@@ -845,7 +860,71 @@ def internal_execute_sql_query(query: str) -> dict:
         query_intent = ai_analyze_query_intent(original_query)
         
         # SMART ROUTING BASED ON QUERY INTENT: Use AI understanding instead of hardcoded patterns
-        if query_intent.get('type') == 'geographic_attendee':
+        if query_intent.get('type') == 'geographic_contact_extraction':
+            app.logger.info(f"GEOGRAPHIC CONTACT EXTRACTION QUERY DETECTED IN SQL TOOL: Routing to email extraction by location")
+            
+            # Extract cities from query intent
+            cities_to_filter = query_intent.get('cities', ['San Francisco', 'SF', 'Daly City'])
+            city_filter = "', '".join(cities_to_filter)
+            
+            contact_query = f"""
+            SELECT 
+                'Balay-Kreative' as event_series,
+                Email,
+                Billing_City,
+                Full_Name
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
+            WHERE Billing_City IN ('{city_filter}') AND Email IS NOT NULL AND Email != ''
+            
+            UNION ALL
+            
+            SELECT 
+                'UNDISCOVERED' as event_series,
+                Email,
+                Billing_City,
+                Full_Name
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
+            WHERE Billing_City IN ('{city_filter}') AND Email IS NOT NULL AND Email != ''
+            ORDER BY event_series, Full_Name
+            LIMIT 100
+            """
+            
+            try:
+                start_time = time.time()
+                query_job = bigquery_client.query(contact_query)
+                contact_results = query_job.result(timeout=60)
+                contact_results = list(contact_results)
+                execution_time = time.time() - start_time
+                
+                # Process results
+                emails = []
+                for row in contact_results:
+                    emails.append({
+                        "email": row.Email,
+                        "name": row.Full_Name,
+                        "city": row.Billing_City,
+                        "event_series": row.event_series
+                    })
+                
+                app.logger.info(f"GEOGRAPHIC CONTACT EXTRACTION SUCCESS IN SQL TOOL: Retrieved {len(emails)} email addresses from {cities_to_filter} in {execution_time:.2f}s")
+                
+                return {
+                    "status": "success", 
+                    "data": {
+                        "emails": emails,
+                        "total_emails": len(emails),
+                        "cities": cities_to_filter
+                    },
+                    "query_executed": contact_query,
+                    "execution_time": execution_time,
+                    "query_type": "geographic_contact_extraction",
+                    "routing_method": "sql_tool_contact_routing"
+                }
+            except Exception as e:
+                app.logger.error(f"GEOGRAPHIC CONTACT EXTRACTION ERROR: {str(e)}")
+                return {"status": "error", "message": f"Geographic contact extraction failed: {str(e)}"}
+        
+        elif query_intent.get('type') == 'geographic_attendee':
             app.logger.info(f"GEOGRAPHIC ATTENDEE QUERY DETECTED IN SQL TOOL: Routing to location-based attendee filtering")
             
             # Extract cities from query intent
