@@ -1153,42 +1153,8 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
             amount = amount_match.group(1)
             
             if 'kapwa gardens' in query_lower:
-                # Use a specific table instead of wildcard query
-                return f"""
-                SELECT 
-                    CASE 
-                        WHEN Vendor_Name IS NOT NULL AND Vendor_Name != '' THEN Vendor_Name
-                        WHEN vendor_name IS NOT NULL AND vendor_name != '' THEN vendor_name
-                        WHEN VENDOR_NAME IS NOT NULL AND VENDOR_NAME != '' THEN VENDOR_NAME
-                        ELSE 'Unknown Vendor'
-                    END as vendor_name,
-                    CASE 
-                        WHEN Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%' THEN 
-                            SAFE_CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                        WHEN total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%' THEN 
-                            SAFE_CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                        WHEN Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%' THEN 
-                            SAFE_CAST(REGEXP_REPLACE(CAST(Cash__Credit_Total AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                        ELSE 0
-                    END as total_revenue
-                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal`
-                WHERE (
-                    (Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%') OR
-                    (total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%') OR
-                    (Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%')
-                )
-                AND CASE 
-                    WHEN Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%' THEN 
-                        SAFE_CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                    WHEN total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%' THEN 
-                        SAFE_CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                    WHEN Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%' THEN 
-                        SAFE_CAST(REGEXP_REPLACE(CAST(Cash__Credit_Total AS STRING), r'[^0-9.]', '') AS FLOAT64)
-                    ELSE 0
-                END > {amount}
-                ORDER BY total_revenue DESC
-                LIMIT 20
-                """
+                # Return None to trigger comprehensive analysis across all 16 Kapwa Gardens tables
+                return None
     
     # Multi-event participation - trigger comprehensive analysis instead of wildcard query
     if ('multiple' in query_lower and 'events' in query_lower) or ('participated' in query_lower and 'multiple' in query_lower):
@@ -1595,8 +1561,76 @@ def natural_language_query():
                 
                 return jsonify(result)
             else:
+                # If pattern matching fails, check if it's a Kapwa Gardens multi-table query
+                if 'kapwa gardens' in query and any(keyword in query for keyword in ['over', 'made', 'vendors', '$', 'revenue']):
+                    app.logger.info(f"Kapwa Gardens multi-table analysis detected: {original_query}")
+                    
+                    # Build multi-table UNION query for all 16 Kapwa Gardens tables
+                    kapwa_tables_query = f"""
+                    SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+                    WHERE LOWER(table_name) LIKE '%kapwa%'
+                    ORDER BY table_name
+                    """
+                    
+                    tables_result = internal_execute_sql_query(kapwa_tables_query)
+                    
+                    if tables_result.get('status') == 'success' and tables_result.get('data'):
+                        table_names = [row['table_name'] for row in tables_result['data']]
+                        
+                        # Extract revenue threshold from query
+                        import re
+                        amount_match = re.search(r'\$(\d+)', original_query)
+                        threshold = int(amount_match.group(1)) if amount_match else 500
+                        
+                        # Build UNION query across all Kapwa Gardens tables
+                        union_queries = []
+                        for table in table_names:
+                            union_queries.append(f"""
+                            SELECT 
+                                '{table}' as source_table,
+                                CASE 
+                                    WHEN Vendor_Name IS NOT NULL AND Vendor_Name != '' THEN Vendor_Name
+                                    WHEN vendor_name IS NOT NULL AND vendor_name != '' THEN vendor_name
+                                    WHEN VENDOR_NAME IS NOT NULL AND VENDOR_NAME != '' THEN VENDOR_NAME
+                                    ELSE 'Unknown Vendor'
+                                END as vendor_name,
+                                CASE 
+                                    WHEN Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%' THEN 
+                                        SAFE_CAST(REGEXP_REPLACE(CAST(Total_Sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                                    WHEN total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%' THEN 
+                                        SAFE_CAST(REGEXP_REPLACE(CAST(total_sales AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                                    WHEN Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%' THEN 
+                                        SAFE_CAST(REGEXP_REPLACE(CAST(Cash__Credit_Total AS STRING), r'[^0-9.]', '') AS FLOAT64)
+                                    ELSE 0
+                                END as total_revenue
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                            WHERE (
+                                (Total_Sales IS NOT NULL AND Total_Sales != '' AND Total_Sales NOT LIKE '%REF%') OR
+                                (total_sales IS NOT NULL AND total_sales != '' AND total_sales NOT LIKE '%REF%') OR
+                                (Cash__Credit_Total IS NOT NULL AND Cash__Credit_Total != '' AND Cash__Credit_Total NOT LIKE '%REF%')
+                            )
+                            """)
+                        
+                        multi_table_query = f"""
+                        SELECT vendor_name, total_revenue, source_table
+                        FROM ({' UNION ALL '.join(union_queries)})
+                        WHERE total_revenue > {threshold}
+                        ORDER BY total_revenue DESC
+                        LIMIT 50
+                        """
+                        
+                        app.logger.info(f"Executing multi-table Kapwa Gardens analysis across {len(table_names)} tables with ${threshold} threshold")
+                        result = internal_execute_sql_query(multi_table_query)
+                        
+                        if result.get('status') == 'success':
+                            result['ai_interpretation'] = f"Multi-table analysis across all {len(table_names)} Kapwa Gardens tables for vendors over ${threshold}"
+                            result['query_type'] = "multi_table_analysis"
+                            result['tables_analyzed'] = len(table_names)
+                        
+                        return jsonify(result)
+                
                 return jsonify({
-                    "status": "error",
+                    "status": "error", 
                     "error_message": f"Unable to process natural language query: {original_query}"
                 })
         
