@@ -1475,65 +1475,10 @@ def natural_language_query():
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
         else:
-            # Route natural language queries through Gemini AI
-            app.logger.info(f"PROCESSING NATURAL LANGUAGE QUERY THROUGH AI: {query}")
-            
-            # Define tool functions list for Gemini
-            tool_functions = [
-                internal_execute_sql_query,
-                get_current_time,
-                get_zip_codes_for_city
-            ]
-            
-            # Create Gemini chat session with available tools
-            chat_session = google_genai_for_client.Client(api_key=GEMINI_API_KEY).chats.start(
-                model="gemini-2.0-flash-exp",
-                system_instruction=f"""You are a sophisticated business intelligence analyst with access to a comprehensive BigQuery workspace containing 38+ tables of vendor, attendee, and event data.
-
-Your BigQuery workspace is: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
-
-IMPORTANT: You have access to these powerful tools:
-1. internal_execute_sql_query - Execute SQL queries and perform comprehensive business analysis
-2. get_current_time - Get current date/time for analysis
-3. get_zip_codes_for_city - Geographic analysis capabilities
-
-CRITICAL: When users ask business questions, use the internal_execute_sql_query tool to:
-1. Discover relevant tables automatically
-2. Examine table schemas to understand column structures  
-3. Build appropriate SQL queries based on the data structure
-4. Provide comprehensive business intelligence analysis
-
-Table categories in your workspace:
-- Close-out sales data (revenue, vendor performance)
-- Vendor/attendee information (contacts, demographics)
-- Event data (dates, locations, participation)
-- Squarespace form submissions
-- Typeform responses
-
-Always provide authentic business intelligence with specific metrics, vendor names, and actionable insights.""",
-                tools=tool_functions
-            )
-            
-            # Send user query to Gemini
-            response = chat_session.send_message(original_query)
-            
-            # Process the response
-            if hasattr(response, 'content') and response.content:
-                response_text = ""
-                if hasattr(response.content, 'parts') and response.content.parts:
-                    response_text = response.content.parts[0].text if response.content.parts[0].text else "Analysis completed"
-                else:
-                    response_text = str(response.content)
-                
-                return jsonify({
-                    "status": "success",
-                    "response": response_text
-                })
-            else:
-                return jsonify({
-                    "status": "error", 
-                    "error_message": "No response from AI system"
-                })
+            # Route natural language queries to comprehensive analysis (with fixed table discovery)
+            app.logger.info(f"PROCESSING NATURAL LANGUAGE QUERY: {query}")
+            result = internal_execute_sql_query(data['query'])
+            return jsonify(result)
         
     except Exception as e:
         app.logger.error(f"Error in natural language query: {str(e)}")
