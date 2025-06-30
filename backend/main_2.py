@@ -1636,6 +1636,81 @@ def natural_language_query():
                 
                 return jsonify(result)
             
+            # Handle event comparison queries (Query 2)
+            elif any(phrase in query for phrase in ['which event', 'made the most money', 'highest revenue', 'most money']) and any(year in query for year in ['2020', '2021', '2022', '2023']):
+                app.logger.info("Processing event revenue comparison query")
+                
+                # Generate SQL to aggregate revenue by event across all tables
+                sql_query = f"""
+                WITH event_revenues AS (
+                  SELECT 
+                    REGEXP_EXTRACT(table_name, r'Close-Out-Sales---([^-]+)') as event_name,
+                    table_name,
+                    EXTRACT(YEAR FROM PARSE_DATE('%Y-%m-%d', REGEXP_EXTRACT(table_name, r'(\\d{{4}}-\\d{{2}}-\\d{{2}})'))) as event_year
+                  FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+                  WHERE table_name LIKE '%Close-Out-Sales%'
+                  AND EXTRACT(YEAR FROM PARSE_DATE('%Y-%m-%d', REGEXP_EXTRACT(table_name, r'(\\d{{4}}-\\d{{2}}-\\d{{2}})'))) BETWEEN 2020 AND 2023
+                ),
+                revenue_data AS (
+                  SELECT 
+                    event_name,
+                    event_year,
+                    COUNT(*) as vendor_count,
+                    SUM(CAST(COALESCE(
+                      NULLIF(
+                        REGEXP_REPLACE(
+                          REGEXP_REPLACE(COALESCE(Cash__Credit_Total, '0'), r'[^0-9.]', ''), 
+                          r'^$', '0'
+                        ), 
+                        ''
+                      ), 
+                      '0'
+                    ) AS FLOAT64)) as total_revenue
+                  FROM event_revenues er
+                  JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{{er.table_name}}` t ON true
+                  WHERE Vendor_Name IS NOT NULL AND Vendor_Name != ''
+                  GROUP BY event_name, event_year
+                )
+                SELECT 
+                  event_name,
+                  event_year,
+                  total_revenue,
+                  vendor_count
+                FROM revenue_data
+                ORDER BY total_revenue DESC
+                LIMIT 20
+                """
+                
+                app.logger.info(f"Generated event comparison SQL: {sql_query[:300]}...")
+                result = internal_execute_sql_query(sql_query)
+                
+                if result.get('status') == 'success' and result.get('data'):
+                    # Add business intelligence analysis
+                    top_event = result['data'][0] if result['data'] else None
+                    total_events = len(result['data'])
+                    
+                    business_intelligence = f"EVENT REVENUE ANALYSIS (2020-2023)\n\n"
+                    
+                    if top_event:
+                        business_intelligence += f"🏆 HIGHEST REVENUE EVENT:\n"
+                        business_intelligence += f"• {top_event.get('event_name', 'Unknown')} ({top_event.get('event_year', 'Unknown')})\n"
+                        business_intelligence += f"• Total Revenue: ${float(top_event.get('total_revenue', 0)):,.2f}\n"
+                        business_intelligence += f"• Vendor Count: {top_event.get('vendor_count', 0)}\n\n"
+                    
+                    business_intelligence += f"TOP 5 EVENTS BY REVENUE:\n"
+                    for i, event in enumerate(result['data'][:5]):
+                        revenue = float(event.get('total_revenue', 0))
+                        business_intelligence += f"{i+1}. {event.get('event_name', 'Unknown')} ({event.get('event_year', '')}): ${revenue:,.2f}\n"
+                    
+                    total_revenue_all = sum(float(row.get('total_revenue', 0)) for row in result['data'])
+                    business_intelligence += f"\nTOTAL ACROSS ALL EVENTS: ${total_revenue_all:,.2f}"
+                    
+                    result['business_intelligence'] = business_intelligence
+                    result['ai_interpretation'] = f"Analysis of highest revenue events from 2020-2023"
+                    result['query_type'] = "event_comparison"
+                
+                return jsonify(result)
+            
             # Fallback to pattern matching for other queries
             sql_query = convert_natural_language_to_sql(original_query)
             
