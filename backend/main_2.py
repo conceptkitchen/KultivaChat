@@ -796,9 +796,13 @@ def internal_execute_sql_query(query: str) -> dict:
                 'sf': ['San Francisco', 'SF'],
                 'san francisco': ['San Francisco', 'SF'],  
                 'daly city': ['Daly City'],
-                'bay area': ['San Francisco', 'SF', 'Daly City'],
-                'attended events in the bay area': ['San Francisco', 'SF', 'Daly City'],
-                'in the bay area': ['San Francisco', 'SF', 'Daly City']
+                'oakland': ['Oakland'],
+                'san jose': ['San Jose'],
+                'hayward': ['Hayward'],
+                'vallejo': ['Vallejo'],
+                'bay area': ['San Francisco', 'SF', 'Daly City', 'Oakland'],
+                'attended events in the bay area': ['San Francisco', 'SF', 'Daly City', 'Oakland'],
+                'in the bay area': ['San Francisco', 'SF', 'Daly City', 'Oakland']
             }
             
             for city_term, city_variants in city_mappings.items():
