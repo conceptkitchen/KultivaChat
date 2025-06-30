@@ -1,0 +1,48 @@
+90a1b2e Update dashboard environment variables for clarity and proper data access
+~/workspace$ ps aux | grep git
+~/workspace$ find .git -name "*.lock" -type f -delete
+~/workspace$ git status
+On branch main
+Your branch is ahead of 'origin/main' by 250 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+~/workspace$ git fetch origin
+~/workspace$ git push --force-with-lease origin main
+Enumerating objects: 1050, done.
+Counting objects: 100% (1050/1050), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (1032/1032), done.
+Writing objects: 100% (1033/1033), 8.83 MiB | 5.44 MiB/s, done.
+Total 1033 (delta 743), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (743/743), completed with 10 local objects.
+remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: 
+remote: - GITHUB PUSH PROTECTION
+remote:   —————————————————————————————————————————
+remote:     Resolve the following violations before pushing again
+remote: 
+remote:     - Push cannot contain secrets
+remote: 
+remote:     
+remote:      (?) Learn how to resolve a blocked push
+remote:      https://docs.github.com/code-security/secret-scanning/working-with-secret-scanning-and-push-protection/working-with-push-protection-from-the-command-line#resolving-a-blocked-push
+remote:     
+remote:      (?) This repository does not have Secret Scanning enabled, but is eligible. Enable Secret Scanning to view and manage detected secrets.
+remote:      Visit the repository settings page, https://github.com/conceptkitchen/KultivaChat/settings/security_analysis
+remote:     
+remote:     
+remote:       —— Google Cloud Service Account Credentials ——————————
+remote:        locations:
+remote:          - commit: 8a5a6eb192af08f7c067488e65254205b8c38cf1
+remote:            path: attached_assets/credentials-839-01jyz0ndk0xkyss0fbef0mehqm_1751240322289.json:1
+remote:     
+remote:        (?) To push, remove secret from commit(s) or follow this URL to allow the secret.
+remote:        https://github.com/conceptkitchen/KultivaChat/security/secret-scanning/unblock-secret/2zD60pw50f93rmWjvNJUQra8Ulj
+remote:     
+remote: 
+remote: 
+To https://github.com/conceptkitchen/KultivaChat
+ ! [remote rejected] main -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/conceptkitchen/KultivaChat'
+~/workspace$ 
