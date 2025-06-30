@@ -1142,35 +1142,53 @@ def convert_natural_language_to_sql(natural_query: str) -> str:
                 """
     
     # Multi-event participation
-    if 'multiple' in query_lower and 'events' in query_lower:
+    if ('multiple' in query_lower and 'events' in query_lower) or ('participated' in query_lower and 'multiple' in query_lower):
         if 'kapwa gardens' in query_lower:
             return f"""
             SELECT 
-                vendor_name,
-                COUNT(DISTINCT table_name) as event_count,
-                SUM(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as total_revenue
+                CASE 
+                    WHEN Vendor_Name IS NOT NULL THEN Vendor_Name
+                    WHEN vendor_name IS NOT NULL THEN vendor_name
+                    ELSE 'Unknown Vendor'
+                END as vendor_name,
+                COUNT(DISTINCT _TABLE_SUFFIX) as event_count,
+                SUM(CASE 
+                    WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
+                    WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
+                    ELSE 0
+                END) as total_revenue
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
-            WHERE LOWER(table_name) LIKE '%kapwa%'
-            AND vendor_name IS NOT NULL
+            WHERE _TABLE_SUFFIX LIKE '%Kapwa%'
+            AND (Vendor_Name IS NOT NULL OR vendor_name IS NOT NULL)
             GROUP BY vendor_name
             HAVING event_count > 1
             ORDER BY event_count DESC, total_revenue DESC
+            LIMIT 20
             """
     
     # Revenue trend analysis
-    if 'revenue' in query_lower and ('time' in query_lower or 'changed' in query_lower):
+    if 'revenue' in query_lower and ('time' in query_lower or 'changed' in query_lower or 'over time' in query_lower):
         if 'kapwa gardens' in query_lower:
             return f"""
             SELECT 
-                EXTRACT(YEAR FROM creation_time) as year,
-                EXTRACT(MONTH FROM creation_time) as month,
+                _TABLE_SUFFIX as event_table,
                 COUNT(*) as transaction_count,
-                SUM(CAST(REGEXP_REPLACE(total_sales, r'[^0-9.]', '') AS FLOAT64)) as monthly_revenue
+                SUM(CASE 
+                    WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
+                    WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
+                    ELSE 0
+                END) as total_revenue,
+                AVG(CASE 
+                    WHEN Total_Sales IS NOT NULL THEN CAST(REGEXP_REPLACE(Total_Sales, r'[^0-9.]', '') AS FLOAT64)
+                    WHEN Cash__Credit_Total IS NOT NULL THEN CAST(REGEXP_REPLACE(Cash__Credit_Total, r'[^0-9.]', '') AS FLOAT64)
+                    ELSE 0
+                END) as avg_revenue
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.*`
-            WHERE LOWER(table_name) LIKE '%kapwa%'
-            AND total_sales IS NOT NULL
-            GROUP BY year, month
-            ORDER BY year, month
+            WHERE _TABLE_SUFFIX LIKE '%Kapwa%'
+            AND (Total_Sales IS NOT NULL OR Cash__Credit_Total IS NOT NULL)
+            GROUP BY _TABLE_SUFFIX
+            ORDER BY total_revenue DESC
+            LIMIT 20
             """
     
     # Comprehensive business intelligence
@@ -1540,7 +1558,7 @@ def natural_language_query():
         app.logger.info(f"Original query: {original_query}")
         
         # Check if this is a direct SQL query first (before keyword routing)
-        if (original_query.strip().upper().startswith(('SELECT', 'WITH', 'SHOW', 'DESCRIBE', 'EXPLAIN')) or
+        if (original_query.strip().upper().startswith(('SELECT', 'WITH', 'CREATE', 'INSERT', 'UPDATE', 'DELETE', 'ALTER', 'DROP')) or
             'INFORMATION_SCHEMA' in original_query.upper() or
             (original_query.count('`') >= 2 and 'FROM' in original_query.upper())):
             app.logger.info(f"DIRECT SQL QUERY detected: {original_query[:100]}...")
