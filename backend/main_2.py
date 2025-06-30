@@ -1492,29 +1492,47 @@ def process_revenue_analysis(query):
     """)
     
     if table_discovery.get('status') != 'success':
+        app.logger.error(f"Table discovery failed: {table_discovery}")
         return jsonify({"error": "Failed to discover sales tables", "details": table_discovery})
     
     # Fix BigQuery Row object conversion with proper error handling
     tables = []
-    for row in table_discovery.get('data', []):
+    raw_data = table_discovery.get('data', [])
+    app.logger.info(f"Raw table discovery data: {len(raw_data)} rows, first row type: {type(raw_data[0]) if raw_data else 'None'}")
+    
+    for i, row in enumerate(raw_data):
         try:
             if isinstance(row, dict):
                 if 'table_name' in row:
                     tables.append(row['table_name'])
+                else:
+                    # If it's a dict but no table_name key, try first value
+                    if row:
+                        tables.append(list(row.values())[0])
+            elif isinstance(row, (list, tuple)):
+                # If it's a list/tuple, take first element
+                if row:
+                    tables.append(row[0])
             else:
                 # Convert BigQuery Row object to dict safely
                 if hasattr(row, 'table_name'):
                     tables.append(row.table_name)
-                elif hasattr(row, '_fields') and 'table_name' in row._fields:
+                elif hasattr(row, '_fields'):
+                    # Convert to dict and get table_name
                     row_dict = dict(row)
-                    tables.append(row_dict['table_name'])
+                    if 'table_name' in row_dict:
+                        tables.append(row_dict['table_name'])
+                    else:
+                        # Take first value if no table_name key
+                        if row_dict:
+                            tables.append(list(row_dict.values())[0])
                 else:
-                    # Try first field if it's a table name
-                    row_dict = dict(row)
-                    if row_dict:
-                        tables.append(list(row_dict.values())[0])
+                    # Last resort - convert to string
+                    table_name = str(row).strip()
+                    if table_name and table_name != 'None':
+                        tables.append(table_name)
         except (KeyError, AttributeError, IndexError) as e:
-            app.logger.warning(f"Row conversion error: {e}, Row: {row}")
+            app.logger.warning(f"Row conversion error at index {i}: {e}, Row: {row}, Type: {type(row)}")
             continue
     
     # Add debugging to see what tables were found
