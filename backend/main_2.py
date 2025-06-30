@@ -1471,18 +1471,9 @@ def natural_language_query():
             # Use enhanced internal tool for comprehensive multi-table analysis
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
-        elif any(keyword in query for keyword in ['revenue', 'money', 'sales', 'vendor', 'total', 'income', 'financial']):
-            app.logger.info(f"ROUTING TO COMPREHENSIVE ANALYSIS FOR REVENUE: {query}")
-            result = internal_execute_sql_query(data['query'])
-            return jsonify(result)
-        elif any(keyword in query for keyword in ['attendee', 'contact', 'email', 'phone', 'participant']):
-            return process_attendee_analysis(query)
-        elif any(keyword in query for keyword in ['table', 'data', 'show me', 'list']):
-            return process_table_discovery(query)
-        elif any(keyword in query for keyword in ['event', 'kapwa', 'undiscovered', 'balay']):
-            return process_event_analysis(query)
         else:
-            # Default comprehensive analysis
+            # ALL queries now use comprehensive analysis to eliminate false errors
+            app.logger.info(f"ROUTING ALL QUERIES TO COMPREHENSIVE ANALYSIS: {query}")
             result = internal_execute_sql_query(data['query'])
             return jsonify(result)
         
