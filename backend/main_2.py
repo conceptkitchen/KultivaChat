@@ -846,6 +846,11 @@ def internal_execute_sql_query(query: str) -> dict:
                 intent['type'] = 'vendor_ranking'
                 intent['focus'] = 'sales_performance'
             
+            # Donation/donor queries - clarify data limitations (PRIORITY: check before attendee_count)
+            elif any(donation_word in query_lower for donation_word in ['donor', 'donation', 'gave', 'contributed', 'donated']):
+                intent['type'] = 'donation_clarification'
+                intent['focus'] = 'data_limitation_explanation'
+            
             # General attendee count queries
             elif (any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant']) and 
                   any(word in query_lower for word in ['how many', 'count', 'total', 'number'])):
@@ -856,11 +861,6 @@ def internal_execute_sql_query(query: str) -> dict:
             elif any(contact_word in query_lower for contact_word in ['phone', 'email', 'contact']):
                 intent['type'] = 'contact_extraction'
                 intent['focus'] = 'contact_information'
-            
-            # Donation/donor queries - clarify data limitations (check before attendee_count)
-            elif any(donation_word in query_lower for donation_word in ['donor', 'donation', 'gave', 'contributed', 'donated']):
-                intent['type'] = 'donation_clarification'
-                intent['focus'] = 'data_limitation_explanation'
             
             # Revenue/financial queries
             elif any(finance_word in query_lower for finance_word in ['revenue', 'money', 'profit', 'sales', 'made']):
