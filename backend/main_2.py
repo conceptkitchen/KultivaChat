@@ -658,7 +658,21 @@ def internal_execute_sql_query(query: str) -> dict:
             'who made over', 'threshold', 'minimum revenue', 'vendors who'
         ]
         
-        is_comprehensive = any(keyword in original_query.lower() for keyword in comprehensive_keywords)
+        # ENHANCED DETECTION: Also check for broad date range queries with specific events
+        multi_table_patterns = [
+            'all undiscovered', 'undiscovered events', 'all kapwa gardens',
+            'kapwa gardens events', 'all lovers mart', 'lovers mart events',
+            'events in 2023', 'events in 2024', 'events from 2023',
+            'all events in', 'events during', 'all vendor', 'vendor data from'
+        ]
+        
+        is_comprehensive = (any(keyword in original_query.lower() for keyword in comprehensive_keywords) or
+                          any(pattern in original_query.lower() for pattern in multi_table_patterns))
+        
+        # Debug logging for comprehensive detection
+        matched_keywords = [k for k in comprehensive_keywords if k in original_query.lower()]
+        matched_patterns = [p for p in multi_table_patterns if p in original_query.lower()]
+        app.logger.info(f"Comprehensive detection - Keywords: {matched_keywords}, Patterns: {matched_patterns}, Result: {is_comprehensive}")
         
         if is_business_query:
             app.logger.info(f"Enhanced business intelligence query: {original_query}")
