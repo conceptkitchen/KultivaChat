@@ -3749,17 +3749,91 @@ def dashboard_vendor_performance():
         else:
             results = None
         
-        # CSV fallback with proper data processing
+        # Use authentic BigQuery data instead of CSV fallback for accurate aggregation
         if results is None:
+            # Get vendor totals directly from BigQuery with proper aggregation
+            try:
+                sql_query = f"""
+                WITH vendor_revenue AS (
+                  SELECT 
+                    COALESCE(Vendor_Name, Contact_Name) as vendor_name,
+                    CASE 
+                      WHEN table_name LIKE '%Kapwa%' OR table_name LIKE '%KG%' THEN 
+                        COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(Cash__Credit_Total, Total_Sales, '0'), r'[,$]', '') AS FLOAT64), 0)
+                      ELSE 
+                        COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(Total_Sales, Cash__Credit_Total, '0'), r'[,$]', '') AS FLOAT64), 0)
+                    END as revenue,
+                    CASE 
+                      WHEN table_name LIKE '%UNDISCOVERED%' THEN 'UNDISCOVERED SF'
+                      WHEN table_name LIKE '%Kapwa%' OR table_name LIKE '%KG%' THEN 'Kapwa Gardens'
+                      ELSE 'Other Events'
+                    END as event_type,
+                    table_name as event_name
+                  FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` t
+                  JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{'{'}t.table_name{'}'}` data ON true
+                  WHERE table_name LIKE '%Close-Out%'
+                  AND COALESCE(Vendor_Name, Contact_Name) IS NOT NULL
+                  AND COALESCE(Vendor_Name, Contact_Name) != ''
+                ),
+                vendor_totals AS (
+                  SELECT 
+                    vendor_name,
+                    SUM(revenue) as total_revenue,
+                    COUNT(DISTINCT event_name) as event_count,
+                    ARRAY_AGG(DISTINCT event_type IGNORE NULLS) as event_types,
+                    MAX(event_type) as primary_event_type
+                  FROM vendor_revenue 
+                  WHERE revenue > 0 
+                  GROUP BY vendor_name
+                )
+                SELECT 
+                  vendor_name,
+                  total_revenue,
+                  event_count,
+                  primary_event_type as event_name
+                FROM vendor_totals
+                ORDER BY total_revenue DESC
+                LIMIT 25
+                """
+                
+                query_job = bigquery_client.query(sql_query)
+                bigquery_results = list(query_job.result(timeout=60))
+                
+                if bigquery_results:
+                    results = []
+                    for row in bigquery_results:
+                        results.append({
+                            "vendor_name": row.vendor_name,
+                            "event_name": row.event_name,
+                            "total_sales": str(round(float(row.total_revenue), 2)),
+                            "revenue": float(row.total_revenue),
+                            "event_count": int(row.event_count),
+                            "aggregated": True  # Flag to show this is aggregated data
+                        })
+                    
+                    return jsonify({
+                        "status": "success", 
+                        "data": results,
+                        "source": "bigquery_aggregated",
+                        "note": "Revenue totals aggregated across all events per vendor"
+                    })
+                    
+            except Exception as bigquery_error:
+                app.logger.warning(f"BigQuery vendor aggregation failed: {bigquery_error}")
+            
             # CSV fallback with improved revenue detection
             kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
             undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
             
             vendor_performance = []
             
+            # Aggregate vendor totals across ALL sheets
+            vendor_totals = {}
+            
             # Process Kapwa Gardens data (use cash_credit_total as main revenue source)
             for row in kapwa_data:
-                if row.get('vendor_name') and row.get('vendor_name').strip():
+                vendor_name = row.get('vendor_name')
+                if vendor_name and vendor_name.strip():
                     # For Kapwa Gardens, prioritize cash_credit_total over total_sales
                     revenue = 0.0
                     if row.get('cash_credit_total'):
@@ -3768,26 +3842,56 @@ def dashboard_vendor_performance():
                         revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
                     
                     if revenue > 0:
-                        vendor_performance.append({
-                            "vendor_name": row.get('vendor_name'),
-                            "event_name": row.get('event_name', 'Unknown'),
-                            "total_sales": str(revenue),  # Keep consistent with expected field name
-                            "revenue": revenue  # For sorting
-                        })
+                        if vendor_name not in vendor_totals:
+                            vendor_totals[vendor_name] = {
+                                "vendor_name": vendor_name,
+                                "total_revenue": 0.0,
+                                "events": [],
+                                "event_count": 0
+                            }
+                        vendor_totals[vendor_name]["total_revenue"] += revenue
+                        vendor_totals[vendor_name]["events"].append(row.get('event_name', 'Kapwa Gardens'))
+                        vendor_totals[vendor_name]["event_count"] += 1
             
             # Process UNDISCOVERED data (use total_sales as primary)
             for row in undiscovered_data:
-                if row.get('vendor_name') and row.get('vendor_name').strip():
+                vendor_name = row.get('vendor_name')
+                if vendor_name and vendor_name.strip():
                     revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
                     if revenue > 0:
-                        vendor_performance.append({
-                            "vendor_name": row.get('vendor_name'),
-                            "event_name": row.get('event_name', 'Unknown'),
-                            "total_sales": str(revenue),  # Keep consistent with expected field name
-                            "revenue": revenue  # For sorting
-                        })
+                        if vendor_name not in vendor_totals:
+                            vendor_totals[vendor_name] = {
+                                "vendor_name": vendor_name,
+                                "total_revenue": 0.0,
+                                "events": [],
+                                "event_count": 0
+                            }
+                        vendor_totals[vendor_name]["total_revenue"] += revenue
+                        vendor_totals[vendor_name]["events"].append(row.get('event_name', 'UNDISCOVERED'))
+                        vendor_totals[vendor_name]["event_count"] += 1
             
-            # Sort by revenue descending and take top 20
+            # Convert to sorted list with total revenue across all events
+            vendor_performance = []
+            for vendor_name, data in vendor_totals.items():
+                # Determine primary event series for display
+                kapwa_events = [e for e in data["events"] if "kapwa" in e.lower() or "kg" in e.lower()]
+                undiscovered_events = [e for e in data["events"] if "undiscovered" in e.lower()]
+                
+                if len(undiscovered_events) >= len(kapwa_events):
+                    primary_event = "UNDISCOVERED SF"
+                else:
+                    primary_event = "Kapwa Gardens"
+                
+                vendor_performance.append({
+                    "vendor_name": vendor_name,
+                    "event_name": primary_event,
+                    "total_sales": str(round(data["total_revenue"], 2)),
+                    "revenue": data["total_revenue"],
+                    "event_count": data["event_count"],
+                    "all_events": list(set(data["events"]))  # Unique events
+                })
+            
+            # Sort by total revenue descending and take top 20
             results = sorted(vendor_performance, key=lambda x: x['revenue'], reverse=True)[:20]
         
         return jsonify({
@@ -3837,8 +3941,65 @@ def dashboard_event_timeline():
 
 @app.route('/api/dashboard/revenue-breakdown', methods=['GET'])
 def dashboard_revenue_breakdown():
-    """Get revenue breakdown by event type for pie charts"""
+    """Get revenue breakdown by event type for pie charts using authentic BigQuery data"""
     try:
+        # Use BigQuery data to match financial summary totals
+        try:
+            sql_query = f"""
+            WITH event_revenue AS (
+              SELECT 
+                CASE 
+                  WHEN table_name LIKE '%UNDISCOVERED%' THEN 'UNDISCOVERED SF'
+                  WHEN table_name LIKE '%Kapwa%' OR table_name LIKE '%KG%' THEN 'Kapwa Gardens'
+                  ELSE REGEXP_EXTRACT(table_name, r'([^-]+(?:-[^-]+)*)-Close-Out')
+                END as event_name,
+                CASE 
+                  WHEN table_name LIKE '%Kapwa%' OR table_name LIKE '%KG%' THEN 
+                    COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(Cash__Credit_Total, Total_Sales, '0'), r'[,$]', '') AS FLOAT64), 0)
+                  ELSE 
+                    COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(Total_Sales, Cash__Credit_Total, '0'), r'[,$]', '') AS FLOAT64), 0)
+                END as revenue
+              FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` t
+              JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{'{'}t.table_name{'}'}` data ON true
+              WHERE table_name LIKE '%Close-Out%'
+              AND COALESCE(Vendor_Name, Contact_Name) IS NOT NULL
+            )
+            SELECT 
+              event_name,
+              SUM(revenue) as total_revenue
+            FROM event_revenue 
+            WHERE revenue > 0 AND event_name IS NOT NULL
+            GROUP BY event_name
+            ORDER BY total_revenue DESC
+            """
+            
+            query_job = bigquery_client.query(sql_query)
+            bigquery_results = list(query_job.result(timeout=60))
+            
+            if bigquery_results:
+                results = []
+                total_revenue = 0
+                
+                for row in bigquery_results:
+                    revenue = float(row.total_revenue or 0)
+                    total_revenue += revenue
+                    results.append({
+                        "event_name": row.event_name,
+                        "revenue": round(revenue, 2)
+                    })
+                
+                return jsonify({
+                    "status": "success",
+                    "data": results,
+                    "total_revenue": round(total_revenue, 2),
+                    "source": "bigquery_authentic",
+                    "note": "Revenue calculated from authentic BigQuery close-out sales data"
+                })
+                
+        except Exception as bigquery_error:
+            app.logger.warning(f"BigQuery revenue breakdown failed: {bigquery_error}")
+        
+        # CSV fallback only if BigQuery fails
         kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
         undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
         
@@ -3846,23 +4007,23 @@ def dashboard_revenue_breakdown():
         event_revenue = {}
         
         for row in kapwa_data:
-            event_name = row.get('event_name', 'Unknown Kapwa Event')
-            revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+            event_name = row.get('event_name', 'Kapwa Gardens')
+            revenue = safe_float_conversion(row.get('cash_credit_total') or row.get('total_sales'))
             event_revenue[event_name] = event_revenue.get(event_name, 0) + revenue
         
         for row in undiscovered_data:
             event_name = row.get('event_name', 'UNDISCOVERED SF')
-            revenue = float(str(row.get('total_sales', 0) or 0).replace('$', '').replace(',', '') or 0)
+            revenue = safe_float_conversion(row.get('total_sales'))
             event_revenue[event_name] = event_revenue.get(event_name, 0) + revenue
         
         # Format for chart
-        results = [{"event_name": name, "revenue": revenue} for name, revenue in event_revenue.items() if revenue > 0]
+        results = [{"event_name": name, "revenue": round(revenue, 2)} for name, revenue in event_revenue.items() if revenue > 0]
         results = sorted(results, key=lambda x: x['revenue'], reverse=True)
         
         return jsonify({
             "status": "success",
             "data": results,
-            "total_revenue": sum(item['revenue'] for item in results),
+            "total_revenue": round(sum(item['revenue'] for item in results), 2),
             "source": "csv_fallback"
         })
     except Exception as e:
