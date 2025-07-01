@@ -706,8 +706,20 @@ def internal_execute_sql_query(query: str) -> dict:
             'balay kreative and undiscovered', 'balay kreative and undscvrd',
             'undiscovered and balay', 'undscvrd and balay', 'attended events at',
             'events at balay', 'both events', 'multiple events', 'cross-event',
-            'attended both', 'who has attended', 'attended events', 'and undscvrd'
+            'attended both', 'who has attended', 'attended events', 'and undscvrd',
+            # GRANT + MULTI-EVENT PATTERNS
+            'applied to.*grant.*attended', 'grant.*attended.*events', 'grant.*went.*events',
+            'applied.*balay.*grant.*events', 'grant application.*multi.*event', 'grant.*more than.*events'
         ]
+        
+        # GRANT + MULTI-EVENT DETECTION: Special handling for grant analysis queries
+        grant_multi_event_indicators = [
+            'applied to a balay kreative grant', 'applied to.*grant.*went.*events',
+            'grant.*attended.*events.*more than', 'grant application.*multi.*event',
+            'grant.*went.*events.*2x', 'applied.*grant.*attended.*multiple'
+        ]
+        
+        is_grant_multi_event = any(re.search(pattern, query_lower) for pattern in grant_multi_event_indicators)
         
         # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
         # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
@@ -1236,7 +1248,162 @@ def internal_execute_sql_query(query: str) -> dict:
             is_attendee_focused = any(indicator in query_lower for indicator in attendee_query_indicators)
             is_vendor_focused = any(indicator in query_lower for indicator in vendor_query_indicators)
             
-            if is_attendee_focused:
+            if is_grant_multi_event:
+                # GRANT + MULTI-EVENT QUERIES: Discover both grant and attendee tables
+                app.logger.info(f"GRANT + MULTI-EVENT ANALYSIS: Discovering grant and attendee tables for cross-dataset analysis")
+                
+                # Step 1: Discover grant tables (typeform with grants)
+                grant_discovery_query = f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%grant%' 
+        OR LOWER(table_name) LIKE '%typeform%'
+        ORDER BY 
+            CASE 
+                WHEN LOWER(table_name) LIKE '%grant%' THEN 1
+                WHEN LOWER(table_name) LIKE '%typeform%' THEN 2
+                ELSE 3
+            END,
+            table_name
+        """
+                
+                # Step 2: Discover attendee tables for multi-event tracking
+                attendee_discovery_query = f"""
+        SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
+        WHERE LOWER(table_name) LIKE '%attendee%' 
+        OR LOWER(table_name) LIKE '%squarespace%'
+        OR LOWER(table_name) LIKE '%balay%'
+        OR LOWER(table_name) LIKE '%undiscovered%'
+        ORDER BY 
+            CASE 
+                WHEN LOWER(table_name) LIKE '%attendee%' THEN 1
+                WHEN LOWER(table_name) LIKE '%squarespace%' THEN 2
+                WHEN LOWER(table_name) LIKE '%balay%' THEN 3
+                WHEN LOWER(table_name) LIKE '%undiscovered%' THEN 4
+                ELSE 5
+            END,
+            table_name
+        """
+                
+                # Execute both discovery queries
+                try:
+                    # Discover grant tables
+                    grant_query_job = bigquery_client.query(grant_discovery_query)
+                    grant_results = grant_query_job.result(timeout=30)
+                    grant_tables = [row.table_name for row in grant_results]
+                    
+                    # Discover attendee tables  
+                    attendee_query_job = bigquery_client.query(attendee_discovery_query)
+                    attendee_results = attendee_query_job.result(timeout=30)
+                    attendee_tables = [row.table_name for row in attendee_results]
+                    
+                    app.logger.info(f"DISCOVERED GRANT TABLES: {grant_tables}")
+                    app.logger.info(f"DISCOVERED ATTENDEE TABLES: {attendee_tables}")
+                    
+                    if grant_tables and attendee_tables:
+                        # Construct cross-dataset analysis query using real table names
+                        primary_grant_table = grant_tables[0]  # Use first grant table
+                        
+                        # Build multi-event analysis across all attendee tables
+                        union_queries = []
+                        for table in attendee_tables[:5]:  # Limit to first 5 to avoid timeout
+                            union_queries.append(f"""
+                            SELECT 
+                                COALESCE(Email, email, EMAIL) as email,
+                                COALESCE(Name, Billing_Name, name, billing_name) as name,
+                                '{table}' as event_table
+                            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{table}`
+                            WHERE COALESCE(Email, email, EMAIL) IS NOT NULL
+                            AND COALESCE(Email, email, EMAIL) != ''
+                            """)
+                        
+                        if union_queries:
+                            final_query = f"""
+                            WITH grant_applicants AS (
+                                SELECT 
+                                    COALESCE(Email, email, EMAIL) as grant_email,
+                                    COALESCE(Name, name, NAME) as grant_name
+                                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{primary_grant_table}`
+                                WHERE COALESCE(Email, email, EMAIL) IS NOT NULL
+                                AND COALESCE(Email, email, EMAIL) != ''
+                            ),
+                            all_attendees AS (
+                                {' UNION ALL '.join(union_queries)}
+                            ),
+                            event_counts AS (
+                                SELECT 
+                                    email,
+                                    name,
+                                    COUNT(DISTINCT event_table) as events_attended,
+                                    STRING_AGG(DISTINCT event_table, ', ') as events_list
+                                FROM all_attendees
+                                GROUP BY email, name
+                            )
+                            SELECT 
+                                g.grant_name,
+                                g.grant_email,
+                                e.events_attended,
+                                e.events_list,
+                                CASE 
+                                    WHEN e.events_attended > 1 THEN 'Multi-event attendee'
+                                    WHEN e.events_attended = 1 THEN 'Single event attendee'
+                                    ELSE 'Grant only'
+                                END as attendance_type
+                            FROM grant_applicants g
+                            LEFT JOIN event_counts e ON LOWER(g.grant_email) = LOWER(e.email)
+                            ORDER BY e.events_attended DESC NULLS LAST, g.grant_name
+                            """
+                            
+                            app.logger.info(f"EXECUTING GRANT + MULTI-EVENT ANALYSIS: {len(grant_tables)} grant tables, {len(attendee_tables)} attendee tables")
+                            
+                            # Execute the cross-dataset analysis
+                            start_time = time.time()
+                            query_job = bigquery_client.query(final_query)
+                            results = query_job.result(timeout=120)  # Extended timeout for complex query
+                            results = list(results)
+                            execution_time = time.time() - start_time
+                            
+                            # Format results
+                            data_rows = []
+                            for row in results:
+                                if hasattr(row, '_mapping'):
+                                    data_rows.append(dict(row._mapping))
+                                elif hasattr(row, 'items'):
+                                    data_rows.append(dict(row.items()))
+                                else:
+                                    data_rows.append(dict(row))
+                            
+                            return {
+                                "status": "success",
+                                "data": data_rows,
+                                "query_executed": final_query,
+                                "execution_time": execution_time,
+                                "query_type": "grant_multi_event_analysis",
+                                "grant_tables_discovered": grant_tables,
+                                "attendee_tables_discovered": attendee_tables,
+                                "workflow_steps": [
+                                    f"1. Discovered {len(grant_tables)} grant tables",
+                                    f"2. Discovered {len(attendee_tables)} attendee tables", 
+                                    "3. Constructed cross-dataset JOIN analysis",
+                                    "4. Executed multi-event attendance tracking"
+                                ]
+                            }
+                    else:
+                        return {
+                            "status": "error",
+                            "error_message": f"Required tables not found - Grant tables: {len(grant_tables)}, Attendee tables: {len(attendee_tables)}",
+                            "grant_tables_found": grant_tables,
+                            "attendee_tables_found": attendee_tables
+                        }
+                        
+                except Exception as e:
+                    app.logger.error(f"Grant + multi-event discovery failed: {e}")
+                    return {
+                        "status": "error", 
+                        "error_message": f"Table discovery failed: {str(e)}",
+                        "query_type": "grant_multi_event_discovery_failed"
+                    }
+                    
+            elif is_attendee_focused:
                 # ATTENDEE QUERIES: Prioritize attendee, squarespace, and typeform tables
                 table_discovery_query = f"""
         SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` 
@@ -2881,123 +3048,22 @@ def natural_language_query():
                 app.logger.error(f"Direct phone query failed: {e}")
                 # Fall through to standard processing
         
-        # PROPER MCP WORKFLOW: Force table discovery first, then construct proper query
-        app.logger.info("PROPER MCP: Starting with forced table discovery for grants and multi-event analysis")
+        # PROPER MCP WORKFLOW: Call internal_execute_sql_query tool directly for semantic discovery  
+        app.logger.info("PROPER MCP: Calling internal_execute_sql_query tool directly for grant + multi-event analysis")
         
-        # Step 1: Discover grant and attendee tables first
-        discovery_queries = [
-            f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%grant%' OR LOWER(table_name) LIKE '%typeform%'",
-            f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%balay%' AND LOWER(table_name) LIKE '%attendee%'",
-            f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%attendee%' OR LOWER(table_name) LIKE '%undiscovered%'"
-        ]
+        # Use the tool directly - all routing logic is now IN the tool itself
+        tool_result = internal_execute_sql_query(original_query)
         
-        discovered_tables = []
-        for discovery_sql in discovery_queries:
-            try:
-                app.logger.info(f"DISCOVERING TABLES: {discovery_sql[:80]}...")
-                query_job = bigquery_client.query(discovery_sql)
-                tables = query_job.result(timeout=30)
-                table_names = [row.table_name for row in tables]
-                discovered_tables.extend(table_names)
-                app.logger.info(f"DISCOVERED: {len(table_names)} tables - {table_names}")
-            except Exception as e:
-                app.logger.warning(f"Table discovery failed: {e}")
-        
-        # Remove duplicates
-        discovered_tables = list(set(discovered_tables))
-        app.logger.info(f"TOTAL DISCOVERED TABLES: {len(discovered_tables)} - {discovered_tables}")
-        
-        if discovered_tables:
-            # Step 2: Use Gemini AI to construct query with REAL table names
-            try:
-                client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
-                
-                # Create prompt with actual discovered table names
-                discovery_prompt = f"""I need to answer: "{original_query}"
-
-I have discovered these REAL tables in the workspace:
-{chr(10).join([f"- {table}" for table in discovered_tables])}
-
-Based on the table names, I can see:
-- Grant data is likely in: {[t for t in discovered_tables if 'grant' in t.lower() or 'typeform' in t.lower()]}
-- Attendee data is likely in: {[t for t in discovered_tables if 'attendee' in t.lower()]}
-
-Please construct a SQL query using these EXACT table names to find people who:
-1. Applied to Balay Kreative grants (from the grant/typeform table)
-2. Attended multiple events (appearing in multiple attendee tables)
-
-Use ONLY the table names I provided above. Never use fake table names like 'attendees' or 'grant_applications'.
-
-Return only the SQL query."""
-
-                response = client.models.generate_content(
-                    model='gemini-2.0-flash-exp',
-                    contents=[discovery_prompt]
-                )
-                
-                if response and hasattr(response, 'text'):
-                    ai_sql = response.text.strip()
-                    
-                    # Clean up the SQL
-                    if '```sql' in ai_sql:
-                        ai_sql = ai_sql.split('```sql')[1].split('```')[0].strip()
-                    elif '```' in ai_sql:
-                        ai_sql = ai_sql.split('```')[1].strip()
-                    
-                    app.logger.info(f"GEMINI CONSTRUCTED SQL WITH REAL TABLES: {ai_sql[:200]}...")
-                    
-                    # Execute the properly constructed query
-                    try:
-                        start_time = time.time()
-                        query_job = bigquery_client.query(ai_sql)
-                        results = query_job.result(timeout=60)
-                        results = list(results)
-                        execution_time = time.time() - start_time
-                        
-                        # Format results
-                        data_rows = []
-                        for row in results:
-                            if hasattr(row, '_mapping'):
-                                data_rows.append(dict(row._mapping))
-                            elif hasattr(row, 'items'):
-                                data_rows.append(dict(row.items()))
-                            else:
-                                data_rows.append(dict(row))
-                        
-                        app.logger.info(f"MCP SUCCESS: {len(data_rows)} results in {execution_time:.2f}s")
-                        
-                        return jsonify({
-                            "status": "success",
-                            "data": data_rows,
-                            "query_executed": ai_sql,
-                            "execution_time": execution_time,
-                            "routing_method": "proper_mcp_discovery",
-                            "query_type": "cross_dataset_analysis",
-                            "discovered_tables": discovered_tables,
-                            "workflow_steps": [
-                                f"1. Discovered {len(discovered_tables)} real tables",
-                                "2. Used Gemini AI with authentic table names",
-                                "3. Constructed cross-dataset query",
-                                "4. Executed with real BigQuery data"
-                            ]
-                        })
-                        
-                    except Exception as e:
-                        app.logger.error(f"Query execution with discovered tables failed: {e}")
-                        
-            except Exception as e:
-                app.logger.error(f"Gemini AI construction with discovered tables failed: {e}")
-                return jsonify({
-                    "status": "error",
-                    "error_message": f"Failed to construct query with discovered tables: {str(e)}",
-                    "discovered_tables": discovered_tables,
-                    "routing_method": "mcp_construction_failed"
-                })
+        # Add MCP metadata to the result
+        if isinstance(tool_result, dict):
+            tool_result['routing_method'] = 'proper_mcp_tool_direct'
+            tool_result['api_endpoint'] = '/api/query'
+            return jsonify(tool_result)
         else:
             return jsonify({
-                "status": "error", 
-                "error_message": "No relevant tables discovered for grant and multi-event analysis",
-                "routing_method": "no_tables_discovered"
+                "status": "error",
+                "error_message": "MCP tool returned unexpected format",
+                "routing_method": "mcp_tool_format_error"
             })
     
     except Exception as e:
