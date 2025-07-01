@@ -30,21 +30,32 @@ curl -X POST http://localhost:8081/api/query \
 # Expected Result: $74,254.51 total from 60 vendors (avg: $1,237.58)
 ```
 
-### 2. Event Series Revenue Analysis
+### 2. Year-Based Revenue Analysis (Multiple Events)
 ```bash
-# All UNDISCOVERED events in 2023 (multi-table analysis)
+# All UNDISCOVERED events in 2023 
 curl -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How much money was made by vendors at UNDISCOVERED events in 2023?"}'
+  -d '{"query": "How much money was made by vendors at UNDISCOVERED in 2023?"}'
 
-# Note: This triggers comprehensive analysis across multiple tables
+# Expected Result: $135,125.84 total from 47 vendors (picks top event from year)
 ```
 
 ```bash
 # All Kapwa Gardens events in 2023
 curl -X POST http://localhost:8081/api/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How much money was made by vendors at Kapwa Gardens events in 2023?"}'
+  -d '{"query": "How much money was made by vendors at Kapwa Gardens in 2023?"}'
+
+# Expected Result: $8,010.84 total from 19 vendors (picks top event from year)
+```
+
+```bash
+# Many Styles events throughout 2023 (July, August, September)
+curl -X POST http://localhost:8081/api/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How much money was made by vendors at Many Styles in 2023?"}'
+
+# Note: This event occurs multiple times per year (2023-07-29, 2023-08-26, 2023-09-30)
 ```
 
 ### 3. Variable Format Examples (Your CRM Document Pattern)
