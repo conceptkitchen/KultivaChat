@@ -4283,19 +4283,81 @@ def main_dashboard():
         app.logger.error(f"Main dashboard error: {e}")
         return jsonify({"error": f"Dashboard error: {str(e)}"}), 500
 
-def load_transformation_data(csv_filename):
-    """Load vendor data from transformation CSV files"""
+def load_transformation_data_with_sql():
+    """Load and process transformation data using SQL for accurate aggregation"""
     import csv
+    import sqlite3
+    
     try:
-        data = []
-        with open(csv_filename, 'r', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
+        # Create in-memory SQLite database
+        conn = sqlite3.connect(':memory:')
+        cursor = conn.cursor()
+        
+        # Create tables
+        cursor.execute('''
+            CREATE TABLE undiscovered_vendors (
+                vendor_name TEXT,
+                contact_name TEXT,
+                vendor_email TEXT,
+                total_sales REAL,
+                event_date TEXT,
+                event_name TEXT
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE kapwa_vendors (
+                vendor_name TEXT,
+                contact_name TEXT,
+                vendor_email TEXT,
+                total_sales REAL,
+                event_date TEXT,
+                event_name TEXT
+            )
+        ''')
+        
+        # Load UNDISCOVERED data
+        undiscovered_file = "attached_assets/24083606.out.c_undiscovered_close_out_sales_transformation.master_undiscovered_report_1751349318193.csv"
+        with open(undiscovered_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
             for row in reader:
-                data.append(dict(row))
-        return data
+                cursor.execute('''
+                    INSERT INTO undiscovered_vendors 
+                    (vendor_name, contact_name, vendor_email, total_sales, event_date, event_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    row.get('vendor_name', ''),
+                    row.get('contact_name', ''),
+                    row.get('vendor_email', ''),
+                    float(row.get('total_sales', 0) or 0),
+                    row.get('event_date', ''),
+                    row.get('event_name', '')
+                ))
+        
+        # Load Kapwa Gardens data
+        kapwa_file = "attached_assets/24083756.out.c_kapwa_gardens_close_out_sales_transformation.master_financial_report_1751349474968.csv"
+        with open(kapwa_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                cursor.execute('''
+                    INSERT INTO kapwa_vendors 
+                    (vendor_name, contact_name, vendor_email, total_sales, event_date, event_name)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (
+                    row.get('vendor_name', ''),
+                    row.get('contact_name', ''),
+                    row.get('vendor_email', ''),
+                    float(row.get('total_sales', 0) or 0),
+                    row.get('event_date', ''),
+                    row.get('event_name', '')
+                ))
+        
+        conn.commit()
+        return conn
+        
     except Exception as e:
-        app.logger.error(f"Error loading {csv_filename}: {e}")
-        return []
+        app.logger.error(f"Error loading transformation data: {e}")
+        return None
 
 def calculate_financial_summary(undiscovered_data, kapwa_data):
     """Calculate financial summary from transformation data"""
