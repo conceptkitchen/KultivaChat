@@ -845,7 +845,7 @@ def internal_execute_sql_query(query: str) -> dict:
             demographic_terms = [
                 'middle eastern', 'asian', 'black', 'african american', 'latino', 
                 'hispanic', 'white', 'native american', 'pacific islander',
-                'lgbtq', 'queer', 'transgender', 'non-binary'
+                'lgbtq+', 'lgbtq', 'queer', 'transgender', 'non-binary'
             ]
             for demo_term in demographic_terms:
                 if demo_term in query_lower:
