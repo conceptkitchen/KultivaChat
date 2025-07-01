@@ -1970,10 +1970,22 @@ def internal_execute_sql_query(query: str) -> dict:
 
 Question: {query}
 
+INTELLIGENT TERMINOLOGY TRANSLATION:
+- "gave", "donated", "donors" → interpret as TICKET PURCHASES and ATTENDEES
+- "gave $X" means "spent $X on tickets" 
+- "donors" means "attendees who bought tickets"
+- "donations" means "ticket purchases"
+
 Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
 Relevant tables found: {', '.join(relevant_tables[:5])}
 
-Generate SQL that counts unique vendors across these Kapwa Gardens tables. Use UNION ALL to combine data from multiple tables if needed.
+CRITICAL SCHEMA RULES:
+- Attendee tables use Event_Date column (NOT Order_Date)
+- Attendee spending amounts are in Lineitem_price column 
+- Vendor sales amounts are in Total_Sales or Cash__Credit_Total columns
+- Use Event_Date for date filtering on attendee tables
+
+Generate SQL that properly handles the business context. Use UNION ALL to combine data from multiple tables if needed.
 
 Return only the SQL query, no explanation."""
 
@@ -2015,18 +2027,31 @@ Return only the SQL query, no explanation."""
             try:
                 client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
                 
-                # Create a simple prompt for SQL conversion
+                # Create a prompt with intelligent terminology translation
                 ai_prompt = f"""Convert this natural language query to SQL for BigQuery:
                 
 Query: {query}
 
+INTELLIGENT TERMINOLOGY TRANSLATION:
+- "gave", "donated", "donors" → interpret as TICKET PURCHASES and ATTENDEES  
+- "gave $X" means "spent $X on tickets"
+- "donors" means "attendees who bought tickets"
+- "donations" means "ticket purchases"
+
 Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
 Available tables include vendor sales data, attendee data, and event information.
 
-For counting queries like "How many vendors participated in Kapwa Gardens events?", generate SQL that:
-1. First discovers relevant tables with table discovery
-2. Then counts unique vendors across those tables
+CRITICAL SCHEMA RULES:
+- Attendee tables use Event_Date column (NOT Order_Date)
+- Attendee spending amounts are in Lineitem_price column
+- Vendor sales amounts are in Total_Sales or Cash__Credit_Total columns
+- Use Event_Date for date filtering on attendee tables
+
+For counting queries, generate SQL that:
+1. Uses correct column names from schema rules above
+2. Counts unique attendees/vendors appropriately 
 3. Uses proper BigQuery syntax
+4. Interprets business terminology correctly
 
 Return only the SQL query, no explanation."""
 
