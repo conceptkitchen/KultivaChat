@@ -4245,23 +4245,24 @@ def safe_float_conversion(value):
 
 @app.route('/dashboard', methods=['GET'])
 def main_dashboard():
-    """Main dashboard endpoint using actual vendor transformation data"""
+    """Main dashboard endpoint using actual vendor transformation data with correct SQL calculations"""
     try:
-        # Load data from your specific transformation files
-        undiscovered_data = load_transformation_data('attached_assets/24083606.out.c_undiscovered_close_out_sales_transformation.master_undiscovered_report_1751349318193.csv')
-        kapwa_data = load_transformation_data('attached_assets/24083756.out.c_kapwa_gardens_close_out_sales_transformation.master_financial_report_1751349474968.csv')
+        app.logger.info("Dashboard request received - using actual transformation CSV files with SQL")
         
-        # Calculate financial summary
-        financial_summary = calculate_financial_summary(undiscovered_data, kapwa_data)
+        # Load data using SQL for accurate aggregation
+        conn = load_transformation_data_with_sql()
+        if not conn:
+            return jsonify({"error": "Unable to load transformation data"}), 500
         
-        # Calculate vendor performance
-        vendor_performance = calculate_vendor_performance(undiscovered_data, kapwa_data)
+        cursor = conn.cursor()
         
-        # Calculate revenue breakdown
-        revenue_breakdown = calculate_revenue_breakdown(undiscovered_data, kapwa_data)
+        # Calculate all dashboard components using SQL
+        financial_summary = calculate_financial_summary_sql(cursor)
+        vendor_performance = calculate_vendor_performance_sql(cursor)
+        revenue_breakdown = calculate_revenue_breakdown_sql(cursor)
+        event_timeline = calculate_event_timeline_sql(cursor)
         
-        # Calculate event timeline
-        event_timeline = calculate_event_timeline(undiscovered_data, kapwa_data)
+        conn.close()
         
         return jsonify({
             "status": "success",
@@ -4272,10 +4273,13 @@ def main_dashboard():
                 "event_timeline": event_timeline
             },
             "metadata": {
-                "total_vendors": len(vendor_performance["data"]),
+                "total_vendors": financial_summary["total_vendors"],
                 "total_revenue": financial_summary["total_revenue"],
-                "data_source": "Transformation CSV Files",
-                "last_updated": "2025-01-01"
+                "undiscovered_revenue": financial_summary["undiscovered_revenue"],
+                "kapwa_revenue": financial_summary["kapwa_revenue"],
+                "data_source": "Transformation CSV Files (SQL Processed)",
+                "last_updated": datetime.now().isoformat(),
+                "vendor_breakdown": f"UNDISCOVERED: {financial_summary['undiscovered_vendors']} vendors, Kapwa Gardens: {financial_summary['kapwa_vendors']} vendors"
             }
         })
         
@@ -4358,6 +4362,169 @@ def load_transformation_data_with_sql():
     except Exception as e:
         app.logger.error(f"Error loading transformation data: {e}")
         return None
+
+def calculate_financial_summary_sql(cursor):
+    """Calculate financial summary from transformation data using SQL"""
+    cursor.execute('''
+        SELECT 
+            'UNDISCOVERED' as event_type,
+            SUM(total_sales) as total_revenue,
+            COUNT(CASE WHEN total_sales > 0 THEN 1 END) as vendor_count
+        FROM undiscovered_vendors
+        WHERE vendor_name != ''
+        
+        UNION ALL
+        
+        SELECT 
+            'Kapwa Gardens' as event_type,
+            SUM(total_sales) as total_revenue,
+            COUNT(CASE WHEN total_sales > 0 THEN 1 END) as vendor_count
+        FROM kapwa_vendors
+        WHERE vendor_name != ''
+    ''')
+    
+    financial_data = cursor.fetchall()
+    
+    undiscovered_revenue = 0
+    undiscovered_vendors = 0
+    kapwa_revenue = 0
+    kapwa_vendors = 0
+    
+    for row in financial_data:
+        event_type, revenue, vendor_count = row
+        if event_type == 'UNDISCOVERED':
+            undiscovered_revenue = revenue
+            undiscovered_vendors = vendor_count
+        else:
+            kapwa_revenue = revenue
+            kapwa_vendors = vendor_count
+    
+    total_revenue = undiscovered_revenue + kapwa_revenue
+    total_vendors = undiscovered_vendors + kapwa_vendors
+    
+    return {
+        "total_revenue": total_revenue,
+        "total_vendors": total_vendors,
+        "undiscovered_revenue": undiscovered_revenue,
+        "undiscovered_vendors": undiscovered_vendors,
+        "kapwa_revenue": kapwa_revenue,
+        "kapwa_vendors": kapwa_vendors,
+        "breakdown": [
+            {
+                "event_type": "UNDISCOVERED",
+                "revenue": undiscovered_revenue,
+                "vendor_count": undiscovered_vendors
+            },
+            {
+                "event_type": "Kapwa Gardens", 
+                "revenue": kapwa_revenue,
+                "vendor_count": kapwa_vendors
+            }
+        ]
+    }
+
+def calculate_vendor_performance_sql(cursor):
+    """Calculate top vendor performance from transformation data using SQL"""
+    cursor.execute('''
+        WITH combined_vendors AS (
+            SELECT vendor_name, total_sales, 'UNDISCOVERED' as source
+            FROM undiscovered_vendors 
+            WHERE vendor_name != '' AND total_sales > 0
+            
+            UNION ALL
+            
+            SELECT vendor_name, total_sales, 'Kapwa Gardens' as source
+            FROM kapwa_vendors 
+            WHERE vendor_name != '' AND total_sales > 0
+        )
+        SELECT 
+            vendor_name,
+            SUM(total_sales) as total_sales,
+            COUNT(*) as event_count,
+            GROUP_CONCAT(DISTINCT source) as sources
+        FROM combined_vendors
+        GROUP BY vendor_name
+        ORDER BY total_sales DESC
+        LIMIT 20
+    ''')
+    
+    vendor_data = cursor.fetchall()
+    vendor_list = []
+    
+    for row in vendor_data:
+        vendor_name, total_sales, event_count, sources = row
+        vendor_list.append({
+            "vendor_name": vendor_name,
+            "total_sales": total_sales,
+            "event_count": event_count,
+            "sources": sources,
+            "rank": len(vendor_list) + 1
+        })
+    
+    return {"data": vendor_list}
+
+def calculate_revenue_breakdown_sql(cursor):
+    """Calculate revenue breakdown by event from transformation data using SQL"""
+    cursor.execute('''
+        SELECT 
+            event_name || ' (' || event_date || ')' as event_key,
+            SUM(total_sales) as revenue,
+            COUNT(CASE WHEN total_sales > 0 THEN 1 END) as vendor_count
+        FROM (
+            SELECT event_name, event_date, total_sales FROM undiscovered_vendors WHERE total_sales > 0
+            UNION ALL
+            SELECT event_name, event_date, total_sales FROM kapwa_vendors WHERE total_sales > 0
+        )
+        GROUP BY event_key
+        HAVING revenue > 0
+        ORDER BY revenue DESC
+        LIMIT 15
+    ''')
+    
+    event_data = cursor.fetchall()
+    events_list = []
+    
+    for row in event_data:
+        event_key, revenue, vendor_count = row
+        events_list.append({
+            "event": event_key,
+            "revenue": revenue,
+            "vendor_count": vendor_count
+        })
+    
+    return {"data": events_list}
+
+def calculate_event_timeline_sql(cursor):
+    """Calculate chronological event timeline from transformation data using SQL"""
+    cursor.execute('''
+        SELECT 
+            event_date,
+            event_name,
+            SUM(total_sales) as revenue,
+            COUNT(CASE WHEN total_sales > 0 THEN 1 END) as vendor_count
+        FROM (
+            SELECT event_date, event_name, total_sales FROM undiscovered_vendors
+            UNION ALL
+            SELECT event_date, event_name, total_sales FROM kapwa_vendors
+        )
+        GROUP BY event_date, event_name
+        ORDER BY event_date DESC
+        LIMIT 20
+    ''')
+    
+    timeline_data = cursor.fetchall()
+    timeline_list = []
+    
+    for row in timeline_data:
+        event_date, event_name, revenue, vendor_count = row
+        timeline_list.append({
+            "date": event_date,
+            "event": event_name,
+            "revenue": revenue,
+            "vendor_count": vendor_count
+        })
+    
+    return {"data": timeline_list}
 
 def calculate_financial_summary(undiscovered_data, kapwa_data):
     """Calculate financial summary from transformation data"""
