@@ -129,28 +129,6 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
 - `get_current_time`: Get current date/time
 - `get_keboola_table_detail`: Get table metadata
 
-**INTELLIGENT QUERY INTERPRETATION RULES:**
-
-**CRITICAL: BUSINESS CONTEXT UNDERSTANDING**
-Before executing any SQL, intelligently interpret user queries based on actual business data:
-
-1. **"GAVE" TERMINOLOGY TRANSLATION:**
-   - "attendees who gave more than $X" → "attendees who SPENT more than $X on tickets"
-   - "people who gave" → "people who PURCHASED tickets"
-   - "gave $50" → "paid $50 for tickets" 
-   - Context: Your data contains TICKET PURCHASES, not donations
-
-2. **"DONOR" TERMINOLOGY TRANSLATION:**
-   - "donors" → "attendees" or "ticket buyers"
-   - "donor information" → "attendee information"
-   - "top donors" → "attendees who spent the most on tickets"
-   - Context: No donation data exists, only ticket purchase data
-
-3. **FINANCIAL AMOUNT INTERPRETATION:**
-   - When users mention money amounts with attendees → interpret as ticket prices/spending
-   - When users mention money amounts with vendors → interpret as sales revenue
-   - Use Lineitem_price column for attendee spending, Total_Sales for vendor revenue
-
 **COMPREHENSIVE QUERY HANDLING RULES:**
 
 **1. CONTACT INFORMATION QUERIES** (emails, phone numbers, contact names):
@@ -189,13 +167,14 @@ Before executing any SQL, intelligently interpret user queries based on actual b
 - Include cross-event analysis and participation tracking
 - Provide event-specific insights with authentic data
 
-**7. ATTENDEE TICKET PURCHASE QUERIES** (ticket buyers, customers, participants):
-- Extract attendee details including names, ticket purchase amounts, event participation
-- ATTENDEE PURCHASE QUERIES use "Balay-Kreative---attendees---all-orders" table (people who bought tickets)
+**7. DONOR INFORMATION QUERIES** (donations, sponsors, contributors, supporters):
+- Extract donor details including names, contribution amounts, purchase amounts
+- IMPORTANT: Donors are people who PAY for events (attendees who purchase tickets)
+- DONOR QUERIES use "Balay-Kreative---attendees---all-orders" table (people who paid for tickets)
 - GRANT queries use "typeform_report_balay_kreative_forms" table (people who received funding)
-- Query format: SELECT attendee_name, ticket_price, event_name, billing_city FROM attendees table
-- Include attendee analysis, ticket purchase tracking, participation data
-- Return actual attendee records who purchased tickets for events
+- Query format: SELECT donor_name, purchase_amount, event_name, billing_city FROM attendees table
+- Include donor analysis, supporter tracking, ticket purchase data
+- Return actual supporter records who financially contributed through ticket purchases
 
 **EVENT-SPECIFIC DATA EXTRACTION:**
 - When users mention specific events, target ONLY that event's tables
@@ -236,7 +215,7 @@ Before executing any SQL, intelligently interpret user queries based on actual b
    - "financial data" → tables with Total_Sales, Revenue, Payment columns
    - "vendor names" → tables with Vendor_Name, Business_Name columns
    - "event data" → tables with Event_Name, Event_Date columns
-   - "attendee ticket information" → "Balay-Kreative---attendees---all-orders" table (people who bought tickets)
+   - "donor information" → "Balay-Kreative---attendees---all-orders" table (people who paid for tickets)
    - "grant information" → "typeform_report_balay_kreative_forms" table (people who received funding)
 
 4. **EVENT NAME RECOGNITION AND MATCHING**: Essential for accurate data extraction:
@@ -1031,7 +1010,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 'Balay-Kreative' as event_series,
                 COUNT(*) as attendee_count
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
-            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Event_Date)) = {target_year}
+            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
             
             UNION ALL
             
@@ -1039,7 +1018,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 'UNDISCOVERED' as event_series,
                 COUNT(*) as attendee_count
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
-            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Event_Date)) = {target_year}
+            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
             """
             
             try:
@@ -1191,7 +1170,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 # Continue to fallback processing
         
         # DETERMINE DATA SOURCE TYPE based on query context (after phone routing)
-        contact_keywords = ['contact', 'email', 'address', 'demographic', 'sponsor', 'grant']
+        contact_keywords = ['contact', 'email', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
         is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
         
         # COMPREHENSIVE ANALYSIS: Only if NOT a contact query
@@ -1970,22 +1949,10 @@ def internal_execute_sql_query(query: str) -> dict:
 
 Question: {query}
 
-INTELLIGENT TERMINOLOGY TRANSLATION:
-- "gave", "donated", "donors" → interpret as TICKET PURCHASES and ATTENDEES
-- "gave $X" means "spent $X on tickets" 
-- "donors" means "attendees who bought tickets"
-- "donations" means "ticket purchases"
-
 Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
 Relevant tables found: {', '.join(relevant_tables[:5])}
 
-CRITICAL SCHEMA RULES:
-- Attendee tables use Event_Date column (NOT Order_Date)
-- Attendee spending amounts are in Lineitem_price column 
-- Vendor sales amounts are in Total_Sales or Cash__Credit_Total columns
-- Use Event_Date for date filtering on attendee tables
-
-Generate SQL that properly handles the business context. Use UNION ALL to combine data from multiple tables if needed.
+Generate SQL that counts unique vendors across these Kapwa Gardens tables. Use UNION ALL to combine data from multiple tables if needed.
 
 Return only the SQL query, no explanation."""
 
@@ -2027,31 +1994,18 @@ Return only the SQL query, no explanation."""
             try:
                 client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
                 
-                # Create a prompt with intelligent terminology translation
+                # Create a simple prompt for SQL conversion
                 ai_prompt = f"""Convert this natural language query to SQL for BigQuery:
                 
 Query: {query}
 
-INTELLIGENT TERMINOLOGY TRANSLATION:
-- "gave", "donated", "donors" → interpret as TICKET PURCHASES and ATTENDEES  
-- "gave $X" means "spent $X on tickets"
-- "donors" means "attendees who bought tickets"
-- "donations" means "ticket purchases"
-
 Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
 Available tables include vendor sales data, attendee data, and event information.
 
-CRITICAL SCHEMA RULES:
-- Attendee tables use Event_Date column (NOT Order_Date)
-- Attendee spending amounts are in Lineitem_price column
-- Vendor sales amounts are in Total_Sales or Cash__Credit_Total columns
-- Use Event_Date for date filtering on attendee tables
-
-For counting queries, generate SQL that:
-1. Uses correct column names from schema rules above
-2. Counts unique attendees/vendors appropriately 
+For counting queries like "How many vendors participated in Kapwa Gardens events?", generate SQL that:
+1. First discovers relevant tables with table discovery
+2. Then counts unique vendors across those tables
 3. Uses proper BigQuery syntax
-4. Interprets business terminology correctly
 
 Return only the SQL query, no explanation."""
 

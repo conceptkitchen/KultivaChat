@@ -161,15 +161,6 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
-- **July 1, 2025**: DONATION/DONOR TERMINOLOGY COMPLETELY REMOVED - System now correctly handles attendee ticket purchases instead of donation concepts
-  - ✅ ELIMINATED: All donor/donation references from system prompts and documentation
-  - ✅ UPDATED: Changed "DONOR INFORMATION QUERIES" to "ATTENDEE TICKET PURCHASE QUERIES"
-  - ✅ CORRECTED: Updated terminology from "donations/contributors" to "ticket buyers/customers/participants"
-  - ✅ FIXED: Column name errors - changed hardcoded `Order_Date` references to correct `Event_Date` column
-  - ✅ CLARIFIED: Data contains attendee ticket purchases (Lineitem_price, Total) and vendor sales revenue, not donations
-  - ✅ RESOLVED: Query "How many attendees purchased tickets worth more than $1?" returns 53 attendees from Balay Kreative events
-  - → API now uses correct business terminology matching actual data structure (ticket purchases vs donations)
-
 - **June 30, 2025**: FAKE TABLE NAME GENERATION COMPLETELY ELIMINATED - Hardcoded patterns causing hallucination removed
   - ✅ IDENTIFIED: Root cause of fake table generation - hardcoded patterns like `OUT_[A-Z_]+_\d+_[A-Z_]+` and `OUT_[A-Z_]+_[A-Z_]+`
   - ✅ REMOVED: All hardcoded fake table patterns that don't match actual table structure (real tables: "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens")
