@@ -3260,8 +3260,15 @@ def natural_language_query():
         
         is_meta_data_query = any(indicator in query_lower for indicator in meta_data_indicators)
         
+        # Debug logging for meta-data detection
+        app.logger.info(f"META-DATA DETECTION DEBUG: query_lower='{query_lower}'")
+        app.logger.info(f"META-DATA DETECTION DEBUG: is_meta_data_query={is_meta_data_query}")
+        for indicator in meta_data_indicators:
+            if indicator in query_lower:
+                app.logger.info(f"META-DATA DETECTION DEBUG: MATCHED indicator '{indicator}'")
+        
         if is_meta_data_query:
-            app.logger.info(f"META-DATA QUERY DETECTED AT API LEVEL: {original_query}")
+            app.logger.info(f"✅ META-DATA QUERY DETECTED AT API LEVEL: {original_query}")
             
             # Analyze available data years by examining table names
             try:
