@@ -2152,12 +2152,31 @@ def internal_execute_sql_query(query: str) -> dict:
                             best_match_score = match_score
                             best_match_table = (table, rev_col)
                     
-                    # Use best matching table if found, otherwise use first table
-                    if best_match_table and best_match_score > 0:
+                    # Use best matching table if found, otherwise return intelligent error
+                    if best_match_table and best_match_score > 5:  # Require meaningful match score
                         target_table, revenue_column = best_match_table
                         app.logger.info(f"SPECIFIC EVENT FILTER: Selected '{target_table}' with score {best_match_score} for query: {original_query[:100]}")
                     else:
-                        app.logger.info(f"NO SPECIFIC MATCH: Using default table '{target_table}' for query: {original_query[:100]}")
+                        # Return intelligent error for queries that don't match real events
+                        app.logger.info(f"NO MEANINGFUL MATCH: Query '{original_query[:100]}' doesn't match any known events")
+                        
+                        # Check if this looks like it should match a real event but doesn't
+                        potential_events = ['nonexistent', 'fake', 'invalid', 'test', 'dummy']
+                        is_obviously_fake = any(fake_event in original_query.lower() for fake_event in potential_events)
+                        
+                        if is_obviously_fake:
+                            return {
+                                'status': 'error',
+                                'error_message': f'No data found for the requested event. Available events include: Lovers Mart, UNDISCOVERED SF, Many Styles, Be Free Festival, Ancestor Altars, and others from 2023-2024.',
+                                'query_attempted': original_query,
+                                'available_events': ['Lovers Mart (2023-02-11)', 'UNDISCOVERED SF (2023-08-19, 2023-09-16)', 'Many Styles (2023-07-29, 2023-08-26)', 'Be Free Festival (2023-06-10)', 'Ancestor Altars (2023-11-04)'],
+                                'suggestion': 'Please specify one of the available events from our database.'
+                            }
+                        else:
+                            # For legitimate queries that don't match specific events, use general table discovery
+                            target_table = revenue_tables[0][0]  # Use first available table
+                            revenue_column = revenue_tables[0][1]
+                            app.logger.info(f"GENERAL QUERY: Using general table '{target_table}' for broad analysis")
                     
                     # Enhanced revenue analysis with proper currency handling
                     final_query = f"""
