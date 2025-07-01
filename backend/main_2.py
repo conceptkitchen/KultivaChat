@@ -3248,6 +3248,7 @@ def natural_language_query():
             return jsonify({"error": "Missing 'query' parameter"}), 400
         
         original_query = data['query']
+        app.logger.info(f"🔥🔥🔥 API ENDPOINT PROCESSING: {original_query} 🔥🔥🔥")
         app.logger.info(f"Processing natural language query: {original_query}")
         
         # CRITICAL FIX: Handle meta-data queries FIRST (before any other routing)
