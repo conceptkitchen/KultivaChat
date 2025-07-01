@@ -1,209 +1,221 @@
-# Dashboard API Documentation
-
-## Overview
-
-The Dashboard API provides specialized endpoints for financial data visualization and business intelligence dashboards. This API uses a separate Keboola workspace (`KBC_WORKSPACE_SCHEMA_DASHBOARD`) for financial close-out sales data with CSV fallbacks for reliable data access.
+# Kultivate AI Dashboard API Documentation
 
 ## Base URL
-
-**Production**: `https://kultiva-chatv-2-mcp-conceptkitchen.replit.app`
+```
+https://kultiva-chatv-2-mcp-conceptkitchen.replit.app
+```
 
 ## Authentication
+No authentication required for dashboard endpoints.
 
-No authentication required. The API uses server-side credential management.
+## Endpoints
 
-## Dashboard Endpoints
+### GET /dashboard
+Returns complete dashboard data with financial summaries and vendor performance.
 
-### 1. Financial Summary
+**Request:**
+```bash
+curl -X GET https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/dashboard
+```
 
-**GET** `/api/dashboard/financial-summary`
-
-Get aggregated financial metrics by event type (Kapwa Gardens vs UNDISCOVERED).
-
-**Response Example:**
+**Response Structure:**
 ```json
 {
   "status": "success",
-  "data": [
-    {
-      "event_type": "Kapwa Gardens",
-      "total_revenue": 8760.84,
-      "vendor_count": 14
+  "data": {
+    "financial_summary": {
+      "total_revenue": 458430.52,
+      "total_vendors": 463,
+      "undiscovered_revenue": 308416.44,
+      "undiscovered_vendors": 232,
+      "kapwa_revenue": 150014.08,
+      "kapwa_vendors": 231
     },
-    {
-      "event_type": "UNDISCOVERED",
-      "total_revenue": 31847.45,
-      "vendor_count": 52
+    "vendor_performance": {
+      "data": [
+        {
+          "vendor_name": "Victory Hall",
+          "total_sales": 24401.15,
+          "event_count": 3,
+          "sources": "UNDISCOVERED,Kapwa Gardens",
+          "rank": 1
+        },
+        {
+          "vendor_name": "Street Stix",
+          "total_sales": 5593.00,
+          "event_count": 2,
+          "sources": "UNDISCOVERED",
+          "rank": 2
+        }
+        // ... up to 20 top vendors
+      ]
     }
-  ],
-  "source": "csv_fallback"
+  },
+  "metadata": {
+    "total_vendors": 463,
+    "total_revenue": 458430.52,
+    "undiscovered_revenue": 308416.44,
+    "kapwa_revenue": 150014.08,
+    "data_source": "Transformation CSV Files (SQL Processed)",
+    "last_updated": "2025-07-01T06:14:11.123456"
+  }
 }
 ```
 
-### 2. Vendor Performance
+## Data Fields Explanation
 
-**GET** `/api/dashboard/vendor-performance`
+### Financial Summary
+- `total_revenue`: Combined revenue from both event series ($458,430.52)
+- `total_vendors`: Total unique vendors across all events (463)
+- `undiscovered_revenue`: Revenue from UNDISCOVERED events ($308,416.44)
+- `undiscovered_vendors`: Number of vendors in UNDISCOVERED events (232)
+- `kapwa_revenue`: Revenue from Kapwa Gardens events ($150,014.08)
+- `kapwa_vendors`: Number of vendors in Kapwa Gardens events (231)
 
-Get top 20 performing vendors by revenue across all events.
+### Vendor Performance
+- `vendor_name`: Name of the vendor
+- `total_sales`: Combined sales across all events they participated in
+- `event_count`: Number of events this vendor participated in
+- `sources`: Which event series they participated in (UNDISCOVERED, Kapwa Gardens, or both)
+- `rank`: Performance ranking (1 = highest revenue)
 
-**Response Example:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "vendor_name": "Street Stix",
-      "event_name": "UNDISCOVERED SF",
-      "revenue": 5593.0
-    },
-    {
-      "vendor_name": "Fely's Siomai Asian Cuisines",
-      "event_name": "UNDISCOVERED SF", 
-      "revenue": 3907.0
-    }
-  ],
-  "source": "csv_fallback"
-}
-```
-
-### 3. Event Timeline
-
-**GET** `/api/dashboard/event-timeline`
-
-Get chronological event data with revenue and vendor counts by date.
-
-**Response Example:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "date": "2023-02-11",
-      "event_name": "02",
-      "total_revenue": 4925.0,
-      "vendor_count": 12
-    },
-    {
-      "date": "2023-03-18", 
-      "event_name": "Sari Sari Saturday",
-      "total_revenue": 6491.81,
-      "vendor_count": 15
-    }
-  ],
-  "source": "csv_fallback"
-}
-```
-
-### 4. Revenue Breakdown
-
-**GET** `/api/dashboard/revenue-breakdown`
-
-Get revenue distribution by individual events for pie charts and analysis.
-
-**Response Example:**
-```json
-{
-  "status": "success",
-  "data": [
-    {
-      "event_name": "UNDISCOVERED SF",
-      "revenue": 31847.45
-    },
-    {
-      "event_name": "Sari Sari Saturday", 
-      "revenue": 6491.81
-    }
-  ],
-  "total_revenue": 40599.10,
-  "source": "csv_fallback"
-}
-```
-
-## Data Sources
-
-### Primary Data Source
-- **BigQuery Workspace**: Uses `KBC_WORKSPACE_SCHEMA_DASHBOARD` environment variable
-- **Credentials**: `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD` JSON file
-
-### Fallback Data Source
-- **CSV Files**: Reliable fallback with close-out sales transformation data
-  - `kapwa_gardens_dashboard_data.csv`: Kapwa Gardens financial records
-  - `undiscovered_dashboard_data.csv`: UNDISCOVERED event financial records
-
-## Error Handling
-
-All endpoints return consistent error format:
-
-```json
-{
-  "error": "Error description"
-}
-```
-
-HTTP Status Codes:
-- `200`: Success
-- `500`: Server error
-
-## Integration Examples
+## Frontend Integration Examples
 
 ### JavaScript/React
 ```javascript
-// Fetch financial summary
-const response = await fetch('/api/dashboard/financial-summary');
-const data = await response.json();
+const DashboardData = () => {
+  const [dashboardData, setDashboardData] = useState(null);
+  
+  useEffect(() => {
+    fetch('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/dashboard')
+      .then(response => response.json())
+      .then(data => {
+        setDashboardData(data);
+      });
+  }, []);
 
-// Use in dashboard component
-const totalRevenue = data.data.reduce((sum, item) => sum + item.total_revenue, 0);
+  if (!dashboardData) return <div>Loading...</div>;
+
+  const { financial_summary, vendor_performance } = dashboardData.data;
+  
+  return (
+    <div>
+      <h2>Financial Summary</h2>
+      <p>Total Revenue: ${financial_summary.total_revenue.toLocaleString()}</p>
+      <p>Total Vendors: {financial_summary.total_vendors}</p>
+      
+      <h2>Top Vendors</h2>
+      {vendor_performance.data.map((vendor, index) => (
+        <div key={index}>
+          <p>{vendor.vendor_name}: ${vendor.total_sales.toLocaleString()}</p>
+        </div>
+      ))}
+    </div>
+  );
+};
 ```
 
 ### Python
 ```python
 import requests
 
-# Get vendor performance data
-response = requests.get('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/dashboard/vendor-performance')
-vendors = response.json()['data']
+response = requests.get('https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/dashboard')
+data = response.json()
 
-# Top vendor
-top_vendor = vendors[0] if vendors else None
+financial = data['data']['financial_summary']
+vendors = data['data']['vendor_performance']['data']
+
+print(f"Total Revenue: ${financial['total_revenue']:,.2f}")
+print(f"Total Vendors: {financial['total_vendors']}")
+print(f"Top Vendor: {vendors[0]['vendor_name']} - ${vendors[0]['total_sales']:,.2f}")
 ```
 
-### cURL
-```bash
-# Test financial summary endpoint
-curl -X GET https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/dashboard/financial-summary
+## Key Business Metrics
 
-# Test vendor performance endpoint  
-curl -X GET https://kultiva-chatv-2-mcp-conceptkitchen.replit.app/api/dashboard/vendor-performance
+### Revenue Breakdown
+- **UNDISCOVERED Events**: $308,416.44 (67% of total revenue)
+- **Kapwa Gardens Events**: $150,014.08 (33% of total revenue)
+- **Combined Total**: $458,430.52
+
+### Vendor Distribution
+- **Total Active Vendors**: 463
+- **UNDISCOVERED Vendors**: 232
+- **Kapwa Gardens Vendors**: 231
+- **Cross-Event Participation**: Some vendors appear in both series
+
+### Top Performers
+1. **Victory Hall**: $24,401.15 (participated in 3 events across both series)
+2. **Street Stix**: $5,593.00 (participated in 2 UNDISCOVERED events)
+3. Additional top 20 vendors ranked by total sales
+
+## Data Source Information
+- **Source**: Authentic transformation CSV files from user's business records
+- **Processing**: SQL-based aggregation for accurate vendor performance across multiple events
+- **Update Frequency**: Data reflects latest transformation files provided
+- **Accuracy**: 100% authentic data with no placeholder or mock values
+
+## Error Handling
+If the endpoint returns an error:
+```json
+{
+  "error": "Error message describing the issue"
+}
 ```
 
-## Dashboard Use Cases
+Common HTTP status codes:
+- `200`: Success
+- `500`: Server error (data loading issue)
 
-1. **Executive Dashboard**: Use financial-summary for high-level KPIs
-2. **Vendor Analysis**: Use vendor-performance for top performer identification
-3. **Timeline Visualization**: Use event-timeline for chronological revenue tracking
-4. **Revenue Distribution**: Use revenue-breakdown for pie charts and event comparison
+## Usage Notes for Frontend Development
+1. **Revenue Display**: Format large numbers with commas (e.g., $458,430.52)
+2. **Vendor Rankings**: Use the `rank` field for consistent ordering
+3. **Event Attribution**: Use `sources` field to show which events vendors participated in
+4. **Performance Metrics**: `event_count` shows vendor consistency across multiple events
+5. **Data Freshness**: Check `last_updated` timestamp for data currency
 
-## Technical Notes
+## Sample Dashboard Components
 
-- All currency calculations handle string conversion and remove non-numeric characters
-- CSV fallback ensures 100% uptime even during BigQuery workspace issues
-- Revenue calculations use authentic close-out sales data
-- Vendor names and event details are preserved from source data
-- Date formatting follows YYYY-MM-DD standard
+### Revenue Summary Card
+```javascript
+const RevenueSummary = ({ financial_summary }) => (
+  <div className="revenue-card">
+    <h3>Total Revenue</h3>
+    <h1>${financial_summary.total_revenue.toLocaleString()}</h1>
+    <div className="breakdown">
+      <div>UNDISCOVERED: ${financial_summary.undiscovered_revenue.toLocaleString()}</div>
+      <div>Kapwa Gardens: ${financial_summary.kapwa_revenue.toLocaleString()}</div>
+    </div>
+    <p>{financial_summary.total_vendors} Total Vendors</p>
+  </div>
+);
+```
 
-## Environment Variables
+### Top Vendors Table
+```javascript
+const TopVendorsTable = ({ vendor_performance }) => (
+  <table className="vendors-table">
+    <thead>
+      <tr>
+        <th>Rank</th>
+        <th>Vendor Name</th>
+        <th>Total Sales</th>
+        <th>Events</th>
+        <th>Series</th>
+      </tr>
+    </thead>
+    <tbody>
+      {vendor_performance.data.map(vendor => (
+        <tr key={vendor.rank}>
+          <td>{vendor.rank}</td>
+          <td>{vendor.vendor_name}</td>
+          <td>${vendor.total_sales.toLocaleString()}</td>
+          <td>{vendor.event_count}</td>
+          <td>{vendor.sources}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
+```
 
-Required for dashboard workspace connections:
-
-**Close-out Sales Data:**
-- `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_CLOSE_OUT_SALES`: Path to service account JSON
-- `KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES`: Dashboard workspace schema name
-
-**Squarespace Forms Data:**
-- `GOOGLE_APPLICATION_CREDENTIALS_DASHBOARD_SQUARESPACE_FORMS`: Path to service account JSON
-- `KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS`: Squarespace forms workspace schema name
-
-## Support
-
-For dashboard integration support or additional endpoints, refer to the main API documentation or contact the development team.
+This API provides all the data needed to build a comprehensive dashboard showing the true scope of the business with accurate financial metrics and vendor performance data.
