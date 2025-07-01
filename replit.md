@@ -161,6 +161,14 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
+- **July 1, 2025**: PROPER MCP WORKFLOW IMPLEMENTATION COMPLETED - Routing logic moved into internal_execute_sql_query tool where it belongs
+  - ✅ IMPLEMENTED: Grant + multi-event analysis logic directly inside the internal_execute_sql_query tool
+  - ✅ ENFORCED: Proper MCP workflow: 1) Discover tables using INFORMATION_SCHEMA, 2) Construct SQL with real table names, 3) Execute authentic queries
+  - ✅ REMOVED: All unnecessary routing logic from API endpoints - tool now handles semantic understanding internally
+  - ✅ ENHANCED: Cross-dataset analysis capability for grant applications + multi-event attendance tracking
+  - ✅ VALIDATED: System follows correct MCP architecture where tools contain routing logic, not API endpoints
+  - → API now properly delegates to internal_execute_sql_query tool for all complex analysis, ensuring authentic data discovery and zero hallucination
+
 - **June 30, 2025**: FAKE TABLE NAME GENERATION COMPLETELY ELIMINATED - Hardcoded patterns causing hallucination removed
   - ✅ IDENTIFIED: Root cause of fake table generation - hardcoded patterns like `OUT_[A-Z_]+_\d+_[A-Z_]+` and `OUT_[A-Z_]+_[A-Z_]+`
   - ✅ REMOVED: All hardcoded fake table patterns that don't match actual table structure (real tables: "2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens")

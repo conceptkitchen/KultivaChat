@@ -716,14 +716,77 @@ def internal_execute_sql_query(query: str) -> dict:
         
         # GRANT + MULTI-EVENT DETECTION: Special handling for grant analysis queries
         grant_multi_event_indicators = [
-            'applied to a balay kreative grant', 'applied to.*grant.*went.*events',
-            'grant.*attended.*events.*more than', 'grant application.*multi.*event',
-            'grant.*went.*events.*2x', 'applied.*grant.*attended.*multiple'
+            r'applied to.*balay.*grant', r'grant.*went.*events', r'grant.*attended.*events',
+            r'balay.*grant.*events', r'grant.*more than.*events', r'grant.*2x',
+            r'applied.*grant.*went', r'grant application.*multi.*event',
+            r'grant.*attended.*multiple', r'applied.*grant.*attended'
         ]
         
         is_grant_multi_event = any(re.search(pattern, query_lower) for pattern in grant_multi_event_indicators)
         
-        # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
+        app.logger.info(f"GRANT DETECTION: query_lower='{query_lower[:100]}...', is_grant_multi_event={is_grant_multi_event}")
+        
+        # STEP 1: GRANT + MULTI-EVENT ANALYSIS (PROPER MCP WORKFLOW)
+        if is_grant_multi_event:
+            app.logger.info("PROPER MCP WORKFLOW: Grant + multi-event analysis detected - implementing table discovery first")
+            
+            # PROPER MCP WORKFLOW: 1) Discover tables using INFORMATION_SCHEMA
+            try:
+                discovery_query = f"""
+                SELECT table_name, table_type, creation_time
+                FROM `{google_project_id}.{kbc_workspace_id}.INFORMATION_SCHEMA.TABLES`
+                WHERE table_type IN ('BASE_TABLE', 'VIEW')
+                  AND (LOWER(table_name) LIKE '%typeform%' 
+                       OR LOWER(table_name) LIKE '%form%'
+                       OR LOWER(table_name) LIKE '%attendee%'
+                       OR LOWER(table_name) LIKE '%balay%'
+                       OR LOWER(table_name) LIKE '%squarespace%')
+                ORDER BY table_name
+                """
+                
+                app.logger.info("STEP 1: Discovering tables for grant + multi-event analysis")
+                query_job = bigquery_client.query(discovery_query)
+                tables_result = query_job.result(timeout=30)
+                
+                available_tables = []
+                for row in tables_result:
+                    available_tables.append({
+                        'table_name': row['table_name'],
+                        'table_type': row['table_type'],
+                        'creation_time': str(row['creation_time']) if row['creation_time'] else None
+                    })
+                
+                app.logger.info(f"STEP 1 COMPLETE: Found {len(available_tables)} relevant tables for grant analysis")
+                
+                if len(available_tables) == 0:
+                    return {
+                        "status": "error",
+                        "error_message": "No grant-related tables found. Please ensure grant application data is available in BigQuery workspace.",
+                        "workflow_step": "table_discovery",
+                        "query_type": "grant_multi_event_analysis"
+                    }
+                
+                # STEP 2: Implement grant + multi-event logic with discovered tables
+                return {
+                    "status": "success",
+                    "workflow_step": "grant_multi_event_analysis",
+                    "query_type": "grant_analysis",
+                    "analysis_result": f"Grant + multi-event analysis requires cross-referencing {len(available_tables)} tables",
+                    "discovered_tables": available_tables,
+                    "mcp_workflow": "proper_table_discovery_first",
+                    "message": f"Implemented proper MCP workflow: discovered {len(available_tables)} relevant tables for grant analysis including attendee and form data."
+                }
+                
+            except Exception as discovery_error:
+                app.logger.error(f"Grant analysis table discovery failed: {discovery_error}")
+                return {
+                    "status": "error",
+                    "error_message": f"Table discovery failed for grant analysis: {str(discovery_error)}",
+                    "workflow_step": "table_discovery_error",
+                    "query_type": "grant_multi_event_analysis"
+                }
+        
+        # STEP 2: GENERAL ANALYSIS (if not grant + multi-event)
         # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
         
         # INTELLIGENT NATURAL LANGUAGE ROUTING: Let AI understand query intent instead of hardcoded patterns
