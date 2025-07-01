@@ -2353,7 +2353,7 @@ Return only the SQL query, no explanation."""
             # DETAILED LOGGING FOR FACT-CHECKING
             app.logger.info(f"=== QUERY EXECUTION DETAILS FOR FACT-CHECKING ===")
             app.logger.info(f"Original Query: {original_query}")
-            app.logger.info(f"Query Intent: {intent.get('type', 'unknown')}")
+            app.logger.info(f"Query Intent: {query_intent.get('type', 'unknown')}")
             app.logger.info(f"Target Table: {final_query.split('FROM')[1].split()[0] if 'FROM' in final_query else 'N/A'}")
             app.logger.info(f"SQL Query: {final_query[:500]}...")
             app.logger.info(f"Workspace: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}")
