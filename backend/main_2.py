@@ -3769,8 +3769,8 @@ def dashboard_vendor_performance():
                       ELSE 'Other Events'
                     END as event_type,
                     table_name as event_name
-                  FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` t
-                  JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{'{'}t.table_name{'}'}` data ON true
+                  FROM `{DASHBOARD_GOOGLE_PROJECT_ID}.{DASHBOARD_KBC_WORKSPACE_SCHEMA}.INFORMATION_SCHEMA.TABLES` t
+                  JOIN `{DASHBOARD_GOOGLE_PROJECT_ID}.{DASHBOARD_KBC_WORKSPACE_SCHEMA}.{'{'}t.table_name{'}'}` data ON true
                   WHERE table_name LIKE '%Close-Out%'
                   AND COALESCE(Vendor_Name, Contact_Name) IS NOT NULL
                   AND COALESCE(Vendor_Name, Contact_Name) != ''
@@ -3941,11 +3941,15 @@ def dashboard_event_timeline():
 
 @app.route('/api/dashboard/revenue-breakdown', methods=['GET'])
 def dashboard_revenue_breakdown():
-    """Get revenue breakdown by event type for pie charts using authentic BigQuery data"""
+    """Get revenue breakdown by event type combining BOTH dashboard data sources"""
     try:
-        # Use BigQuery data to match financial summary totals
+        # Combine data from BOTH dashboard BigQuery sources
+        revenue_data = []
+        total_combined_revenue = 0
+        
+        # 1. Get Close-out Sales Revenue
         try:
-            sql_query = f"""
+            closeout_query = f"""
             WITH event_revenue AS (
               SELECT 
                 CASE 
@@ -3958,23 +3962,94 @@ def dashboard_revenue_breakdown():
                     COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(Cash__Credit_Total, Total_Sales, '0'), r'[,$]', '') AS FLOAT64), 0)
                   ELSE 
                     COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(Total_Sales, Cash__Credit_Total, '0'), r'[,$]', '') AS FLOAT64), 0)
-                END as revenue
-              FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` t
-              JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{'{'}t.table_name{'}'}` data ON true
+                END as revenue,
+                'close_out_sales' as source_type
+              FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES}.INFORMATION_SCHEMA.TABLES` t
+              JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_CLOSE_OUT_SALES}.{'{'}t.table_name{'}'}` data ON true
               WHERE table_name LIKE '%Close-Out%'
               AND COALESCE(Vendor_Name, Contact_Name) IS NOT NULL
             )
             SELECT 
               event_name,
-              SUM(revenue) as total_revenue
+              SUM(revenue) as total_revenue,
+              source_type
             FROM event_revenue 
             WHERE revenue > 0 AND event_name IS NOT NULL
-            GROUP BY event_name
+            GROUP BY event_name, source_type
             ORDER BY total_revenue DESC
             """
             
-            query_job = bigquery_client.query(sql_query)
-            bigquery_results = list(query_job.result(timeout=60))
+            closeout_job = dashboard_bigquery_client.query(closeout_query)
+            closeout_results = list(closeout_job.result(timeout=60))
+            
+            for row in closeout_results:
+                revenue = float(row.total_revenue or 0)
+                total_combined_revenue += revenue
+                revenue_data.append({
+                    "event_name": f"{row.event_name} (Sales)",
+                    "revenue": round(revenue, 2),
+                    "source": "close_out_sales"
+                })
+                
+        except Exception as closeout_error:
+            app.logger.warning(f"Close-out sales revenue query failed: {closeout_error}")
+        
+        # 2. Get Squarespace Forms Revenue (if any)
+        try:
+            squarespace_query = f"""
+            WITH form_revenue AS (
+              SELECT 
+                CASE 
+                  WHEN table_name LIKE '%vendor%' THEN 'Vendor Registration Revenue'
+                  WHEN table_name LIKE '%attendee%' THEN 'Attendee Registration Revenue'
+                  ELSE REGEXP_EXTRACT(table_name, r'([^-]+)')
+                END as event_name,
+                COALESCE(SAFE_CAST(REGEXP_REPLACE(COALESCE(registration_fee, ticket_price, amount, '0'), r'[,$]', '') AS FLOAT64), 0) as revenue,
+                'squarespace_forms' as source_type
+              FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS}.INFORMATION_SCHEMA.TABLES` t
+              JOIN `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_SCHEMA_DASHBOARD_SQUARESPACE_FORMS}.{'{'}t.table_name{'}'}` data ON true
+              WHERE table_name NOT LIKE '-%'
+            )
+            SELECT 
+              event_name,
+              SUM(revenue) as total_revenue,
+              source_type
+            FROM form_revenue 
+            WHERE revenue > 0 AND event_name IS NOT NULL
+            GROUP BY event_name, source_type
+            ORDER BY total_revenue DESC
+            """
+            
+            squarespace_job = dashboard_squarespace_bigquery_client.query(squarespace_query)
+            squarespace_results = list(squarespace_job.result(timeout=60))
+            
+            for row in squarespace_results:
+                revenue = float(row.total_revenue or 0)
+                total_combined_revenue += revenue
+                revenue_data.append({
+                    "event_name": f"{row.event_name} (Registration)",
+                    "revenue": round(revenue, 2),
+                    "source": "squarespace_forms"
+                })
+                
+        except Exception as squarespace_error:
+            app.logger.warning(f"Squarespace forms revenue query failed: {squarespace_error}")
+        
+        # If we got data from BigQuery, return it
+        if revenue_data:
+            # Sort by revenue descending
+            revenue_data.sort(key=lambda x: x['revenue'], reverse=True)
+            
+            return jsonify({
+                "status": "success",
+                "data": revenue_data,
+                "total_revenue": round(total_combined_revenue, 2),
+                "source": "combined_bigquery_dashboards",
+                "note": "Revenue combined from both close-out sales and Squarespace forms data"
+            })
+        
+        # CSV fallback only if BigQuery completely fails
+        try:
             
             if bigquery_results:
                 results = []
