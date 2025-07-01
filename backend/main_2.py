@@ -2266,11 +2266,26 @@ Return only the SQL query, no explanation."""
         if not (is_business_query and is_comprehensive):
             start_time = time.time()
             
+            # DETAILED LOGGING FOR FACT-CHECKING
+            app.logger.info(f"=== QUERY EXECUTION DETAILS FOR FACT-CHECKING ===")
+            app.logger.info(f"Original Query: {original_query}")
+            app.logger.info(f"Query Intent: {intent.get('type', 'unknown')}")
+            app.logger.info(f"Target Table: {final_query.split('FROM')[1].split()[0] if 'FROM' in final_query else 'N/A'}")
+            app.logger.info(f"SQL Query: {final_query[:500]}...")
+            app.logger.info(f"Workspace: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}")
+            
             query_job = bigquery_client.query(final_query)
             results = query_job.result(timeout=60)
             results = list(results)
                 
             execution_time = time.time() - start_time
+            
+            # LOG RESULTS FOR VERIFICATION
+            app.logger.info(f"Query executed successfully in {execution_time:.2f}s")
+            app.logger.info(f"Returned {len(results)} rows")
+            if results:
+                app.logger.info(f"Sample result (first row): {dict(results[0]) if results else 'No data'}")
+            app.logger.info(f"=== END QUERY EXECUTION DETAILS ===")
             app.logger.info(f"Tool Call: internal_execute_sql_query executed in {execution_time:.2f}s, returned {len(results)} rows.")
             
             # Convert results to list of dictionaries
