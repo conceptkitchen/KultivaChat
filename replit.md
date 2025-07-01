@@ -161,6 +161,14 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
+- **July 1, 2025**: REVENUE CALCULATION DISCREPANCY IDENTIFIED AND RESOLVED - Dashboard endpoints now combine both BigQuery data sources for accurate totals
+  - ✅ IDENTIFIED: Revenue mismatch between Financial Summary ($27,867.99) and Revenue Breakdown ($24,333.03) due to different data sources
+  - ✅ PROBLEM: Dashboard endpoints were using inconsistent data sources (BigQuery vs CSV fallback vs single dashboard client)
+  - ✅ SOLUTION: Combined both dashboard BigQuery clients (close-out sales + Squarespace forms) to capture complete revenue picture
+  - ✅ ENHANCED: Vendor performance endpoint now aggregates vendor totals across ALL events instead of showing single event amounts
+  - ✅ FIXED: All dashboard endpoints now use authentic BigQuery data and provide consistent revenue totals for frontend integration
+  - → Dashboard API now provides unified revenue calculations combining vendor sales and registration revenue for complete business intelligence
+
 - **July 1, 2025**: COMPREHENSIVE SCHEMA ANALYSIS COMPLETED - All 38 tables mapped with complete column header documentation and intelligent query routing verified
   - ✅ MAPPED: Complete schema for 38 tables (33 close-out sales, 2 attendee registration, 2 vendor registration, 1 typeform responses)
   - ✅ DOCUMENTED: All column headers by category - revenue (Total_Sales, Cash__Credit_Total), vendor (Vendor_Name, Email), demographics (Do_you_identify_as_any_of_the_following)
