@@ -639,6 +639,8 @@ def internal_execute_sql_query(query: str) -> dict:
     
     app.logger.info(f"Tool Call: internal_execute_sql_query with query: {query[:200]}...")
     
+    import re  # Import at function level for all regex operations
+    
     try:
         # CHECK IF THIS IS ALREADY A PROPERLY FORMATTED SQL QUERY
         query_stripped = query.strip()
@@ -725,7 +727,6 @@ def internal_execute_sql_query(query: str) -> dict:
         # CRITICAL FIX: Analyze request type BEFORE routing to determine best data source
         
         # INTELLIGENT NATURAL LANGUAGE ROUTING: Let AI understand query intent instead of hardcoded patterns
-        import re
         
         # AI-DRIVEN QUERY ANALYSIS: Let the AI understand query intent naturally
         def ai_analyze_query_intent(query_text):
