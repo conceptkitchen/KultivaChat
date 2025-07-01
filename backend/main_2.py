@@ -701,7 +701,12 @@ def internal_execute_sql_query(query: str) -> dict:
             'all undiscovered', 'undiscovered events', 'all kapwa gardens',
             'kapwa gardens events', 'all lovers mart', 'lovers mart events',
             'events in 2023', 'events in 2024', 'events from 2023',
-            'all events in', 'events during', 'all vendor', 'vendor data from'
+            'all events in', 'events during', 'all vendor', 'vendor data from',
+            # CROSS-EVENT ANALYSIS PATTERNS
+            'balay kreative and undiscovered', 'balay kreative and undscvrd',
+            'undiscovered and balay', 'undscvrd and balay', 'attended events at',
+            'events at balay', 'both events', 'multiple events', 'cross-event',
+            'attended both', 'who has attended', 'attended events', 'and undscvrd'
         ]
         
         # STEP 1: INTELLIGENT REQUEST ANALYSIS FIRST
