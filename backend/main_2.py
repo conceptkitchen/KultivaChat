@@ -2250,23 +2250,36 @@ def internal_execute_sql_query(query: str) -> dict:
                         target_table, revenue_column = best_match_table
                         app.logger.info(f"SPECIFIC EVENT FILTER: Selected '{target_table}' with score {best_match_score} for query: {original_query[:100]}")
                     else:
-                        # NO FALLBACKS - Return error for unmatched events
+                        # NO FALLBACKS - Return enhanced error with intelligent reasoning
                         app.logger.warning(f"NO EVENT MATCH: Query '{original_query}' does not match any known events")
+                        
+                        # Analyze what the user was looking for and provide specific reasoning
+                        query_analysis = analyze_query_intent(original_query)
+                        
                         return {
                             'status': 'error',
                             'error_type': 'event_not_found',
-                            'error_message': f'No data found for the requested event in your query.',
+                            'error_message': f'No data found for the requested information in your query.',
                             'query_attempted': original_query,
+                            'reasoning': {
+                                'what_you_asked': query_analysis['intent_description'],
+                                'why_no_data': query_analysis['availability_explanation'],
+                                'data_coverage': 'Sales data available from 2023-2024 only',
+                                'available_years': ['2023', '2024'],
+                                'missing_years': query_analysis['missing_years'] if query_analysis['missing_years'] else 'None - query may need different approach'
+                            },
                             'available_events': [
                                 'Lovers Mart (February 11, 2023)',
-                                'UNDISCOVERED SF (August 19, 2023)',
-                                'Kapwa Gardens events',
-                                'Yum Yams events',
-                                'Be Free Festival',
-                                'Many Styles events'
+                                'UNDISCOVERED SF (August 19, 2023, September 16, 2023, October 21, 2023)',
+                                'Kapwa Gardens events (2023-2024)',
+                                'Yum Yams events (May 13, 2023)',
+                                'Be Free Festival (June 10, 2023)',
+                                'Many Styles events (July 29, 2023)',
+                                'Sulat events (July 13, 2024)',
+                                'Balay Kreative events (2023-2024)'
                             ],
-                            'suggestion': 'Please specify a valid event name from our database.',
-                            'routing_method': 'strict_event_matching_no_fallback'
+                            'suggestion': query_analysis['suggested_alternative'],
+                            'routing_method': 'enhanced_reasoning_with_analysis'
                         }
                     
                     # Enhanced revenue analysis with proper currency handling
@@ -2754,6 +2767,41 @@ def get_zip_codes_for_city(
         f"Could not find zip codes for {city_name}{f', {state_code}' if state_code else ''} (mock data only). Replace with real API for full functionality."
     }
 
+
+def analyze_query_intent(query: str) -> dict:
+    """Analyze what the user was asking for and provide intelligent reasoning when data isn't available"""
+    query_lower = query.lower()
+    
+    # Determine what the user was looking for
+    if 'years' in query_lower and 'sales data' in query_lower:
+        return {
+            'intent_description': 'Information about what years of sales data are available',
+            'availability_explanation': 'This is a meta-data query about data coverage, not an event-specific query',
+            'missing_years': [],
+            'suggested_alternative': 'Try asking: "Show me revenue data from UNDISCOVERED events from 2023 to 2024" or "List all events with their dates"'
+        }
+    elif any(year in query_lower for year in ['2019', '2020', '2021', '2022']):
+        missing_years = [year for year in ['2019', '2020', '2021', '2022'] if year in query_lower]
+        return {
+            'intent_description': f'Data from {", ".join(missing_years)}',
+            'availability_explanation': f'No sales data available for {", ".join(missing_years)}. Database only contains 2023-2024 events.',
+            'missing_years': missing_years,
+            'suggested_alternative': f'Try asking about 2023-2024 data instead: "How much money was made by vendors in 2023?"'
+        }
+    elif 'all events' in query_lower or 'list events' in query_lower:
+        return {
+            'intent_description': 'Complete list of all events and dates',
+            'availability_explanation': 'This is a data discovery query that should show all available events',
+            'missing_years': [],
+            'suggested_alternative': 'Try asking: "Show me revenue from UNDISCOVERED events in 2023" or "Who are the top vendors from Kapwa Gardens events?"'
+        }
+    else:
+        return {
+            'intent_description': 'Specific event or analysis not found in available data',
+            'availability_explanation': 'Query does not match any known event names or date patterns in the database',
+            'missing_years': [],
+            'suggested_alternative': 'Try asking about specific events like "UNDISCOVERED", "Kapwa Gardens", "Lovers Mart", or "Balay Kreative"'
+        }
 
 def convert_natural_language_to_sql(natural_query: str) -> str:
     """Convert natural language business questions to SQL queries"""
