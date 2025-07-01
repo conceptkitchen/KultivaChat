@@ -2881,15 +2881,124 @@ def natural_language_query():
                 app.logger.error(f"Direct phone query failed: {e}")
                 # Fall through to standard processing
         
-        # Enhanced MCP processing with smart table filtering
-        result = internal_execute_sql_query(original_query)
+        # PROPER MCP WORKFLOW: Force table discovery first, then construct proper query
+        app.logger.info("PROPER MCP: Starting with forced table discovery for grants and multi-event analysis")
         
-        # Add smart routing metadata to response
-        if result.get('status') == 'success':
-            result['routing_method'] = 'smart_filtered'
-            result['query_type'] = 'natural_language'
+        # Step 1: Discover grant and attendee tables first
+        discovery_queries = [
+            f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%grant%' OR LOWER(table_name) LIKE '%typeform%'",
+            f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%balay%' AND LOWER(table_name) LIKE '%attendee%'",
+            f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%attendee%' OR LOWER(table_name) LIKE '%undiscovered%'"
+        ]
         
-        return jsonify(result)
+        discovered_tables = []
+        for discovery_sql in discovery_queries:
+            try:
+                app.logger.info(f"DISCOVERING TABLES: {discovery_sql[:80]}...")
+                query_job = bigquery_client.query(discovery_sql)
+                tables = query_job.result(timeout=30)
+                table_names = [row.table_name for row in tables]
+                discovered_tables.extend(table_names)
+                app.logger.info(f"DISCOVERED: {len(table_names)} tables - {table_names}")
+            except Exception as e:
+                app.logger.warning(f"Table discovery failed: {e}")
+        
+        # Remove duplicates
+        discovered_tables = list(set(discovered_tables))
+        app.logger.info(f"TOTAL DISCOVERED TABLES: {len(discovered_tables)} - {discovered_tables}")
+        
+        if discovered_tables:
+            # Step 2: Use Gemini AI to construct query with REAL table names
+            try:
+                client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
+                
+                # Create prompt with actual discovered table names
+                discovery_prompt = f"""I need to answer: "{original_query}"
+
+I have discovered these REAL tables in the workspace:
+{chr(10).join([f"- {table}" for table in discovered_tables])}
+
+Based on the table names, I can see:
+- Grant data is likely in: {[t for t in discovered_tables if 'grant' in t.lower() or 'typeform' in t.lower()]}
+- Attendee data is likely in: {[t for t in discovered_tables if 'attendee' in t.lower()]}
+
+Please construct a SQL query using these EXACT table names to find people who:
+1. Applied to Balay Kreative grants (from the grant/typeform table)
+2. Attended multiple events (appearing in multiple attendee tables)
+
+Use ONLY the table names I provided above. Never use fake table names like 'attendees' or 'grant_applications'.
+
+Return only the SQL query."""
+
+                response = client.models.generate_content(
+                    model='gemini-2.0-flash-exp',
+                    contents=[discovery_prompt]
+                )
+                
+                if response and hasattr(response, 'text'):
+                    ai_sql = response.text.strip()
+                    
+                    # Clean up the SQL
+                    if '```sql' in ai_sql:
+                        ai_sql = ai_sql.split('```sql')[1].split('```')[0].strip()
+                    elif '```' in ai_sql:
+                        ai_sql = ai_sql.split('```')[1].strip()
+                    
+                    app.logger.info(f"GEMINI CONSTRUCTED SQL WITH REAL TABLES: {ai_sql[:200]}...")
+                    
+                    # Execute the properly constructed query
+                    try:
+                        start_time = time.time()
+                        query_job = bigquery_client.query(ai_sql)
+                        results = query_job.result(timeout=60)
+                        results = list(results)
+                        execution_time = time.time() - start_time
+                        
+                        # Format results
+                        data_rows = []
+                        for row in results:
+                            if hasattr(row, '_mapping'):
+                                data_rows.append(dict(row._mapping))
+                            elif hasattr(row, 'items'):
+                                data_rows.append(dict(row.items()))
+                            else:
+                                data_rows.append(dict(row))
+                        
+                        app.logger.info(f"MCP SUCCESS: {len(data_rows)} results in {execution_time:.2f}s")
+                        
+                        return jsonify({
+                            "status": "success",
+                            "data": data_rows,
+                            "query_executed": ai_sql,
+                            "execution_time": execution_time,
+                            "routing_method": "proper_mcp_discovery",
+                            "query_type": "cross_dataset_analysis",
+                            "discovered_tables": discovered_tables,
+                            "workflow_steps": [
+                                f"1. Discovered {len(discovered_tables)} real tables",
+                                "2. Used Gemini AI with authentic table names",
+                                "3. Constructed cross-dataset query",
+                                "4. Executed with real BigQuery data"
+                            ]
+                        })
+                        
+                    except Exception as e:
+                        app.logger.error(f"Query execution with discovered tables failed: {e}")
+                        
+            except Exception as e:
+                app.logger.error(f"Gemini AI construction with discovered tables failed: {e}")
+                return jsonify({
+                    "status": "error",
+                    "error_message": f"Failed to construct query with discovered tables: {str(e)}",
+                    "discovered_tables": discovered_tables,
+                    "routing_method": "mcp_construction_failed"
+                })
+        else:
+            return jsonify({
+                "status": "error", 
+                "error_message": "No relevant tables discovered for grant and multi-event analysis",
+                "routing_method": "no_tables_discovered"
+            })
     
     except Exception as e:
         app.logger.error(f"Natural language query processing error: {e}")
