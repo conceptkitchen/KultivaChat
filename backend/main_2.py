@@ -1132,16 +1132,50 @@ def internal_execute_sql_query(query: str) -> dict:
                 app.logger.error(f"Direct attendee count query failed in SQL tool: {e}")
                 # Continue to fallback processing
         
-        # IMMEDIATE VENDOR SALES ROUTING: Direct query for top X vendors
+        # IMMEDIATE VENDOR SALES ROUTING: Direct query for top X vendors WITH EVENT MATCHING
         if query_intent.get('type') == 'vendor_ranking':
             limit_number = query_intent.get('limit', 5)
-            app.logger.info(f"VENDOR SALES QUERY DETECTED IN SQL TOOL: Routing directly to UNDISCOVERED sales data for top {limit_number} vendors")
+            
+            # EVENT-SPECIFIC VENDOR SALES ROUTING
+            query_lower = query.lower()
+            target_table = None
+            
+            # Event name to table mapping
+            event_table_mapping = {
+                'lovers mart': '2023-02-11-Lovers-Mart-_-Close-Out-Sales---Kapwa-Gardens-START-HERE-Vendor-Close-Out-Sal',
+                'undiscovered': '2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors',
+                'kapwa gardens': '2023-06-10-Be-Free-Festival---2023-06-10---Kapwa-Gardens-Iggy---Vendor-Close-Out-Sales',
+                'yum yams': '2023-05-13-Yum-Yams-Benefit-_-Close-Out-Sales---Kapwa-Gardens-Iggy---Vendor-Close-Out',
+                'many styles': '2023-07-29-Many-Styles-Market---Close-Out-Sales-Check-out-Sheet-Raposa',
+                'be free': '2023-06-10-Be-Free-Festival---2023-06-10---Kapwa-Gardens-Iggy---Vendor-Close-Out-Sales'
+            }
+            
+            # Find matching event in query
+            for event_name, table_name in event_table_mapping.items():
+                if event_name in query_lower:
+                    target_table = table_name
+                    app.logger.info(f"EVENT MATCHED: '{event_name}' → table '{table_name}'")
+                    break
+            
+            # If no specific event found, return error (no fallbacks)
+            if not target_table:
+                app.logger.warning(f"NO EVENT MATCH FOR VENDOR QUERY: '{query}' - no fallback used")
+                return {
+                    "status": "error",
+                    "error_type": "event_not_specified",
+                    "error_message": "Please specify which event you want vendor sales data from.",
+                    "query_attempted": query,
+                    "available_events": list(event_table_mapping.keys()),
+                    "suggestion": "Try: 'Who are the top 3 vendors from Lovers Mart?' or 'Top vendors from UNDISCOVERED'"
+                }
+            
+            app.logger.info(f"VENDOR SALES QUERY DETECTED IN SQL TOOL: Routing to {target_table} for top {limit_number} vendors")
             
             vendor_sales_query = f"""
             SELECT 
                 Vendor_Name,
                 Total_Sales
-            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.2023-08-19-UNDISCOVERED-SF---Close-Out-Sales-Check-out-Sheet-All-vendors`
+            FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}`
             WHERE Total_Sales IS NOT NULL 
             AND Vendor_Name IS NOT NULL 
             AND Vendor_Name != ''
@@ -2085,16 +2119,13 @@ def internal_execute_sql_query(query: str) -> dict:
                 
                 if revenue_tables:
                     # ENHANCED TABLE SELECTION: Filter for specific events mentioned in query
-                    target_table, revenue_column = revenue_tables[0]  # Default fallback
-                    
-                    # Check if query mentions specific event/date and filter accordingly
                     query_lower = original_query.lower()
                     
                     # Event name mapping for precise table selection
                     event_filters = {
                         'undiscovered': ['undiscovered'],
                         'kapwa gardens': ['kapwa'],
-                        'lovers mart': ['lovers-mart'],
+                        'lovers mart': ['lovers-mart', 'lovers_mart'],
                         'yum yams': ['yum-yams'],
                         'dye hard': ['dye-hard'],
                         'be free': ['be-free'],
@@ -2121,6 +2152,8 @@ def internal_execute_sql_query(query: str) -> dict:
                     best_match_table = None
                     best_match_score = 0
                     
+                    app.logger.info(f"EVENT MATCHING: Looking for matches in query: '{original_query[:100]}'")
+                    
                     for table, rev_col in revenue_tables:
                         table_lower = table.lower()
                         match_score = 0
@@ -2128,9 +2161,11 @@ def internal_execute_sql_query(query: str) -> dict:
                         # Score based on event name matches
                         for event_name, event_keywords in event_filters.items():
                             if event_name in query_lower:
+                                app.logger.info(f"EVENT DETECTED: '{event_name}' found in query")
                                 for keyword in event_keywords:
                                     if keyword in table_lower:
                                         match_score += 10
+                                        app.logger.info(f"TABLE MATCH: '{keyword}' found in table '{table}' (+10 points)")
                         
                         # Score based on date matches
                         import re
@@ -2140,43 +2175,46 @@ def internal_execute_sql_query(query: str) -> dict:
                                 if 'august 19' in query_lower or '2023-08-19' in query_lower:
                                     if '2023-08-19' in table_lower:
                                         match_score += 20
+                                        app.logger.info(f"DATE MATCH: August 19, 2023 found in table '{table}' (+20 points)")
                                 elif 'september 16' in query_lower or '2023-09-16' in query_lower:
                                     if '2023-09-16' in table_lower:
                                         match_score += 20
+                                        app.logger.info(f"DATE MATCH: September 16, 2023 found in table '{table}' (+20 points)")
                                 elif 'february 11' in query_lower or '2023-02-11' in query_lower:
                                     if '2023-02-11' in table_lower:
                                         match_score += 20
+                                        app.logger.info(f"DATE MATCH: February 11, 2023 found in table '{table}' (+20 points)")
+                        
+                        app.logger.info(f"TABLE SCORE: '{table}' scored {match_score} points")
                         
                         # Update best match if this table scores higher
                         if match_score > best_match_score:
                             best_match_score = match_score
                             best_match_table = (table, rev_col)
                     
-                    # Use best matching table if found, otherwise return intelligent error
-                    if best_match_table and best_match_score > 5:  # Require meaningful match score
+                    # Use best matching table ONLY if found, otherwise return error
+                    if best_match_table and best_match_score > 0:  # Require positive score
                         target_table, revenue_column = best_match_table
                         app.logger.info(f"SPECIFIC EVENT FILTER: Selected '{target_table}' with score {best_match_score} for query: {original_query[:100]}")
                     else:
-                        # Return intelligent error for queries that don't match real events
-                        app.logger.info(f"NO MEANINGFUL MATCH: Query '{original_query[:100]}' doesn't match any known events")
-                        
-                        # Check if this looks like it should match a real event but doesn't
-                        potential_events = ['nonexistent', 'fake', 'invalid', 'test', 'dummy']
-                        is_obviously_fake = any(fake_event in original_query.lower() for fake_event in potential_events)
-                        
-                        if is_obviously_fake:
-                            return {
-                                'status': 'error',
-                                'error_message': f'No data found for the requested event. Available events include: Lovers Mart, UNDISCOVERED SF, Many Styles, Be Free Festival, Ancestor Altars, and others from 2023-2024.',
-                                'query_attempted': original_query,
-                                'available_events': ['Lovers Mart (2023-02-11)', 'UNDISCOVERED SF (2023-08-19, 2023-09-16)', 'Many Styles (2023-07-29, 2023-08-26)', 'Be Free Festival (2023-06-10)', 'Ancestor Altars (2023-11-04)'],
-                                'suggestion': 'Please specify one of the available events from our database.'
-                            }
-                        else:
-                            # For legitimate queries that don't match specific events, use general table discovery
-                            target_table = revenue_tables[0][0]  # Use first available table
-                            revenue_column = revenue_tables[0][1]
-                            app.logger.info(f"GENERAL QUERY: Using general table '{target_table}' for broad analysis")
+                        # NO FALLBACKS - Return error for unmatched events
+                        app.logger.warning(f"NO EVENT MATCH: Query '{original_query}' does not match any known events")
+                        return {
+                            'status': 'error',
+                            'error_type': 'event_not_found',
+                            'error_message': f'No data found for the requested event in your query.',
+                            'query_attempted': original_query,
+                            'available_events': [
+                                'Lovers Mart (February 11, 2023)',
+                                'UNDISCOVERED SF (August 19, 2023)',
+                                'Kapwa Gardens events',
+                                'Yum Yams events',
+                                'Be Free Festival',
+                                'Many Styles events'
+                            ],
+                            'suggestion': 'Please specify a valid event name from our database.',
+                            'routing_method': 'strict_event_matching_no_fallback'
+                        }
                     
                     # Enhanced revenue analysis with proper currency handling
                     final_query = f"""
