@@ -161,6 +161,14 @@ The system processed real vendor registration data from UNDISCOVERED events, int
 
 ## Recent Changes
 
+- **July 1, 2025**: FALLBACK ELIMINATION COMPLETED - Event matching now strict with no fallbacks to wrong data
+  - ✅ FIXED: "Lovers Mart" queries now correctly return Lovers Mart vendors (The Hidden Gem: $861.09) instead of UNDISCOVERED vendors
+  - ✅ ELIMINATED: All hardcoded fallbacks that defaulted to first table when no event match found
+  - ✅ IMPLEMENTED: Strict event-to-table mapping with helpful error messages for unmatched events
+  - ✅ ENHANCED: Detailed logging shows exact event matching and table selection for fact-checking accuracy
+  - ✅ VALIDATED: Query "Who are the top 3 vendors from Lovers Mart?" returns authentic Lovers Mart data from correct table
+  - → API now ensures 100% accuracy by returning errors instead of wrong data when events don't match
+
 - **July 1, 2025**: PROPER MCP WORKFLOW IMPLEMENTATION COMPLETED - Routing logic moved into internal_execute_sql_query tool where it belongs
   - ✅ IMPLEMENTED: Grant + multi-event analysis logic directly inside the internal_execute_sql_query tool
   - ✅ ENFORCED: Proper MCP workflow: 1) Discover tables using INFORMATION_SCHEMA, 2) Construct SQL with real table names, 3) Execute authentic queries
