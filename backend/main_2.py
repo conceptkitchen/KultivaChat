@@ -835,6 +835,31 @@ def internal_execute_sql_query(query: str) -> dict:
                 'in the bay area': ['San Francisco', 'SF', 'Daly City', 'Oakland']
             }
             
+            # Zip code detection
+            zip_codes = re.findall(r'\b\d{5}\b', query_lower)
+            if zip_codes:
+                intent['zip_codes'] = zip_codes
+            
+            # Demographic detection
+            demographics = []
+            demographic_terms = [
+                'middle eastern', 'asian', 'black', 'african american', 'latino', 
+                'hispanic', 'white', 'native american', 'pacific islander',
+                'lgbtq', 'queer', 'transgender', 'non-binary'
+            ]
+            for demo_term in demographic_terms:
+                if demo_term in query_lower:
+                    demographics.append(demo_term)
+            if demographics:
+                intent['demographics'] = demographics
+            
+            # Income/revenue thresholds
+            income_match = re.search(r'(?:more than|less than|over|under|above|below)\s*\$?(\d+(?:,\d+)*(?:\.\d+)?)', query_lower)
+            if income_match:
+                amount = income_match.group(1).replace(',', '')
+                operator = 'greater_than' if any(word in income_match.group(0) for word in ['more than', 'over', 'above']) else 'less_than'
+                intent['income_threshold'] = {'amount': float(amount), 'operator': operator}
+            
             for city_term, city_variants in city_mappings.items():
                 if city_term in query_lower:
                     cities.extend(city_variants)
@@ -869,6 +894,21 @@ def internal_execute_sql_query(query: str) -> dict:
             elif (cities and any(attendee_term in query_lower for attendee_term in ['attendee', 'people', 'participant', 'customer'])):
                 intent['type'] = 'geographic_attendee'
                 intent['focus'] = 'location_filtering'
+            
+            # Zip code analysis queries
+            elif any(zip_word in query_lower for zip_word in ['zip code', 'postal code', 'zip']) and 'vendor' in query_lower:
+                intent['type'] = 'vendor_zip_analysis'
+                intent['focus'] = 'geographic_distribution'
+            
+            # Demographic filtering queries
+            elif demographics and any(word in query_lower for word in ['identify as', 'demographic', 'ethnicity', 'race']):
+                intent['type'] = 'demographic_filtering'
+                intent['focus'] = 'demographic_analysis'
+            
+            # Income threshold queries
+            elif 'income_threshold' in intent and any(word in query_lower for word in ['income', 'make', 'earn']):
+                intent['type'] = 'income_filtering'
+                intent['focus'] = 'financial_screening'
             
             # Vendor queries
             elif ('vendor' in query_lower and 
