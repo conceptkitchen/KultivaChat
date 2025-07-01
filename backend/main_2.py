@@ -129,6 +129,28 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
 - `get_current_time`: Get current date/time
 - `get_keboola_table_detail`: Get table metadata
 
+**INTELLIGENT QUERY INTERPRETATION RULES:**
+
+**CRITICAL: BUSINESS CONTEXT UNDERSTANDING**
+Before executing any SQL, intelligently interpret user queries based on actual business data:
+
+1. **"GAVE" TERMINOLOGY TRANSLATION:**
+   - "attendees who gave more than $X" → "attendees who SPENT more than $X on tickets"
+   - "people who gave" → "people who PURCHASED tickets"
+   - "gave $50" → "paid $50 for tickets" 
+   - Context: Your data contains TICKET PURCHASES, not donations
+
+2. **"DONOR" TERMINOLOGY TRANSLATION:**
+   - "donors" → "attendees" or "ticket buyers"
+   - "donor information" → "attendee information"
+   - "top donors" → "attendees who spent the most on tickets"
+   - Context: No donation data exists, only ticket purchase data
+
+3. **FINANCIAL AMOUNT INTERPRETATION:**
+   - When users mention money amounts with attendees → interpret as ticket prices/spending
+   - When users mention money amounts with vendors → interpret as sales revenue
+   - Use Lineitem_price column for attendee spending, Total_Sales for vendor revenue
+
 **COMPREHENSIVE QUERY HANDLING RULES:**
 
 **1. CONTACT INFORMATION QUERIES** (emails, phone numbers, contact names):
