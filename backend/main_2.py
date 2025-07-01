@@ -167,14 +167,13 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
 - Include cross-event analysis and participation tracking
 - Provide event-specific insights with authentic data
 
-**7. DONOR INFORMATION QUERIES** (donations, sponsors, contributors, supporters):
-- Extract donor details including names, contribution amounts, purchase amounts
-- IMPORTANT: Donors are people who PAY for events (attendees who purchase tickets)
-- DONOR QUERIES use "Balay-Kreative---attendees---all-orders" table (people who paid for tickets)
+**7. ATTENDEE TICKET PURCHASE QUERIES** (ticket buyers, customers, participants):
+- Extract attendee details including names, ticket purchase amounts, event participation
+- ATTENDEE PURCHASE QUERIES use "Balay-Kreative---attendees---all-orders" table (people who bought tickets)
 - GRANT queries use "typeform_report_balay_kreative_forms" table (people who received funding)
-- Query format: SELECT donor_name, purchase_amount, event_name, billing_city FROM attendees table
-- Include donor analysis, supporter tracking, ticket purchase data
-- Return actual supporter records who financially contributed through ticket purchases
+- Query format: SELECT attendee_name, ticket_price, event_name, billing_city FROM attendees table
+- Include attendee analysis, ticket purchase tracking, participation data
+- Return actual attendee records who purchased tickets for events
 
 **EVENT-SPECIFIC DATA EXTRACTION:**
 - When users mention specific events, target ONLY that event's tables
@@ -215,7 +214,7 @@ SYSTEM_INSTRUCTION_PROMPT = f"""You are an expert BigQuery Data Analyst Assistan
    - "financial data" → tables with Total_Sales, Revenue, Payment columns
    - "vendor names" → tables with Vendor_Name, Business_Name columns
    - "event data" → tables with Event_Name, Event_Date columns
-   - "donor information" → "Balay-Kreative---attendees---all-orders" table (people who paid for tickets)
+   - "attendee ticket information" → "Balay-Kreative---attendees---all-orders" table (people who bought tickets)
    - "grant information" → "typeform_report_balay_kreative_forms" table (people who received funding)
 
 4. **EVENT NAME RECOGNITION AND MATCHING**: Essential for accurate data extraction:
@@ -1010,7 +1009,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 'Balay-Kreative' as event_series,
                 COUNT(*) as attendee_count
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Balay-Kreative---attendees---all-orders-Ballay-Kreative---attendees---all-orders`
-            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
+            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Event_Date)) = {target_year}
             
             UNION ALL
             
@@ -1170,7 +1169,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 # Continue to fallback processing
         
         # DETERMINE DATA SOURCE TYPE based on query context (after phone routing)
-        contact_keywords = ['contact', 'email', 'address', 'demographic', 'donor', 'donation', 'sponsor', 'grant']
+        contact_keywords = ['contact', 'email', 'address', 'demographic', 'sponsor', 'grant']
         is_contact_query = any(keyword in query_lower for keyword in contact_keywords)
         
         # COMPREHENSIVE ANALYSIS: Only if NOT a contact query
