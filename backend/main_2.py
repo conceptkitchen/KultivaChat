@@ -840,9 +840,13 @@ def internal_execute_sql_query(query: str) -> dict:
             if zip_codes:
                 intent['zip_codes'] = zip_codes
             
-            # Demographic detection
+            # Demographic detection - based on actual table data
             demographics = []
             demographic_terms = [
+                # Actual values from Vendor_data_Do_you_identify_as_any_of_the_following
+                'filipino descent', 'filipino', 'currently living in sf', 'currently living in soma', 
+                'currently living in the bay area', 'bay area', 'sf resident',
+                # Common demographic terms
                 'middle eastern', 'asian', 'black', 'african american', 'latino', 
                 'hispanic', 'white', 'native american', 'pacific islander',
                 'lgbtq+', 'lgbtq', 'queer', 'transgender', 'non-binary'
@@ -853,11 +857,13 @@ def internal_execute_sql_query(query: str) -> dict:
             if demographics:
                 intent['demographics'] = demographics
             
-            # Income/revenue thresholds
-            income_match = re.search(r'(?:more than|less than|over|under|above|below)\s*\$?(\d+(?:,\d+)*(?:\.\d+)?)', query_lower)
+            # Income/revenue thresholds - DYNAMIC amount detection
+            income_match = re.search(r'(?:more than|less than|over|under|above|below|making|made|earn|income)\s*\$?(\d+(?:,\d+)*(?:\.\d+)?)', query_lower)
             if income_match:
                 amount = income_match.group(1).replace(',', '')
-                operator = 'greater_than' if any(word in income_match.group(0) for word in ['more than', 'over', 'above']) else 'less_than'
+                # Determine operator from the full match context
+                full_match = income_match.group(0).lower()
+                operator = 'greater_than' if any(word in full_match for word in ['more than', 'over', 'above', 'making', 'made', 'earn']) else 'less_than'
                 intent['income_threshold'] = {'amount': float(amount), 'operator': operator}
             
             for city_term, city_variants in city_mappings.items():
