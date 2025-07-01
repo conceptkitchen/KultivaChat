@@ -840,16 +840,23 @@ def internal_execute_sql_query(query: str) -> dict:
             if zip_codes:
                 intent['zip_codes'] = zip_codes
             
-            # Demographic detection - based on actual table data
+            # Demographic detection - based on actual vendor registration data
             demographics = []
             demographic_terms = [
-                # Actual values from Vendor_data_Do_you_identify_as_any_of_the_following
-                'filipino descent', 'filipino', 'currently living in sf', 'currently living in soma', 
-                'currently living in the bay area', 'bay area', 'sf resident',
-                # Common demographic terms
-                'middle eastern', 'asian', 'black', 'african american', 'latino', 
+                # Exact values from your Vendor_data_Do_you_identify_as_any_of_the_following field
+                'filipino descent', 'filipino',
+                'woman', 'asian',
+                'currently living in the bay area', 
+                'currently living in sf',
+                'currently living in soma, sf',
+                'outside the bay area',
+                'lgbtq+',
+                # Variations and partial matches
+                'bay area', 'sf', 'soma', 'san francisco',
+                # Common demographic terms (for potential future use)
+                'middle eastern', 'black', 'african american', 'latino', 
                 'hispanic', 'white', 'native american', 'pacific islander',
-                'lgbtq+', 'lgbtq', 'queer', 'transgender', 'non-binary'
+                'lgbtq', 'queer', 'transgender', 'non-binary'
             ]
             for demo_term in demographic_terms:
                 if demo_term in query_lower:
