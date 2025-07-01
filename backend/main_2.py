@@ -734,7 +734,7 @@ def internal_execute_sql_query(query: str) -> dict:
             try:
                 discovery_query = f"""
                 SELECT table_name, table_type, creation_time
-                FROM `{google_project_id}.{kbc_workspace_id}.INFORMATION_SCHEMA.TABLES`
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
                 WHERE table_type IN ('BASE_TABLE', 'VIEW')
                   AND (LOWER(table_name) LIKE '%typeform%' 
                        OR LOWER(table_name) LIKE '%form%'
