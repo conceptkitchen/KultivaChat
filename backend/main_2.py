@@ -680,6 +680,69 @@ def internal_execute_sql_query(query: str) -> dict:
         original_query = query  # Preserve original query for detection
         query_lower = query.lower()
         
+        # CRITICAL FIX: HANDLE META-DATA QUERIES FIRST (before event matching)
+        # These are queries about data coverage, years available, etc.
+        meta_data_indicators = [
+            'what years', 'which years', 'years of sales data', 'years of data',
+            'what data do we have', 'data coverage', 'available years',
+            'how many years', 'data range', 'time period'
+        ]
+        
+        is_meta_data_query = any(indicator in query_lower for indicator in meta_data_indicators)
+        
+        if is_meta_data_query:
+            app.logger.info(f"META-DATA QUERY DETECTED: {original_query}")
+            
+            # Analyze available data years by examining table names
+            try:
+                discovery_query = f"""
+                SELECT table_name, creation_time
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+                WHERE table_type = 'BASE_TABLE'
+                AND LOWER(table_name) LIKE '%close-out%'
+                ORDER BY table_name
+                """
+                
+                query_job = bigquery_client.query(discovery_query)
+                results = query_job.result(timeout=30)
+                
+                # Extract years from table names
+                years_found = set()
+                total_tables = 0
+                for row in results:
+                    total_tables += 1
+                    table_name = row.table_name
+                    # Extract year from table names like "2023-02-11-Lovers-Mart"
+                    if '2023-' in table_name:
+                        years_found.add('2023')
+                    elif '2024-' in table_name:
+                        years_found.add('2024')
+                
+                years_list = sorted(list(years_found))
+                
+                return {
+                    "status": "success",
+                    "data": [{
+                        "query_type": "data_coverage_inquiry",
+                        "available_years": years_list,
+                        "total_event_tables": total_tables,
+                        "data_description": f"Sales data available from {years_list[0]} to {years_list[-1]}" if years_list else "No sales data found",
+                        "coverage_summary": f"Database contains {total_tables} event tables spanning {len(years_list)} years",
+                        "specific_years": years_list
+                    }],
+                    "query_executed": "INFORMATION_SCHEMA analysis for data coverage",
+                    "query_type": "meta_data_analysis",
+                    "routing_method": "meta_data_direct_answer"
+                }
+                
+            except Exception as e:
+                app.logger.error(f"Meta-data query failed: {e}")
+                return {
+                    "status": "error",
+                    "error_message": f"Could not analyze data coverage: {str(e)}",
+                    "query_type": "meta_data_error"
+                }
+        
         # Check if this is a natural language query needing intelligent processing
         business_indicators = [
             'show me', 'how much', 'how many', 'who are', 'which event', 'what vendor', 'revenue', 'sales',
@@ -3186,6 +3249,71 @@ def natural_language_query():
         
         original_query = data['query']
         app.logger.info(f"Processing natural language query: {original_query}")
+        
+        # CRITICAL FIX: Handle meta-data queries FIRST (before any other routing)
+        query_lower = original_query.lower()
+        meta_data_indicators = [
+            'what years', 'which years', 'years of sales data', 'years of data',
+            'what data do we have', 'data coverage', 'available years',
+            'how many years', 'data range', 'time period'
+        ]
+        
+        is_meta_data_query = any(indicator in query_lower for indicator in meta_data_indicators)
+        
+        if is_meta_data_query:
+            app.logger.info(f"META-DATA QUERY DETECTED AT API LEVEL: {original_query}")
+            
+            # Analyze available data years by examining table names
+            try:
+                discovery_query = f"""
+                SELECT table_name, creation_time
+                FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES`
+                WHERE table_type = 'BASE_TABLE'
+                AND LOWER(table_name) LIKE '%close-out%'
+                ORDER BY table_name
+                """
+                
+                query_job = bigquery_client.query(discovery_query)
+                results = query_job.result(timeout=30)
+                
+                # Extract years from table names
+                years_found = set()
+                total_tables = 0
+                for row in results:
+                    total_tables += 1
+                    table_name = row.table_name
+                    # Extract year from table names like "2023-02-11-Lovers-Mart"
+                    if '2023-' in table_name:
+                        years_found.add('2023')
+                    elif '2024-' in table_name:
+                        years_found.add('2024')
+                
+                years_list = sorted(list(years_found))
+                
+                return jsonify({
+                    "status": "success",
+                    "data": [{
+                        "query_type": "data_coverage_inquiry",
+                        "available_years": years_list,
+                        "total_event_tables": total_tables,
+                        "data_description": f"Sales data available from {years_list[0]} to {years_list[-1]}" if years_list else "No sales data found",
+                        "coverage_summary": f"Database contains {total_tables} event tables spanning {len(years_list)} years",
+                        "specific_years": years_list
+                    }],
+                    "query_executed": "INFORMATION_SCHEMA analysis for data coverage",
+                    "query_type": "meta_data_analysis",
+                    "routing_method": "meta_data_direct_answer",
+                    "api_endpoint": "/api/query"
+                })
+                
+            except Exception as e:
+                app.logger.error(f"Meta-data query failed: {e}")
+                return jsonify({
+                    "status": "error",
+                    "error_message": f"Could not analyze data coverage: {str(e)}",
+                    "query_type": "meta_data_error",
+                    "api_endpoint": "/api/query"
+                })
         
         # Check if this is a direct SQL query first
         if (original_query.strip().upper().startswith(('SELECT', 'WITH', 'CREATE', 'INSERT', 'UPDATE', 'DELETE', 'ALTER', 'DROP')) or
