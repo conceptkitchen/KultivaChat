@@ -4074,9 +4074,8 @@ def dashboard_revenue_breakdown():
         except Exception as bigquery_error:
             app.logger.warning(f"BigQuery revenue breakdown failed: {bigquery_error}")
         
-        # CSV fallback only if BigQuery fails
-        kapwa_data = load_csv_fallback_data('kapwa_gardens_dashboard_data.csv')
-        undiscovered_data = load_csv_fallback_data('undiscovered_dashboard_data.csv')
+        # No fallback - BigQuery should always work
+        return jsonify({"error": "BigQuery authentication required for dashboard data"}), 503
         
         # Calculate revenue by event
         event_revenue = {}
@@ -4243,6 +4242,192 @@ def safe_float_conversion(value):
             return 0.0
     
     return 0.0
+
+@app.route('/dashboard', methods=['GET'])
+def main_dashboard():
+    """Main dashboard endpoint using actual vendor transformation data"""
+    try:
+        # Load data from your specific transformation files
+        undiscovered_data = load_transformation_data('attached_assets/24083606.out.c_undiscovered_close_out_sales_transformation.master_undiscovered_report_1751349318193.csv')
+        kapwa_data = load_transformation_data('attached_assets/24083756.out.c_kapwa_gardens_close_out_sales_transformation.master_financial_report_1751349474968.csv')
+        
+        # Calculate financial summary
+        financial_summary = calculate_financial_summary(undiscovered_data, kapwa_data)
+        
+        # Calculate vendor performance
+        vendor_performance = calculate_vendor_performance(undiscovered_data, kapwa_data)
+        
+        # Calculate revenue breakdown
+        revenue_breakdown = calculate_revenue_breakdown(undiscovered_data, kapwa_data)
+        
+        # Calculate event timeline
+        event_timeline = calculate_event_timeline(undiscovered_data, kapwa_data)
+        
+        return jsonify({
+            "status": "success",
+            "data": {
+                "financial_summary": financial_summary,
+                "vendor_performance": vendor_performance,
+                "revenue_breakdown": revenue_breakdown,
+                "event_timeline": event_timeline
+            },
+            "metadata": {
+                "total_vendors": len(vendor_performance["data"]),
+                "total_revenue": financial_summary["total_revenue"],
+                "data_source": "Transformation CSV Files",
+                "last_updated": "2025-01-01"
+            }
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Main dashboard error: {e}")
+        return jsonify({"error": f"Dashboard error: {str(e)}"}), 500
+
+def load_transformation_data(csv_filename):
+    """Load vendor data from transformation CSV files"""
+    import csv
+    try:
+        data = []
+        with open(csv_filename, 'r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(dict(row))
+        return data
+    except Exception as e:
+        app.logger.error(f"Error loading {csv_filename}: {e}")
+        return []
+
+def calculate_financial_summary(undiscovered_data, kapwa_data):
+    """Calculate financial summary from transformation data"""
+    undiscovered_total = sum(safe_float_conversion(row.get('total_sales', 0)) for row in undiscovered_data)
+    kapwa_total = sum(safe_float_conversion(row.get('total_sales', 0)) for row in kapwa_data)
+    
+    undiscovered_vendors = len([row for row in undiscovered_data if safe_float_conversion(row.get('total_sales', 0)) > 0])
+    kapwa_vendors = len([row for row in kapwa_data if safe_float_conversion(row.get('total_sales', 0)) > 0])
+    
+    return {
+        "data": [
+            {"event_type": "UNDISCOVERED", "total_revenue": round(undiscovered_total, 2), "vendor_count": undiscovered_vendors},
+            {"event_type": "Kapwa Gardens", "total_revenue": round(kapwa_total, 2), "vendor_count": kapwa_vendors}
+        ],
+        "total_revenue": round(undiscovered_total + kapwa_total, 2)
+    }
+
+def calculate_vendor_performance(undiscovered_data, kapwa_data):
+    """Calculate vendor performance from transformation data"""
+    vendor_totals = {}
+    
+    # Aggregate UNDISCOVERED vendors
+    for row in undiscovered_data:
+        vendor_name = row.get('vendor_name', '').strip()
+        sales = safe_float_conversion(row.get('total_sales', 0))
+        if vendor_name and sales > 0:
+            if vendor_name not in vendor_totals:
+                vendor_totals[vendor_name] = {"sales": 0, "events": set(), "source": "UNDISCOVERED"}
+            vendor_totals[vendor_name]["sales"] += sales
+            vendor_totals[vendor_name]["events"].add(row.get('event_name', ''))
+    
+    # Aggregate Kapwa Gardens vendors  
+    for row in kapwa_data:
+        vendor_name = row.get('vendor_name', '').strip()
+        sales = safe_float_conversion(row.get('total_sales', 0))
+        if vendor_name and sales > 0:
+            if vendor_name not in vendor_totals:
+                vendor_totals[vendor_name] = {"sales": 0, "events": set(), "source": "Kapwa Gardens"}
+            vendor_totals[vendor_name]["sales"] += sales
+            vendor_totals[vendor_name]["events"].add(row.get('event_name', ''))
+    
+    # Format for response
+    vendor_list = []
+    for vendor_name, data in vendor_totals.items():
+        vendor_list.append({
+            "vendor_name": vendor_name,
+            "total_sales": round(data["sales"], 2),
+            "event_count": len(data["events"]),
+            "source": data["source"]
+        })
+    
+    # Sort by sales descending
+    vendor_list.sort(key=lambda x: x["total_sales"], reverse=True)
+    
+    return {
+        "data": vendor_list[:50],  # Top 50 vendors
+        "total_vendors": len(vendor_list)
+    }
+
+def calculate_revenue_breakdown(undiscovered_data, kapwa_data):
+    """Calculate revenue breakdown by events"""
+    event_revenue = {}
+    
+    # UNDISCOVERED events
+    for row in undiscovered_data:
+        event_name = row.get('event_name', 'UNDISCOVERED')
+        event_date = row.get('event_date', '')
+        sales = safe_float_conversion(row.get('total_sales', 0))
+        
+        event_key = f"{event_name} ({event_date})" if event_date else event_name
+        event_revenue[event_key] = event_revenue.get(event_key, 0) + sales
+    
+    # Kapwa Gardens events
+    for row in kapwa_data:
+        event_name = row.get('event_name', 'Kapwa Gardens')
+        event_date = row.get('event_date', '')
+        sales = safe_float_conversion(row.get('total_sales', 0))
+        
+        event_key = f"{event_name} ({event_date})" if event_date else event_name
+        event_revenue[event_key] = event_revenue.get(event_key, 0) + sales
+    
+    # Format for response
+    breakdown = []
+    for event_name, revenue in event_revenue.items():
+        if revenue > 0:
+            breakdown.append({
+                "event_name": event_name,
+                "revenue": round(revenue, 2)
+            })
+    
+    breakdown.sort(key=lambda x: x["revenue"], reverse=True)
+    
+    return {
+        "data": breakdown,
+        "total_revenue": round(sum(item["revenue"] for item in breakdown), 2)
+    }
+
+def calculate_event_timeline(undiscovered_data, kapwa_data):
+    """Calculate chronological event timeline"""
+    events = {}
+    
+    # Process both datasets
+    for dataset, source in [(undiscovered_data, "UNDISCOVERED"), (kapwa_data, "Kapwa Gardens")]:
+        for row in dataset:
+            event_date = row.get('event_date', '')
+            event_name = row.get('event_name', source)
+            sales = safe_float_conversion(row.get('total_sales', 0))
+            
+            if event_date:
+                key = f"{event_date}:{event_name}"
+                if key not in events:
+                    events[key] = {
+                        "date": event_date,
+                        "event_name": event_name,
+                        "total_revenue": 0,
+                        "vendor_count": 0
+                    }
+                events[key]["total_revenue"] += sales
+                if sales > 0:
+                    events[key]["vendor_count"] += 1
+    
+    # Convert to list and sort by date
+    timeline = list(events.values())
+    timeline.sort(key=lambda x: x["date"])
+    
+    # Round revenue
+    for event in timeline:
+        event["total_revenue"] = round(event["total_revenue"], 2)
+    
+    return {
+        "data": timeline
+    }
 
 @app.route('/api/dashboard/cumulative-sales', methods=['GET'])
 def dashboard_cumulative_sales():
