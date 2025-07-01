@@ -76,6 +76,22 @@ curl -X POST http://localhost:8081/api/query -H "Content-Type: application/json"
 curl -X POST http://localhost:8081/api/query -H "Content-Type: application/json" -d '{"query": "Which of our Balay Kreative grant applicants identify as Filipino?"}'
 ```
 
+## DATA AVAILABILITY QUERIES
+
+```bash
+# Check what years of sales data you have
+curl -X POST http://localhost:8081/api/query -H "Content-Type: application/json" -d '{"query": "What years of sales data do we have?"}'
+
+# List all available events and dates
+curl -X POST http://localhost:8081/api/query -H "Content-Type: application/json" -d '{"query": "Show me all events and their dates from our sales data"}'
+
+# Check specific year availability
+curl -X POST http://localhost:8081/api/query -H "Content-Type: application/json" -d '{"query": "Do we have sales data from 2023?"}'
+
+# Check date range coverage
+curl -X POST http://localhost:8081/api/query -H "Content-Type: application/json" -d '{"query": "What is the date range of our sales data?"}'
+```
+
 ## SIMPLE TEST QUERIES
 
 ```bash
