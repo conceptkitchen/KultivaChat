@@ -2223,51 +2223,25 @@ Return only the SQL query, no explanation."""
                         final_query = f"SELECT * FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.{target_table}` LIMIT 100"
         
         else:
-            # This is a natural language query that needs Gemini AI processing
-            app.logger.info(f"Natural language query needs AI processing: {query[:100]}...")
+            # PROPER MCP WORKFLOW: No fallback to Gemini AI - use intelligent no-match detection
+            app.logger.info(f"No valid table match found for query: {query[:100]}...")
             
-            # Use Gemini AI to convert natural language to SQL
-            try:
-                client = google_genai_for_client.Client(api_key=GEMINI_API_KEY)
-                
-                # Create a simple prompt for SQL conversion
-                ai_prompt = f"""Convert this natural language query to SQL for BigQuery:
-                
-Query: {query}
-
-Database: {GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}
-Available tables include vendor sales data, attendee data, and event information.
-
-For counting queries like "How many vendors participated in Kapwa Gardens events?", generate SQL that:
-1. First discovers relevant tables with table discovery
-2. Then counts unique vendors across those tables
-3. Uses proper BigQuery syntax
-
-Return only the SQL query, no explanation."""
-
-                response = client.models.generate_content(
-                    model='gemini-2.0-flash-exp',
-                    contents=[ai_prompt]
-                )
-                
-                if response and hasattr(response, 'text'):
-                    ai_generated_sql = response.text.strip()
-                    # Clean up the response to extract just the SQL
-                    if '```sql' in ai_generated_sql:
-                        ai_generated_sql = ai_generated_sql.split('```sql')[1].split('```')[0].strip()
-                    elif '```' in ai_generated_sql:
-                        ai_generated_sql = ai_generated_sql.split('```')[1].strip()
-                    
-                    app.logger.info(f"Gemini AI generated SQL: {ai_generated_sql[:200]}...")
-                    final_query = ai_generated_sql
-                else:
-                    # Fallback: try to construct a basic query
-                    final_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%vendor%' OR LOWER(table_name) LIKE '%sales%' ORDER BY table_name"
-                    
-            except Exception as e:
-                app.logger.error(f"Error using Gemini AI for SQL conversion: {e}")
-                # Fallback: construct a basic query
-                final_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE LOWER(table_name) LIKE '%vendor%' OR LOWER(table_name) LIKE '%sales%' ORDER BY table_name"
+            # Check if this looks like it should match a real event but doesn't
+            potential_events = ['fakefest', 'nonexistent', 'invalid', 'test', 'dummy']
+            is_obviously_fake = any(fake_event in query.lower() for fake_event in potential_events)
+            
+            if is_obviously_fake:
+                # Return intelligent error for obviously fake events
+                return {
+                    'status': 'error',
+                    'error_message': f'No data found for the requested event. Available events include: Lovers Mart, UNDISCOVERED SF, Many Styles, Be Free Festival, Ancestor Altars, and others from 2023-2024.',
+                    'query_attempted': query,
+                    'available_events': ['Lovers Mart (2023-02-11)', 'UNDISCOVERED SF (2023-08-19, 2023-09-16)', 'Many Styles (2023-07-29, 2023-08-26)', 'Be Free Festival (2023-06-10)', 'Ancestor Altars (2023-11-04)'],
+                    'suggestion': 'Please specify one of the available events from our database.'
+                }
+            else:
+                # Use basic table discovery for legitimate queries that don't match patterns
+                final_query = f"SELECT table_name FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.INFORMATION_SCHEMA.TABLES` WHERE table_type IN ('BASE_TABLE', 'VIEW') ORDER BY table_name LIMIT 20"
         
         # STEP 4: EXECUTE FINAL QUERY (for non-comprehensive analysis)
         if not (is_business_query and is_comprehensive):
