@@ -2430,8 +2430,10 @@ def smart_table_filter(query: str, available_tables: list) -> list:
         elif '2024' in query_lower and '2024' in table_lower:
             match_score += 5
         
-        # General table relevance (base score for all tables)
-        if any(term in table_lower for term in ['close-out-sales', 'vendor', 'sales']):
+        # General table relevance (base score for all tables) - ONLY if there's actually some content match
+        # Don't give base scores to unrelated queries
+        if (any(term in table_lower for term in ['close-out-sales', 'vendor', 'sales']) and 
+            (is_vendor_query or is_attendee_query or is_phone_query)):
             match_score += 1
             
         scored_tables.append((table, match_score))
