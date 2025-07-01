@@ -1017,7 +1017,7 @@ def internal_execute_sql_query(query: str) -> dict:
                 'UNDISCOVERED' as event_series,
                 COUNT(*) as attendee_count
             FROM `{GOOGLE_PROJECT_ID}.{KBC_WORKSPACE_ID}.Undiscovered---Attendees-Export---Squarespace---All-data-orders--2-`
-            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Order_Date)) = {target_year}
+            WHERE EXTRACT(YEAR FROM PARSE_DATETIME('%m/%d/%Y %H:%M:%S', Event_Date)) = {target_year}
             """
             
             try:
